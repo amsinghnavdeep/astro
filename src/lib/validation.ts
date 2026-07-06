@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const birthDetailsSchema = z.object({
   fullName: z.string().min(1).max(120),
+  gender: z.enum(['Male', 'Female', 'Other']),
   dateOfBirth: z.string().min(1).max(40),
   timeOfBirth: z.string().min(1).max(20),
   placeOfBirth: z.string().min(1).max(160),
