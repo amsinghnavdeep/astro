@@ -63,14 +63,18 @@ function buildKundliPrompt(d: BirthDetails): string {
       : '';
   return [
     'Generate a full Vedic (Hindu) Janma Kundli birth-chart report for the following person.',
+    'These details are complete and confirmed — proceed automatically without waiting for a reply.',
     `Full name: ${d.fullName}`,
     `Date of birth: ${d.dateOfBirth}`,
     `Time of birth: ${d.timeOfBirth}`,
     `Place of birth: ${d.placeOfBirth}`,
+    `Customer email: ${d.email}`,
     questions,
     '',
     'Keep the confirmed birth details available in this session so future follow-up',
-    'questions can reuse or recompute the chart. Deliver the PDF and interactive HTML.',
+    'questions can reuse or recompute the chart. Produce the PDF and interactive HTML,',
+    'then email the finished report to the Customer email above using the RESEND_API_KEY',
+    'secret (per the playbook), and also attach both files to this session.',
   ].join('\n');
 }
 

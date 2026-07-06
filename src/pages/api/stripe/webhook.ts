@@ -51,13 +51,9 @@ export const POST: APIRoute = async ({ request }) => {
       });
       const reference = encodeReference(devinSession.session_id);
 
-      // We email the reference NOW. The chart itself is produced asynchronously.
-      //
-      // TODO: a Devin session takes minutes and can produce attachments (the PDF)
-      // asynchronously. For v1 we email the reference immediately; delivering the
-      // final PDF/answers requires either (a) polling the session from
-      // /api/status and emailing when complete, or (b) having the playbook itself
-      // send the final email once the report is ready.
+      // We email the reference NOW (Stripe needs a fast 200). The PDF itself is
+      // produced asynchronously and emailed by the `!kundli` playbook once ready
+      // (the customer email is passed into the session prompt), so no polling here.
       await sendEmail({
         to: m.email,
         subject: 'Your Kundli reference number',
