@@ -80,8 +80,11 @@ Devin cost; ACUs are billed per session run regardless of who triggers it.
 2. `POST /api/checkout/new` → Stripe Checkout ($2,100), details saved in metadata.
 3. On `checkout.session.completed`, the webhook runs the **`!kundli`** playbook →
    `session_id`.
-4. Playbook computes the chart (Swiss Ephemeris) and produces **PDF + interactive HTML**.
-5. Backend emails the **PDF** + the **encrypted reference number**.
+4. Backend immediately emails the **encrypted reference number** (their receipt for
+   buying follow-ups later).
+5. Playbook computes the chart (Swiss Ephemeris), produces **PDF + interactive HTML**,
+   and — minutes later, when done — **emails the finished PDF to the customer itself**
+   (using the `RESEND_API_KEY` Devin secret). This closes the async gap without polling.
 
 ### Flow B — Returning customer ($1,100 → 2 questions)
 1. UI collects **reference number + 2 questions** + email.
@@ -99,12 +102,20 @@ Devin cost; ACUs are billed per session run regardless of who triggers it.
 
 | Playbook | Macro | Purpose | Output |
 |---|---|---|---|
-| Generate a Vedic Astrology (Kundli) Birth Chart | `!kundli` | Full chart + report | PDF + interactive HTML |
+| Generate a Vedic Astrology (Kundli) Birth Chart | `!kundli` | Full chart + report, **emails the PDF** | PDF + interactive HTML |
 | Answer Follow-Up Questions on an Existing Chart | `!kundli_followup` | Resume session, answer 2 Qs | precise text answers |
 
 Both compute planetary positions with the **Swiss Ephemeris** (sidereal zodiac,
 Lahiri ayanamsa, whole-sign houses) — never guessed or hard-coded. The follow-up
 playbook reuses the original session's chart and produces no new report.
+
+> **Async PDF delivery (no polling):** the `!kundli` report takes minutes, but the
+> Stripe webhook must respond in seconds. So the backend sends the reference email
+> instantly, and the **`!kundli` playbook emails the finished PDF itself** once it
+> completes. For this the playbook session needs a **Devin secret named
+> `RESEND_API_KEY`** (Settings → Secrets, org scope) — this is separate from the
+> app's own `RESEND_API_KEY` env var. The customer's email is passed into the
+> session prompt by the backend.
 
 ---
 
