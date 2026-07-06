@@ -1,0 +1,103 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Your Janma Kundli, computed precisely">
+  <h1>Your Janma Kundli, computed precisely</h1>
+  <p class="lead">
+    A complete Vedic birth chart, prepared from your exact birth details and
+    delivered as a PDF for <strong>$2,100</strong>. No account needed — your
+    reading is private.
+  </p>
+
+  <form id="kundli-form">
+    <label for="fullName">Full name</label>
+    <input type="text" id="fullName" name="fullName" required autocomplete="name" />
+
+    <label for="dateOfBirth">Date of birth</label>
+    <input type="text" id="dateOfBirth" name="dateOfBirth" placeholder="30 Jan 2000" required />
+
+    <label for="timeOfBirth">Time of birth</label>
+    <input type="text" id="timeOfBirth" name="timeOfBirth" placeholder="11:30 AM" required />
+    <p class="helper">Please include AM/PM — it materially changes your chart.</p>
+
+    <label for="placeOfBirth">Place of birth</label>
+    <input type="text" id="placeOfBirth" name="placeOfBirth" placeholder="City, State, Country" required />
+
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" required autocomplete="email" />
+
+    <label for="q1">Optional questions (up to 3)</label>
+    <input type="text" id="q1" name="q1" placeholder="e.g. When is a favourable time to marry?" />
+    <input type="text" id="q2" name="q2" placeholder="Optional question" style="margin-top:0.5rem" />
+    <input type="text" id="q3" name="q3" placeholder="Optional question" style="margin-top:0.5rem" />
+
+    <button type="submit" id="submit-btn">Pay $2,100 &amp; Generate</button>
+    <div id="error" class="error" hidden></div>
+  </form>
+
+  <p>
+    Already have a reference number?
+    <a href="/returning">Ask follow-up questions →</a>
+  </p>
+</Base>
+
+<script>
+  const form = document.getElementById('kundli-form') as HTMLFormElement;
+  const btn = document.getElementById('submit-btn') as HTMLButtonElement;
+  const errorEl = document.getElementById('error') as HTMLDivElement;
+
+  function showError(message: string) {
+    errorEl.textContent = message;
+    errorEl.hidden = false;
+  }
+
+  function value(id: string): string {
+    const el = document.getElementById(id) as HTMLInputElement | null;
+    return (el?.value ?? '').trim();
+  }
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    errorEl.hidden = true;
+
+    const questions = ['q1', 'q2', 'q3']
+      .map((id) => value(id))
+      .filter((q) => q.length > 0);
+
+    const payload = {
+      fullName: value('fullName'),
+      dateOfBirth: value('dateOfBirth'),
+      timeOfBirth: value('timeOfBirth'),
+      placeOfBirth: value('placeOfBirth'),
+      email: value('email'),
+      questions,
+    };
+
+    btn.disabled = true;
+    const originalText = btn.textContent;
+    btn.textContent = 'Redirecting to secure checkout…';
+
+    try {
+      const res = await fetch('/api/checkout/new', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 200 && data && typeof data.url === 'string') {
+        window.location.href = data.url;
+        return;
+      }
+
+      showError((data && data.error) || 'Something went wrong. Please check your details and try again.');
+    } catch {
+      showError('Network error. Please try again.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  });
+</script>
