@@ -66,4 +66,10 @@ export const env = {
     },
     from: optional('EMAIL_FROM', 'Kundli <onboarding@resend.dev>'),
   },
+
+  admin: {
+    get apiToken() {
+      return required('ADMIN_API_TOKEN');
+    },
+  },
 } as const;

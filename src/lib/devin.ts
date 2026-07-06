@@ -115,3 +115,64 @@ export async function getSession(sessionId: string): Promise<DevinSession> {
     method: 'GET',
   });
 }
+
+export interface SessionListItem {
+  session_id: string;
+  url?: string;
+  title?: string;
+  status?: string;
+  playbook_id?: string | null;
+  created_at?: number; // unix seconds
+  updated_at?: number;
+  acus_consumed?: number;
+  is_archived?: boolean;
+}
+
+interface SessionsPage {
+  items: SessionListItem[];
+  end_cursor: string | null;
+  has_next_page: boolean;
+  total?: number;
+}
+
+/**
+ * List every session in the org, following pagination. The v3 list endpoint
+ * returns newest-first pages of up to `pageSize`; we walk `end_cursor` until
+ * `has_next_page` is false (bounded by `maxPages` for safety).
+ */
+export async function listAllSessions(
+  pageSize = 100,
+  maxPages = 50,
+): Promise<SessionListItem[]> {
+  const out: SessionListItem[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < maxPages; i++) {
+    const qs = new URLSearchParams({ limit: String(pageSize) });
+    if (cursor) qs.set('after', cursor);
+    const page = await devinFetch<SessionsPage>(`${sessionsBase()}?${qs}`, {
+      method: 'GET',
+    });
+    out.push(...(page.items ?? []));
+    if (!page.has_next_page || !page.end_cursor) break;
+    cursor = page.end_cursor;
+  }
+  return out;
+}
+
+export interface SessionAttachment {
+  attachment_id: string;
+  name: string;
+  url: string;
+  content_type?: string;
+  source?: string;
+}
+
+/** List a session's attachments (e.g. the generated PDF / HTML). */
+export async function getAttachments(
+  sessionId: string,
+): Promise<SessionAttachment[]> {
+  return devinFetch<SessionAttachment[]>(
+    `${sessionsBase()}/${devinId(sessionId)}/attachments`,
+    { method: 'GET' },
+  );
+}
