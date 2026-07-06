@@ -1,11 +1,26 @@
 /**
- * Minimal server-side client for the Devin REST API.
+ * Minimal server-side client for the Devin REST API (v3, org-scoped).
  *
  * Docs: https://docs.devin.ai/api-reference/overview
+ *
+ * We use the v3 organization endpoints because service-user API keys
+ * (prefix `cog_`) authenticate against v3, not the legacy v1 routes:
+ *   - create:  POST /v3/organizations/{org}/sessions
+ *   - message: POST /v3/organizations/{org}/sessions/{devin_id}/messages
+ *   - get:     GET  /v3/organizations/{org}/sessions/{devin_id}
  *
  * Only the backend ever holds DEVIN_API_KEY. The browser never talks to Devin.
  */
 import { env } from './env';
+
+/** v3 session/message endpoints expect the `devin-` prefixed id. */
+function devinId(sessionId: string): string {
+  return sessionId.startsWith('devin-') ? sessionId : `devin-${sessionId}`;
+}
+
+function sessionsBase(): string {
+  return `${env.devin.apiBase}/v3/organizations/${env.devin.orgId}/sessions`;
+}
 
 export interface BirthDetails {
   fullName: string;
@@ -24,8 +39,8 @@ export interface DevinSession {
   status?: string;
 }
 
-async function devinFetch<T>(path: string, init: RequestInit): Promise<T> {
-  const res = await fetch(`${env.devin.apiBase}${path}`, {
+async function devinFetch<T>(fullUrl: string, init: RequestInit): Promise<T> {
+  const res = await fetch(fullUrl, {
     ...init,
     headers: {
       Authorization: `Bearer ${env.devin.apiKey}`,
@@ -35,7 +50,7 @@ async function devinFetch<T>(path: string, init: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Devin API ${res.status} on ${path}: ${body}`);
+    throw new Error(`Devin API ${res.status} on ${fullUrl}: ${body}`);
   }
   return (await res.json()) as T;
 }
@@ -61,9 +76,12 @@ function buildKundliPrompt(d: BirthDetails): string {
 
 /** Create the first-time Kundli session. Returns the created session. */
 export async function createKundliSession(d: BirthDetails): Promise<DevinSession> {
-  const body: Record<string, unknown> = { prompt: buildKundliPrompt(d) };
+  const body: Record<string, unknown> = {
+    prompt: buildKundliPrompt(d),
+    title: `Kundli — ${d.fullName}`,
+  };
   if (env.devin.kundliPlaybook) body.playbook_id = env.devin.kundliPlaybook;
-  return devinFetch<DevinSession>('/sessions', {
+  return devinFetch<DevinSession>(sessionsBase(), {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -81,7 +99,7 @@ export async function askFollowup(
     'Answer ONLY these questions, precisely, with dasha/transit timing:',
     ...questions.map((q, i) => `${i + 1}. ${q}`),
   ].join('\n');
-  await devinFetch(`/session/${sessionId}/message`, {
+  await devinFetch(`${sessionsBase()}/${devinId(sessionId)}/messages`, {
     method: 'POST',
     body: JSON.stringify({ message: prompt }),
   });
@@ -89,5 +107,7 @@ export async function askFollowup(
 
 /** Fetch the current state of a session. */
 export async function getSession(sessionId: string): Promise<DevinSession> {
-  return devinFetch<DevinSession>(`/session/${sessionId}`, { method: 'GET' });
+  return devinFetch<DevinSession>(`${sessionsBase()}/${devinId(sessionId)}`, {
+    method: 'GET',
+  });
 }

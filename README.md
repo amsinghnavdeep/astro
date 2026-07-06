@@ -161,7 +161,8 @@ npm run dev               # http://localhost:4321
 |---|---|
 | `PRICE_KUNDLI_USD` / `PRICE_FOLLOWUP_USD` | prices in dollars (default 2100 / 1100) |
 | `PUBLIC_SITE_URL` | site URL for Stripe redirects |
-| `DEVIN_API_KEY` | Devin API key (server only) |
+| `DEVIN_API_KEY` | Devin **service-user** key (prefix `cog_`, server only) — v3 API |
+| `DEVIN_ORG_ID` | Devin org id (prefix `org-`), required by v3 org-scoped endpoints |
 | `DEVIN_KUNDLI_PLAYBOOK` / `DEVIN_FOLLOWUP_PLAYBOOK` | playbook ids |
 | `REFERENCE_SECRET` | base64 of 32 random bytes — reference encryption key |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe keys |
