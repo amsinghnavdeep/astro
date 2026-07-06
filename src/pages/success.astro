@@ -2,21 +2,35 @@
 import Base from '../layouts/Base.astro';
 ---
 
-<Base title="Payment received">
-  <h1>Payment received 🎉</h1>
-  <p id="status" class="lead">Confirming payment…</p>
-  <div id="reference-box" hidden>
-    <h2>Your reference number</h2>
-    <p class="helper">Keep this safe — it is encrypted and unique to your reading.</p>
-    <pre id="reference-value" style="white-space:pre-wrap;word-break:break-all;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.9rem;"></pre>
+<Base title="Payment received — your Kundli is on its way">
+  <div class="wrap">
+    <section class="block">
+      <div class="card narrow success-hero">
+        <div class="divider-om">🕉️</div>
+        <h1>Payment received 🎉</h1>
+        <p id="status" class="lead">Confirming your payment…</p>
+
+        <div id="pandit-box" hidden>
+          <div class="pandit-card">
+            <div class="pandit-avatar" aria-hidden="true">🧑‍🦳</div>
+            <div>
+              <p style="margin:0"><strong id="pandit-name">Our senior astrologer</strong> is now personally studying your Janma Kundli.</p>
+              <p class="helper" style="margin:0.3rem 0 0">You'll receive your complete report by email shortly — please keep an eye on your inbox.</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="helper">You can safely close this page — everything arrives by email.</p>
+        <p style="margin-top:1rem"><a href="/">← Back home</a></p>
+      </div>
+    </section>
   </div>
-  <p><a href="/">← Back home</a></p>
 </Base>
 
 <script>
   const statusEl = document.getElementById('status') as HTMLParagraphElement;
-  const refBox = document.getElementById('reference-box') as HTMLDivElement;
-  const refValue = document.getElementById('reference-value') as HTMLPreElement;
+  const panditBox = document.getElementById('pandit-box') as HTMLDivElement;
+  const panditName = document.getElementById('pandit-name') as HTMLElement;
 
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get('session_id');
@@ -24,11 +38,6 @@ import Base from '../layouts/Base.astro';
   const POLL_MS = 4000;
   const MAX_MS = 5 * 60 * 1000;
   const startedAt = Date.now();
-
-  function showReference(reference: string) {
-    refValue.textContent = reference;
-    refBox.hidden = false;
-  }
 
   async function poll() {
     if (!sessionId) {
@@ -46,24 +55,22 @@ import Base from '../layouts/Base.astro';
       const res = await fetch(`/api/status?session_id=${encodeURIComponent(sessionId)}`);
       const data = await res.json().catch(() => ({}));
 
-      if (data && typeof data.reference === 'string' && data.reference) {
-        showReference(data.reference);
-      }
-
       if (data && data.state === 'paid') {
         if (data.kind === 'followup') {
           statusEl.textContent =
-            "We're preparing your answers and will email them shortly.";
+            'Thank you! Your astrologer is preparing your answers and will email them to you shortly.';
         } else {
-          statusEl.textContent =
-            "Your report is being generated. We've emailed your reference number now; the full PDF arrives by email shortly.";
+          const pandit = (data.pandit && String(data.pandit)) || 'Our senior astrologer';
+          panditName.textContent = pandit;
+          panditBox.hidden = false;
+          statusEl.textContent = 'Thank you — your reading has begun. 🙏';
         }
         return;
       }
 
-      statusEl.textContent = 'Confirming payment…';
+      statusEl.textContent = 'Confirming your payment…';
     } catch {
-      statusEl.textContent = 'Confirming payment…';
+      statusEl.textContent = 'Confirming your payment…';
     }
 
     setTimeout(poll, POLL_MS);
