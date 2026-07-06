@@ -1,0 +1,73 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Payment received">
+  <h1>Payment received 🎉</h1>
+  <p id="status" class="lead">Confirming payment…</p>
+  <div id="reference-box" hidden>
+    <h2>Your reference number</h2>
+    <p class="helper">Keep this safe — it is encrypted and unique to your reading.</p>
+    <pre id="reference-value" style="white-space:pre-wrap;word-break:break-all;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:0.9rem;"></pre>
+  </div>
+  <p><a href="/">← Back home</a></p>
+</Base>
+
+<script>
+  const statusEl = document.getElementById('status') as HTMLParagraphElement;
+  const refBox = document.getElementById('reference-box') as HTMLDivElement;
+  const refValue = document.getElementById('reference-value') as HTMLPreElement;
+
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get('session_id');
+
+  const POLL_MS = 4000;
+  const MAX_MS = 5 * 60 * 1000;
+  const startedAt = Date.now();
+
+  function showReference(reference: string) {
+    refValue.textContent = reference;
+    refBox.hidden = false;
+  }
+
+  async function poll() {
+    if (!sessionId) {
+      statusEl.textContent = 'Missing session id. If you just paid, please check your email.';
+      return;
+    }
+
+    if (Date.now() - startedAt > MAX_MS) {
+      statusEl.textContent =
+        'Still processing. You can close this page — everything will arrive by email.';
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/status?session_id=${encodeURIComponent(sessionId)}`);
+      const data = await res.json().catch(() => ({}));
+
+      if (data && typeof data.reference === 'string' && data.reference) {
+        showReference(data.reference);
+      }
+
+      if (data && data.state === 'paid') {
+        if (data.kind === 'followup') {
+          statusEl.textContent =
+            "We're preparing your answers and will email them shortly.";
+        } else {
+          statusEl.textContent =
+            "Your report is being generated. We've emailed your reference number now; the full PDF arrives by email shortly.";
+        }
+        return;
+      }
+
+      statusEl.textContent = 'Confirming payment…';
+    } catch {
+      statusEl.textContent = 'Confirming payment…';
+    }
+
+    setTimeout(poll, POLL_MS);
+  }
+
+  poll();
+</script>
