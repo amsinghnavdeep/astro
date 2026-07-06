@@ -39,7 +39,10 @@ export const env = {
     get apiKey() {
       return required('DEVIN_API_KEY');
     },
-    apiBase: optional('DEVIN_API_BASE', 'https://api.devin.ai/v1'),
+    get orgId() {
+      return required('DEVIN_ORG_ID');
+    },
+    apiBase: optional('DEVIN_API_BASE', 'https://api.devin.ai'),
     kundliPlaybook: optional('DEVIN_KUNDLI_PLAYBOOK'),
     followupPlaybook: optional('DEVIN_FOLLOWUP_PLAYBOOK'),
   },
