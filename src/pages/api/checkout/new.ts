@@ -9,7 +9,8 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { stripe } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
-import { getPricing } from '../../../lib/pricing';
+import { detectCountry } from '../../../lib/geo';
+import { getCurrencyPricing } from '../../../lib/pricing';
 import { birthDetailsSchema } from '../../../lib/validation';
 import { randomPandit } from '../../../lib/pandits';
 
@@ -27,7 +28,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
   const d = parsed.data;
   const pandit = randomPandit();
-  const pricing = await getPricing(locals.runtime.env.SIDDH_KV);
+  const country = detectCountry(request, locals.runtime);
+  const { currency, pricing } = await getCurrencyPricing(locals.runtime.env.SIDDH_KV, country);
 
   const session = await stripe().checkout.sessions.create({
     mode: 'payment',
@@ -36,7 +38,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       {
         quantity: 1,
         price_data: {
-          currency: pricing.currency,
+          currency,
           unit_amount: pricing.kundliCents,
           product_data: {
             name: 'Siddh Jyotish — Full Vedic Birth Chart Report (includes 3 questions)',

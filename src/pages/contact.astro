@@ -1,5 +1,14 @@
 ---
 import Base from '../layouts/Base.astro';
+import { detectCountry } from '../lib/geo';
+import { getCurrencyPricing } from '../lib/pricing';
+import { formatMoney } from '../lib/money';
+
+export const prerender = false;
+
+const country = detectCountry(Astro.request, Astro.locals.runtime);
+const { currency, pricing } = await getCurrencyPricing(Astro.locals.runtime?.env?.SIDDH_KV, country);
+const kundliNow = formatMoney(pricing.kundliCents, currency);
 ---
 
 <Base title="Contact — Siddh Jyotish">
@@ -57,7 +66,7 @@ import Base from '../layouts/Base.astro';
       <div class="contact-ctas">
         <h3>Ready to begin?</h3>
         <div class="contact-cta-actions">
-          <a class="btn" href="/#order">Create my Kundli &amp; ask 3 questions — $31</a>
+          <a class="btn" href="/#order">Create my Kundli &amp; ask 3 questions — {kundliNow}</a>
           <a class="btn btn-outline" href="/returning">Ask additional questions</a>
         </div>
       </div>

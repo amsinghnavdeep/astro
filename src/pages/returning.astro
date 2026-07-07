@@ -1,5 +1,27 @@
 ---
 import Base from '../layouts/Base.astro';
+import { detectCountry } from '../lib/geo';
+import { getCurrencyPricing } from '../lib/pricing';
+import { formatMoney } from '../lib/money';
+
+export const prerender = false;
+
+const country = detectCountry(Astro.request, Astro.locals.runtime);
+const { currency, pricing } = await getCurrencyPricing(Astro.locals.runtime?.env?.SIDDH_KV, country);
+const tiers = {
+  1: {
+    now: formatMoney(pricing.followupTierCents[1], currency),
+    was: formatMoney(pricing.followupTierWasCents[1], currency),
+  },
+  2: {
+    now: formatMoney(pricing.followupTierCents[2], currency),
+    was: formatMoney(pricing.followupTierWasCents[2], currency),
+  },
+  3: {
+    now: formatMoney(pricing.followupTierCents[3], currency),
+    was: formatMoney(pricing.followupTierWasCents[3], currency),
+  },
+};
 ---
 
 <Base title="Siddh Jyotish — Ask follow-up questions">
@@ -12,7 +34,7 @@ import Base from '../layouts/Base.astro';
           Already have your Kundli? Paste your reference number and ask up to
           three precise questions. Your assigned pandit reuses your existing
           chart — no new PDF, just precise answers. Pricing:
-          <strong>1 → $8 · 2 → $11 · 3 → $13</strong> (max 18 words each).
+          <strong>1 → {tiers[1].now} · 2 → {tiers[2].now} · 3 → {tiers[3].now}</strong> (max 18 words each).
         </p>
       </div>
 
@@ -42,11 +64,11 @@ import Base from '../layouts/Base.astro';
           <button type="button" id="add-question" class="btn btn-outline" style="margin-top:0.5rem">+ Add another question</button>
 
           <div class="price-tag" style="margin-top:1.25rem">
-            <s class="was" id="was-price">$13</s> <b id="now-price">$8</b>
+            <s class="was" id="was-price">{tiers[1].was}</s> <b id="now-price">{tiers[1].now}</b>
             <span id="price-note">· 1 question</span>
           </div>
 
-          <button type="submit" id="submit-btn" class="btn btn-block">Pay <span id="btn-price">$8</span> &amp; Get Answers</button>
+          <button type="submit" id="submit-btn" class="btn btn-block">Pay <span id="btn-price">{tiers[1].now}</span> &amp; Get Answers</button>
           <div id="error" class="error" hidden></div>
           <p class="helper center" style="margin-top:1rem">🔒 Secure Stripe checkout · Answers delivered by email</p>
         </form>
@@ -55,6 +77,8 @@ import Base from '../layouts/Base.astro';
       <p class="center" style="margin-top:1.5rem"><a href="/">← Back to a new Siddh Jyotish reading</a></p>
     </section>
   </div>
+
+  <script id="pricing-data" type="application/json" set:html={JSON.stringify(tiers)}></script>
 </Base>
 
 <style>
@@ -91,11 +115,14 @@ import Base from '../layouts/Base.astro';
 </style>
 
 <script>
-  const TIERS: Record<number, { now: string; was: string }> = {
-    1: { now: '$8', was: '$13' },
-    2: { now: '$11', was: '$18' },
-    3: { now: '$13', was: '$21' },
-  };
+  const TIERS: Record<number, { now: string; was: string }> = (() => {
+    const el = document.getElementById('pricing-data');
+    try {
+      return JSON.parse(el?.textContent || '{}');
+    } catch {
+      return {};
+    }
+  })();
   const MAX_QUESTIONS = 3;
 
   type QuestionField = {

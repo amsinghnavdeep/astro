@@ -9,7 +9,8 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { stripe } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
-import { getPricing } from '../../../lib/pricing';
+import { detectCountry } from '../../../lib/geo';
+import { getCurrencyPricing } from '../../../lib/pricing';
 import { followupSchema } from '../../../lib/validation';
 import { decodeReference } from '../../../lib/reference';
 
@@ -39,7 +40,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return json({ error: 'You may ask between 1 and 3 questions.' }, 400);
   }
 
-  const pricing = await getPricing(locals.runtime.env.SIDDH_KV);
+  const country = detectCountry(request, locals.runtime);
+  const { currency, pricing } = await getCurrencyPricing(locals.runtime.env.SIDDH_KV, country);
   const unitAmount = pricing.followupTierCents[count as 1 | 2 | 3];
 
   const session = await stripe().checkout.sessions.create({
@@ -49,7 +51,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       {
         quantity: 1,
         price_data: {
-          currency: pricing.currency,
+          currency,
           unit_amount: unitAmount,
           product_data: {
             name: `Siddh Jyotish Follow-up — ${count} precise question${count === 1 ? '' : 's'}`,
