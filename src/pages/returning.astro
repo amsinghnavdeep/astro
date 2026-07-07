@@ -4,7 +4,7 @@ import Base from '../layouts/Base.astro';
 
 <Base title="Siddh Jyotish — Ask follow-up questions">
   <div class="wrap">
-    <section class="block">
+    <section class="block returning-section">
       <div class="section-head">
         <span class="eyebrow">Returning seeker</span>
         <h2>Ask follow-up questions</h2>
@@ -26,9 +26,9 @@ import Base from '../layouts/Base.astro';
 
           <label>Your questions (max 18 words each)</label>
           <div id="questions">
-            <input type="text" class="question" placeholder="e.g. Is the coming year favourable for a career change?" required />
+            <input type="text" class="question" placeholder="e.g. When will my health improve?" required />
           </div>
-          <button type="button" id="add-question" class="btn btn-ghost" style="margin-top:0.5rem">+ Add another question</button>
+          <button type="button" id="add-question" class="btn btn-outline" style="margin-top:0.5rem">+ Add another question</button>
 
           <div class="price-tag" style="margin-top:1.25rem">
             <s class="was" id="was-price">$13</s> <b id="now-price">$8</b>
@@ -45,6 +45,21 @@ import Base from '../layouts/Base.astro';
     </section>
   </div>
 </Base>
+
+<style>
+  .returning-section {
+    background: url('/astro-bg.png') center/cover no-repeat;
+    border-radius: 24px;
+    padding-top: clamp(2.4rem, 5vw, 3.3rem);
+    padding-bottom: clamp(2.4rem, 5vw, 3.3rem);
+  }
+  .returning-section .section-head,
+  .returning-section .card,
+  .returning-section .center {
+    position: relative;
+    z-index: 1;
+  }
+</style>
 
 <script>
   const TIERS: Record<number, { now: string; was: string }> = {
