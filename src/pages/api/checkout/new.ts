@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request }) => {
           currency: 'usd',
           unit_amount: env.pricing.kundliCents,
           product_data: {
-            name: 'Janma Kundli — Full Vedic Birth Chart Report',
+            name: 'Siddh Jyotish — Full Vedic Birth Chart Report (includes 3 questions)',
             description: 'Detailed PDF + interactive chart, computed with Swiss Ephemeris.',
           },
         },

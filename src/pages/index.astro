@@ -19,7 +19,7 @@ import Base from '../layouts/Base.astro';
         astrologer into a detailed, personal report.
       </p>
       <div class="price-tag">
-        <b>$2,100</b><span>· one-time · delivered by email</span>
+        <s class="was">$51</s> <b>$31</b><span>· one-time · delivered by email</span>
       </div>
       <div class="hero-cta">
         <a class="btn" href="#order">Get my Kundli report</a>
@@ -113,12 +113,12 @@ import Base from '../layouts/Base.astro';
           <label for="email">Email</label>
           <input type="email" id="email" name="email" required autocomplete="email" />
 
-          <label for="q1">Optional questions (up to 3)</label>
+          <label for="q1">3 questions included with your report (max 18 words each)</label>
           <input type="text" id="q1" name="q1" placeholder="e.g. When is a favourable time to marry?" />
           <input type="text" id="q2" name="q2" placeholder="Optional question" style="margin-top:0.5rem" />
           <input type="text" id="q3" name="q3" placeholder="Optional question" style="margin-top:0.5rem" />
 
-          <button type="submit" id="submit-btn" class="btn btn-block">Pay $2,100 &amp; Generate my Kundli</button>
+          <button type="submit" id="submit-btn" class="btn btn-block"><s class="was-btn">$51</s> Pay $31 &amp; Generate my Kundli</button>
           <div id="error" class="error" hidden></div>
           <p class="helper center" style="margin-top:1rem">🔒 Secure Stripe checkout · 100% money-back guarantee</p>
         </form>
@@ -208,6 +208,12 @@ import Base from '../layouts/Base.astro';
     const questions = ['q1', 'q2', 'q3']
       .map((id) => value(id))
       .filter((q) => q.length > 0);
+
+    const tooLong = questions.find((q) => q.split(/\s+/).length > 18);
+    if (tooLong) {
+      showError('Each question must be 18 words or fewer.');
+      return;
+    }
 
     const payload = {
       fullName: value('fullName'),
