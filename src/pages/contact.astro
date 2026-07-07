@@ -1,0 +1,142 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Contact — Siddh Jyotish">
+  <div class="wrap">
+    <section class="block">
+      <div class="section-head">
+        <h2>Contact Siddh Jyotish</h2>
+        <p>We're here to help — whether you have a question about your reading, need support, or just want to say hello.</p>
+      </div>
+
+      <div class="contact-grid">
+        <div class="contact-card">
+          <h3>Get in touch</h3>
+          <p>
+            For questions about your order, delivery timelines, refund requests,
+            or anything else — email us directly:
+          </p>
+          <a class="contact-email" href="mailto:hello@siddhjyotish.com">
+            hello@siddhjyotish.com
+          </a>
+          <p class="contact-response">We respond within 24 hours, usually sooner.</p>
+        </div>
+
+        <div class="contact-card contact-lineage">
+          <h3>Who we are</h3>
+          <p>
+            Siddh Jyotish carries forward a centuries-old living tradition. Our
+            astrologers are <strong>Siddh Yogis</strong> descended from a
+            <strong>Kashmiri Pandit</strong> lineage and a
+            <strong>Kerala Namboodiri Brahmin</strong> lineage of Jyotish
+            scholars — families who have practised and refined Vedic astrology
+            for generations.
+          </p>
+          <p>
+            Every chart is computed using the <strong>Swiss Ephemeris</strong>
+            (accurate to the arc-second) and personally interpreted by an
+            experienced pandit. We are an honest guide, not a fear-based upsell
+            machine.
+          </p>
+        </div>
+      </div>
+
+      <div class="guarantee-box">
+        <div class="ico">🛡️</div>
+        <div>
+          <h3>100% Money-Back Guarantee</h3>
+          <p>
+            Not satisfied with your Kundli report? No problem — email us and
+            we will refund you in full. We stand behind the quality of every
+            reading. No questions asked.
+          </p>
+        </div>
+      </div>
+
+      <div class="contact-ctas">
+        <h3>Ready to begin?</h3>
+        <div class="contact-cta-actions">
+          <a class="btn" href="/#order">Create my Kundli &amp; ask questions — $31</a>
+          <a class="btn btn-outline" href="/returning">I already have a Kundli — ask more questions</a>
+        </div>
+      </div>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .contact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    max-width: 800px;
+    margin: 0 auto 2rem;
+  }
+  @media (max-width: 680px) { .contact-grid { grid-template-columns: 1fr; } }
+
+  .contact-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+  }
+  .contact-card h3 {
+    margin-top: 0;
+  }
+  .contact-email {
+    display: inline-block;
+    font-family: var(--serif);
+    font-size: 1.2rem;
+    color: var(--maroon);
+    font-weight: 600;
+    margin: 0.5rem 0;
+  }
+  .contact-response {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+  }
+  .contact-lineage {
+    border-top: 3px solid var(--gold);
+  }
+
+  .guarantee-box {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    max-width: 800px;
+    margin: 0 auto 2.5rem;
+    background: linear-gradient(135deg, #fff7e6, #fef5dd);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1.5rem;
+  }
+  .guarantee-box .ico { font-size: 2rem; flex-shrink: 0; }
+  .guarantee-box h3 { margin-top: 0; }
+  .guarantee-box p { color: var(--muted); margin-bottom: 0; }
+
+  .contact-ctas {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  .contact-cta-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.8rem;
+    margin-top: 1rem;
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--maroon);
+    border: 2px solid var(--maroon);
+    box-shadow: none;
+  }
+  .btn-outline:hover {
+    background: var(--maroon);
+    color: #fff;
+    text-decoration: none;
+  }
+</style>

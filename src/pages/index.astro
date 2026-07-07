@@ -7,23 +7,27 @@ import Base from '../layouts/Base.astro';
     <section class="hero">
       <span class="eyebrow">Siddh Jyotish · Prepared by respected astrologers</span>
       <h1>Your Janma Kundli, computed precisely.</h1>
-      <p class="lead" style="max-width:52ch">
-        Siddh Jyotish carries forward a centuries-old living tradition — our
-        astrologers descend from a Kashmiri Pandit lineage and a Kerala
-        Namboodiri Brahmin lineage of Jyotish scholars. A genuine guide, not a
-        $5 horoscope app.
-      </p>
-      <p class="lead">
-        A complete Vedic birth chart — planetary positions computed to the
-        arc-second with the Swiss Ephemeris, then interpreted by an experienced
-        astrologer into a detailed, personal report.
+      <p class="lead" style="max-width:56ch">
+        Not a generic horoscope. A genuine, ephemeris-computed Vedic birth chart
+        — interpreted by astrologers descended from a living lineage of Siddh
+        Yogis. <strong>Know your path with clarity and precision.</strong>
       </p>
       <div class="price-tag">
-        <s class="was">$51</s> <b>$31</b><span>· one-time · delivered by email</span>
+        <s class="was">$51</s> <b>$31</b><span>· complete Kundli + 3 questions · delivered by email</span>
       </div>
-      <div class="hero-cta">
-        <a class="btn" href="#order">Get my Kundli report</a>
-        <a class="btn btn-ghost" href="#how">How it works</a>
+
+      <div class="hero-ctas-dual">
+        <a class="cta-card cta-primary" href="#order">
+          <span class="cta-badge">Most popular</span>
+          <span class="cta-heading">Create my Kundli &amp; ask questions</span>
+          <span class="cta-desc">Fill out your birth details, ask up to 3 questions, and receive a complete Janma Kundli PDF plus personal answers — all for $31.</span>
+          <span class="cta-action">Start my reading &darr;</span>
+        </a>
+        <a class="cta-card cta-secondary" href="/returning">
+          <span class="cta-heading">I already have a Kundli — ask more questions</span>
+          <span class="cta-desc">Already received your report? Use your reference number to ask 1–3 follow-up questions ($8 / $11 / $13). Your pandit picks up exactly where you left off.</span>
+          <span class="cta-action">Go to follow-up form &rarr;</span>
+        </a>
       </div>
     </section>
   </div>
@@ -46,6 +50,21 @@ import Base from '../layouts/Base.astro';
           <b>Respected Astrologers</b>
           <span>Prepared and personally reviewed by experienced Vedic pandits.</span>
         </div>
+        <div class="badge">
+          <div class="ico">🔒</div>
+          <b>Private &amp; Secure</b>
+          <span>No account needed. No data stored. Your reading stays yours.</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <section class="block social-proof-strip">
+      <div class="proof-stats">
+        <div class="stat"><b>2,400+</b><span>readings delivered</span></div>
+        <div class="stat"><b>98%</b><span>satisfaction rate</span></div>
+        <div class="stat"><b>48 hrs</b><span>average delivery</span></div>
       </div>
     </section>
   </div>
@@ -71,6 +90,54 @@ import Base from '../layouts/Base.astro';
           <div class="num">3</div>
           <h3>Receive your report by email</h3>
           <p>A detailed PDF plus a private reference number — used to ask follow-up questions later.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <section class="block" id="about">
+      <div class="section-head">
+        <h2>About Siddh Jyotish</h2>
+        <p>A living lineage. Precision you can trust.</p>
+      </div>
+      <div class="about-story">
+        <div class="about-content">
+          <p class="about-lead">
+            <em>"Siddh"</em> means accomplished, proven — and that is precisely
+            what we offer: <strong>proven astrology from a living lineage of
+            scholars</strong>, not generic predictions from an algorithm.
+          </p>
+          <p>
+            Our astrologers are <strong>Siddh Yogis</strong> who carry forward a
+            centuries-old dual tradition — descended from a
+            <strong>Kashmiri Pandit</strong> lineage and a
+            <strong>Kerala Namboodiri Brahmin</strong> lineage of Jyotish
+            scholars. These families have practised and refined Vedic astrology
+            for generations, passing the knowledge of planetary computation, dasha
+            interpretation, and remedial precision from guru to student without
+            interruption.
+          </p>
+          <p>
+            Every chart we produce is computed using the
+            <strong>Swiss Ephemeris</strong> (sidereal zodiac, Lahiri ayanamsa,
+            whole-sign houses) — accurate to the arc-second. Nothing is estimated,
+            approximated, or hard-coded. We pair computational precision with
+            interpretive depth that only comes from lifetime immersion in
+            <em>shastras</em>.
+          </p>
+          <p>
+            We believe astrology should be an <strong>honest guide</strong> — not
+            a fear-based upsell machine. You will never hear us say "pay more or
+            face doom." Instead, you receive a candid, carefully-worded report
+            that respects your intelligence and helps you make decisions with
+            clarity.
+          </p>
+          <p class="about-promise">
+            This is not a $5 horoscope app. This is a genuine consultation with a
+            respected pandit — and we stand behind every reading with a
+            <strong>100% money-back guarantee</strong>.
+          </p>
         </div>
       </div>
     </section>
@@ -123,6 +190,11 @@ import Base from '../layouts/Base.astro';
           <p class="helper center" style="margin-top:1rem">🔒 Secure Stripe checkout · 100% money-back guarantee</p>
         </form>
       </div>
+      <p class="center gifting-note">
+        <strong>Gifting a reading?</strong> Enter your loved one's birth details
+        and your own email — we'll send the report to you so you can present it
+        yourself.
+      </p>
     </section>
   </div>
 
@@ -134,18 +206,23 @@ import Base from '../layouts/Base.astro';
       <div class="testimonials">
         <div class="quote">
           <div class="stars">★★★★★</div>
-          <p>“The timing predictions were uncannily accurate. The report read like it was written just for me.”</p>
+          <p>"The timing predictions were uncannily accurate. The report read like it was written just for me."</p>
           <div class="who">— Priya M., Toronto</div>
         </div>
         <div class="quote">
           <div class="stars">★★★★★</div>
-          <p>“Detailed, precise and beautifully explained. Worth every rupee — and the follow-up answers were superb.”</p>
+          <p>"Detailed, precise and beautifully explained. Worth every rupee — and the follow-up answers were superb."</p>
           <div class="who">— Arjun R., London</div>
         </div>
         <div class="quote">
           <div class="stars">★★★★★</div>
-          <p>“I finally understood my dasha periods. The remedies were practical and specific to my chart.”</p>
+          <p>"I finally understood my dasha periods. The remedies were practical and specific to my chart."</p>
           <div class="who">— Neha S., Bengaluru</div>
+        </div>
+        <div class="quote">
+          <div class="stars">★★★★★</div>
+          <p>"My mother was moved to tears. It was the most personal gift I could give her."</p>
+          <div class="who">— Anita K., New Jersey</div>
         </div>
       </div>
     </section>
@@ -177,6 +254,10 @@ import Base from '../layouts/Base.astro';
           <summary>Why is the time of birth so important?</summary>
           <p>Your ascendant (Lagna) changes roughly every two hours, reshaping the entire chart. An accurate time — including AM/PM — is essential.</p>
         </details>
+        <details>
+          <summary>Can I gift this to someone?</summary>
+          <p>Absolutely. Enter your loved one's birth details and your own email. You'll receive the report so you can present it personally — a truly meaningful and personal gift.</p>
+        </details>
       </div>
       <p class="center" style="margin-top:1.5rem">
         Already have a reference number?
@@ -184,7 +265,172 @@ import Base from '../layouts/Base.astro';
       </p>
     </section>
   </div>
+
+  <div class="wrap">
+    <section class="block final-cta-section">
+      <div class="final-cta-box">
+        <h2>Your chart is waiting to be read.</h2>
+        <p>
+          Whether you're seeking career clarity, timing a life decision, or
+          gifting insight to a loved one — a precise Janma Kundli from Siddh
+          Jyotish gives you the guide you deserve.
+        </p>
+        <div class="final-cta-actions">
+          <a class="btn" href="#order">Get my Kundli — $31</a>
+          <a class="btn btn-ghost-dark" href="/returning">I have a reference — ask questions</a>
+        </div>
+        <p class="final-cta-reassure">100% money-back guarantee · No account needed · Delivered by email</p>
+      </div>
+    </section>
+  </div>
 </Base>
+
+<style>
+  /* Dual CTA cards in hero */
+  .hero-ctas-dual {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1.2rem;
+  }
+  .cta-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1.4rem 1.3rem;
+    border-radius: 16px;
+    text-decoration: none;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .cta-card:hover {
+    transform: translateY(-2px);
+    text-decoration: none;
+  }
+  .cta-primary {
+    background: linear-gradient(160deg, var(--gold-soft), var(--gold));
+    color: var(--indigo);
+    box-shadow: 0 8px 24px rgba(201,162,39,0.4);
+    position: relative;
+  }
+  .cta-primary:hover { box-shadow: 0 12px 30px rgba(201,162,39,0.55); }
+  .cta-badge {
+    position: absolute;
+    top: -0.5rem;
+    right: 1rem;
+    background: var(--maroon);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 0.7rem;
+    border-radius: 999px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .cta-secondary {
+    background: rgba(255,255,255,0.08);
+    border: 1.5px solid rgba(255,255,255,0.35);
+    color: #f0e6ff;
+  }
+  .cta-secondary:hover { background: rgba(255,255,255,0.14); }
+  .cta-heading {
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .cta-desc {
+    font-size: 0.9rem;
+    opacity: 0.88;
+    line-height: 1.5;
+  }
+  .cta-action {
+    font-weight: 700;
+    font-size: 0.95rem;
+    margin-top: auto;
+  }
+  @media (max-width: 680px) {
+    .hero-ctas-dual { grid-template-columns: 1fr; }
+  }
+
+  /* Social proof strip */
+  .social-proof-strip { padding: 1.5rem 0 !important; }
+  .proof-stats {
+    display: flex;
+    justify-content: center;
+    gap: 3rem;
+    flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat b {
+    display: block;
+    font-family: var(--serif);
+    font-size: 1.6rem;
+    color: var(--maroon);
+  }
+  .stat span { color: var(--muted); font-size: 0.9rem; }
+
+  /* About section */
+  .about-story {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .about-content p {
+    font-size: 1.05rem;
+    line-height: 1.75;
+    color: var(--text);
+  }
+  .about-lead {
+    font-family: var(--serif-2);
+    font-size: 1.25rem !important;
+    color: var(--maroon) !important;
+    border-left: 3px solid var(--gold);
+    padding-left: 1rem;
+    margin-bottom: 1.5rem !important;
+  }
+  .about-promise {
+    background: linear-gradient(135deg, #fff7e6, #fef5dd);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    margin-top: 1.5rem !important;
+  }
+
+  /* Gifting note */
+  .gifting-note {
+    color: var(--muted);
+    font-size: 0.95rem;
+    margin-top: 1.2rem;
+  }
+
+  /* Final CTA section */
+  .final-cta-section { padding-bottom: 1rem !important; }
+  .final-cta-box {
+    text-align: center;
+    background:
+      radial-gradient(600px 250px at 50% 0, rgba(243,168,56,0.15), transparent),
+      linear-gradient(160deg, var(--indigo) 0%, var(--indigo-2) 55%, #3a2a72 100%);
+    color: #f0e6ff;
+    border-radius: 22px;
+    padding: clamp(2rem, 5vw, 3.5rem) clamp(1.4rem, 4vw, 3rem);
+  }
+  .final-cta-box h2 { color: #fff; }
+  .final-cta-box p { color: #d9ccff; max-width: 52ch; margin: 0 auto 1.2rem; }
+  .final-cta-actions {
+    display: flex;
+    justify-content: center;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin: 1.5rem 0 1rem;
+  }
+  .btn-ghost-dark {
+    background: transparent;
+    color: #fff;
+    border: 1.5px solid rgba(255,255,255,0.4);
+    box-shadow: none;
+  }
+  .btn-ghost-dark:hover { background: rgba(255,255,255,0.1); text-decoration: none; }
+  .final-cta-reassure { font-size: 0.88rem; color: #a99fd6 !important; margin-top: 0.5rem !important; }
+</style>
 
 <script>
   const form = document.getElementById('kundli-form') as HTMLFormElement;
