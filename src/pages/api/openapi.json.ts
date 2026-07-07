@@ -303,11 +303,49 @@ const spec = {
       },
       PricingConfig: {
         type: 'object',
-        required: ['currency', 'kundliCents', 'followupTierCents'],
+        required: ['defaultCurrency', 'currencies'],
         properties: {
-          currency: { type: 'string', minLength: 3, maxLength: 3 },
+          defaultCurrency: { type: 'string', minLength: 3, maxLength: 3, examples: ['usd'] },
+          currencies: {
+            type: 'object',
+            additionalProperties: { $ref: '#/components/schemas/CurrencyPricing' },
+          },
+        },
+        example: {
+          defaultCurrency: 'usd',
+          currencies: {
+            usd: {
+              kundliCents: 3100,
+              kundliWasCents: 5100,
+              followupTierCents: { '1': 800, '2': 1100, '3': 1300 },
+              followupTierWasCents: { '1': 1300, '2': 1800, '3': 2100 },
+            },
+            inr: {
+              kundliCents: 250000,
+              kundliWasCents: 410000,
+              followupTierCents: { '1': 60000, '2': 85000, '3': 110000 },
+              followupTierWasCents: { '1': 110000, '2': 150000, '3': 180000 },
+            },
+          },
+        },
+      },
+      CurrencyPricing: {
+        type: 'object',
+        required: ['kundliCents', 'kundliWasCents', 'followupTierCents', 'followupTierWasCents'],
+        properties: {
           kundliCents: { type: 'integer', minimum: 1 },
+          kundliWasCents: { type: 'integer', minimum: 1 },
           followupTierCents: {
+            type: 'object',
+            required: ['1', '2', '3'],
+            properties: {
+              '1': { type: 'integer', minimum: 1 },
+              '2': { type: 'integer', minimum: 1 },
+              '3': { type: 'integer', minimum: 1 },
+            },
+            additionalProperties: false,
+          },
+          followupTierWasCents: {
             type: 'object',
             required: ['1', '2', '3'],
             properties: {

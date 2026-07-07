@@ -1,5 +1,18 @@
 ---
 import Base from '../layouts/Base.astro';
+import { detectCountry } from '../lib/geo';
+import { getCurrencyPricing } from '../lib/pricing';
+import { formatMoney } from '../lib/money';
+
+export const prerender = false;
+
+const country = detectCountry(Astro.request, Astro.locals.runtime);
+const { currency, pricing } = await getCurrencyPricing(Astro.locals.runtime?.env?.SIDDH_KV, country);
+const kundliNow = formatMoney(pricing.kundliCents, currency);
+const kundliWas = formatMoney(pricing.kundliWasCents, currency);
+const f1 = formatMoney(pricing.followupTierCents[1], currency);
+const f2 = formatMoney(pricing.followupTierCents[2], currency);
+const f3 = formatMoney(pricing.followupTierCents[3], currency);
 ---
 
 <Base title="Siddh Jyotish — Your Vedic Birth Chart, Created with Precision">
@@ -13,7 +26,7 @@ import Base from '../layouts/Base.astro';
             Not a generic horoscope. A genuine Vedic birth chart, cast from your exact birth details and interpreted by hand. <strong>Know your path with clarity and precision.</strong>
           </p>
           <div class="price-tag">
-            <s class="was">$51</s> <b>$31</b><span>· complete Kundli + 3 questions · delivered by email</span>
+            <s class="was">{kundliWas}</s> <b>{kundliNow}</b><span>· complete Kundli + 3 questions · delivered by email</span>
           </div>
 
           <div class="hero-ctas-dual">
@@ -21,13 +34,13 @@ import Base from '../layouts/Base.astro';
               <span class="cta-badge">Most popular</span>
               <span class="cta-kicker">New to Siddh Jyotish?</span>
               <span class="cta-heading">Create my Kundli &amp; ask 3 questions</span>
-              <span class="cta-desc">Fill in your birth details, ask up to 3 questions, and get a complete Janma Kundli PDF plus personal answers — $31.</span>
+              <span class="cta-desc">Fill in your birth details, ask up to 3 questions, and get a complete Janma Kundli PDF plus personal answers — {kundliNow}.</span>
               <span class="cta-action cta-action-primary">Start my reading &darr;</span>
             </a>
             <a class="cta-card cta-secondary" href="/returning">
               <span class="cta-kicker">Already ordered before?</span>
               <span class="cta-heading">Ask additional questions</span>
-              <span class="cta-desc">You'll have a reference number in the email from your last order — paste it in to ask 1–3 follow-up questions ($8 / $11 / $13). Your pandit picks up exactly where you left off.</span>
+              <span class="cta-desc">You'll have a reference number in the email from your last order — paste it in to ask 1–3 follow-up questions ({f1} / {f2} / {f3}). Your pandit picks up exactly where you left off.</span>
               <span class="cta-action cta-action-secondary">Ask additional questions &rarr;</span>
             </a>
           </div>
@@ -224,7 +237,7 @@ import Base from '../layouts/Base.astro';
             <p class="field-error" id="q3-error" aria-live="polite"></p>
           </div>
 
-          <button type="submit" id="submit-btn" class="btn btn-block"><s class="was-btn">$51</s> Pay $31 &amp; Get Kundli Report and Answers</button>
+          <button type="submit" id="submit-btn" class="btn btn-block"><s class="was-btn">{kundliWas}</s> Pay {kundliNow} &amp; Get Kundli Report and Answers</button>
           <div id="error" class="error" hidden></div>
           <p class="helper center" style="margin-top:1rem">🔒 Secure Stripe checkout · 100% money-back guarantee</p>
         </form>
@@ -315,7 +328,7 @@ import Base from '../layouts/Base.astro';
           Jyotish gives you the guide you deserve.
         </p>
         <div class="final-cta-actions">
-          <a class="btn" href="#order">Get my Kundli — $31</a>
+          <a class="btn" href="#order">Get my Kundli — {kundliNow}</a>
           <a class="btn btn-ghost-dark" href="/returning">I have a reference — ask questions</a>
         </div>
         <p class="final-cta-reassure">100% money-back guarantee · No account needed · Delivered by email</p>
