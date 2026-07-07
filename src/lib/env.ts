@@ -71,6 +71,21 @@ export const env = {
     get apiKey() {
       return required('RESEND_API_KEY');
     },
-    from: optional('EMAIL_FROM', 'Siddh Jyotish <onboarding@resend.dev>'),
+    // NOTE: siddhjyotish.com must be a verified sending domain in Resend for
+    // this From address to deliver (Resend → Domains). Otherwise sends fail.
+    from: optional('EMAIL_FROM', 'Siddh Jyotish <namaste@siddhjyotish.com>'),
+  },
+
+  // Bearer token protecting the runtime pricing admin API
+  // (`PUT /api/admin/pricing`). Required in production.
+  get adminApiToken() {
+    return required('ADMIN_API_TOKEN');
+  },
+
+  // Serverless KV (Upstash Redis REST) for the runtime pricing config store.
+  // Optional: when unset, pricing falls back to the env-var defaults above.
+  kv: {
+    restUrl: optional('KV_REST_API_URL'),
+    restToken: optional('KV_REST_API_TOKEN'),
   },
 } as const;
