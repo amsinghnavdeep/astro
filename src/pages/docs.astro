@@ -1,0 +1,69 @@
+---
+export const prerender = false;
+import { basicAuthGuard } from '../lib/basicAuth';
+
+const auth = basicAuthGuard(Astro.request);
+if (auth) return auth;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Siddh Jyotish API Docs</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" />
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      html, body {
+        margin: 0;
+        background: #f9f1df;
+        color: #231b33;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .topbar {
+        background: #fff8eb;
+        border-bottom: 1px solid rgba(122, 30, 30, 0.12);
+        padding: 1rem 1.25rem;
+      }
+      .topbar h1 {
+        margin: 0;
+        font: 700 1.2rem/1.2 Georgia, serif;
+        color: #5d2b55;
+      }
+      .topbar p {
+        margin: 0.35rem 0 0;
+        color: #6e637f;
+        font-size: 0.95rem;
+      }
+      #swagger-ui {
+        padding: 0.5rem 0 2rem;
+      }
+      .swagger-ui .topbar { display: none; }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Siddh Jyotish API Docs</h1>
+      <p>Use the Authorize button for the bearer token on admin endpoints.</p>
+    </header>
+    <main id="swagger-ui"></main>
+    <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+    <script>
+      window.onload = () => {
+        window.ui = SwaggerUIBundle({
+          url: '/api/openapi.json',
+          dom_id: '#swagger-ui',
+          deepLinking: true,
+          displayRequestDuration: true,
+          docExpansion: 'list',
+          persistAuthorization: true,
+          presets: [SwaggerUIBundle.presets.apis],
+          layout: 'BaseLayout',
+        });
+      };
+    </script>
+  </body>
+</html>

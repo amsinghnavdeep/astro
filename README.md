@@ -196,6 +196,7 @@ npm run dev               # http://localhost:4321
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe keys |
 | `RESEND_API_KEY` / `EMAIL_FROM` | email delivery — `EMAIL_FROM` defaults to `Siddh Jyotish <namaste@siddhjyotish.com>` (see note) |
 | `ADMIN_API_TOKEN` | bearer token protecting the runtime pricing/admin APIs (`/api/admin/pricing`, `/api/admin/orders`) — **required** |
+| `DOCS_AUTH_USER` / `DOCS_AUTH_PASS` | HTTP Basic Auth for `/docs` and `/api/openapi.json` |
 | `SIDDH_KV` | Cloudflare KV namespace binding for runtime pricing + orders (`wrangler kv namespace create SIDDH_KV`, id wired in `wrangler.jsonc`) |
 
 > **`EMAIL_FROM` / Resend verified domain:** the default sender is
@@ -258,6 +259,13 @@ curl -X PUT https://your-site.com/api/admin/pricing \
 A wrong/missing token returns `401`; invalid input returns `400` with the zod
 issues. On success the new config takes effect on the next checkout (reads are
 cached in-memory for ~30s).
+
+### API docs (`/docs`)
+
+The Swagger UI docs are protected by HTTP Basic Auth and load the OpenAPI spec
+from `/api/openapi.json`. Set `DOCS_AUTH_USER` and `DOCS_AUTH_PASS` locally in
+`.env` / `.dev.vars`, then open `/docs` in a browser. The same credentials
+protect the raw spec endpoint.
 
 ### Admin orders API (`/api/admin/orders`)
 Orders live in the same `SIDDH_KV` namespace as pricing.
