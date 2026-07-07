@@ -23,3 +23,13 @@ export function stripe(): Stripe {
   }
   return client;
 }
+
+export function isUnsupportedCurrencyError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as { type?: unknown; param?: unknown; message?: unknown };
+  const isInvalidReq =
+    e.type === 'StripeInvalidRequestError' || err instanceof Stripe.errors.StripeInvalidRequestError;
+  const paramIsCurrency = e.param === 'currency';
+  const msg = typeof e.message === 'string' ? e.message : '';
+  return isInvalidReq && (paramIsCurrency || /currency/i.test(msg));
+}
