@@ -12,7 +12,7 @@ if (auth) return auth;
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Siddh Jyotish API Docs</title>
-    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" />
+    <link rel="stylesheet" href="/vendor/swagger-ui/swagger-ui.css" />
     <style>
       :root {
         color-scheme: light;
@@ -50,7 +50,8 @@ if (auth) return auth;
       <p>Use the Authorize button for the bearer token on admin endpoints.</p>
     </header>
     <main id="swagger-ui"></main>
-    <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+    <script is:inline src="/vendor/swagger-ui/swagger-ui-bundle.js"></script>
+    <script is:inline src="/vendor/swagger-ui/swagger-ui-standalone-preset.js"></script>
     <script>
       window.onload = () => {
         window.ui = SwaggerUIBundle({
