@@ -31,8 +31,12 @@ export const env = {
   siteUrl: optional('PUBLIC_SITE_URL', 'http://localhost:4321'),
 
   pricing: {
-    kundliCents: usdToCents('PRICE_KUNDLI_USD', 2100),
-    followupCents: usdToCents('PRICE_FOLLOWUP_USD', 1100),
+    kundliCents: usdToCents('PRICE_KUNDLI_USD', 31),
+    followupTierCents: {
+      1: usdToCents('PRICE_FOLLOWUP_1_USD', 8),
+      2: usdToCents('PRICE_FOLLOWUP_2_USD', 11),
+      3: usdToCents('PRICE_FOLLOWUP_3_USD', 13),
+    } as Record<number, number>,
   },
 
   devin: {
@@ -44,6 +48,9 @@ export const env = {
     },
     apiBase: optional('DEVIN_API_BASE', 'https://api.devin.ai'),
     kundliPlaybook: optional('DEVIN_KUNDLI_PLAYBOOK'),
+    // Not consumed at runtime — the v3 message API does not accept a
+    // playbook_id, so follow-ups resume the original session's context.
+    // Retained for documentation; will be wired in if the API adds support.
     followupPlaybook: optional('DEVIN_FOLLOWUP_PLAYBOOK'),
   },
 
@@ -64,7 +71,20 @@ export const env = {
     get apiKey() {
       return required('RESEND_API_KEY');
     },
-    from: optional('EMAIL_FROM', 'Siddh Jyotish <onboarding@resend.dev>'),
+    // NOTE: siddhjyotish.com must be a verified sending domain in Resend for
+    // this From address to deliver (Resend → Domains). Otherwise sends fail.
+    from: optional('EMAIL_FROM', 'Siddh Jyotish <namaste@siddhjyotish.com>'),
+  },
+
+  docs: {
+    authUser: optional('DOCS_AUTH_USER'),
+    authPass: optional('DOCS_AUTH_PASS'),
+  },
+
+  // Bearer token protecting the runtime pricing admin API
+  // (`PUT /api/admin/pricing`). Required in production.
+  get adminApiToken() {
+    return required('ADMIN_API_TOKEN');
   },
 
   admin: {

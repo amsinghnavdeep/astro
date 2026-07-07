@@ -22,6 +22,11 @@ function sessionsBase(): string {
   return `${env.devin.apiBase}/v3/organizations/${env.devin.orgId}/sessions`;
 }
 
+/** The v3 API expects the `playbook-` prefixed id; tolerate a bare uuid in config. */
+function playbookId(id: string): string {
+  return id.startsWith('playbook-') ? id : `playbook-${id}`;
+}
+
 export interface BirthDetails {
   fullName: string;
   gender: 'Male' | 'Female' | 'Other';
@@ -56,6 +61,42 @@ async function devinFetch<T>(fullUrl: string, init: RequestInit): Promise<T> {
     throw new Error(`Devin API ${res.status} on ${fullUrl}: ${body}`);
   }
   return (await res.json()) as T;
+}
+
+function isInitializingError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    err.message.includes('Devin API 400') &&
+    err.message.toLowerCase().includes('still initializing')
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postSessionMessage(
+  sessionId: string,
+  message: string,
+  opts: { retryOnInitializing?: boolean } = {},
+): Promise<void> {
+  const url = `${sessionsBase()}/${devinId(sessionId)}/messages`;
+  const attempts = opts.retryOnInitializing ? 8 : 1;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await devinFetch(url, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      });
+      return;
+    } catch (err) {
+      if (!opts.retryOnInitializing || !isInitializingError(err) || attempt === attempts) {
+        throw err;
+      }
+      await delay(8000);
+    }
+  }
 }
 
 /** Build the prompt that drives the first-time Kundli playbook. */
@@ -95,29 +136,34 @@ export async function createKundliSession(d: BirthDetails): Promise<DevinSession
     prompt: buildKundliPrompt(d),
     title: `Kundli — ${d.fullName}`,
   };
-  if (env.devin.kundliPlaybook) body.playbook_id = env.devin.kundliPlaybook;
+  if (env.devin.kundliPlaybook) body.playbook_id = playbookId(env.devin.kundliPlaybook);
   return devinFetch<DevinSession>(sessionsBase(), {
     method: 'POST',
     body: JSON.stringify(body),
   });
 }
 
-/** Resume an existing session to answer follow-up questions (no new PDF). */
+/**
+ * Resume an existing session to answer follow-up questions (no new PDF).
+ *
+ * NOTE: The Devin v3 message API does not accept a playbook_id, so we cannot
+ * attach DEVIN_FOLLOWUP_PLAYBOOK here. The session keeps its original !kundli
+ * playbook context, and the prompt itself instructs the agent to behave as a
+ * follow-up handler. If the API adds playbook-on-resume support, pass
+ * env.devin.followupPlaybook in the request body.
+ */
 export async function askFollowup(
   sessionId: string,
   questions: string[],
 ): Promise<void> {
   const prompt = [
-    'Follow-up request from a returning customer using the kundli_followup playbook.',
+    'Follow-up request from a returning customer.',
     'Reuse the already-computed chart from this session (recompute from the same birth',
     'details only if a value is missing). Do NOT produce a new PDF or HTML.',
     'Answer ONLY these questions, precisely, with dasha/transit timing:',
     ...questions.map((q, i) => `${i + 1}. ${q}`),
   ].join('\n');
-  await devinFetch(`${sessionsBase()}/${devinId(sessionId)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({ message: prompt }),
-  });
+  await postSessionMessage(sessionId, prompt);
 }
 
 /**
@@ -139,10 +185,7 @@ export async function instructKundliDelivery(
     'must prominently include the reference number above, and the Kundli_Report.pdf must be',
     'attached. Send via Resend using the RESEND_API_KEY secret. Do not send more than one email.',
   ].join('\n');
-  await devinFetch(`${sessionsBase()}/${devinId(sessionId)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({ message }),
-  });
+  await postSessionMessage(sessionId, message, { retryOnInitializing: true });
 }
 
 /** Fetch the current state of a session. */

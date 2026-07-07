@@ -15,14 +15,16 @@ This README is both the **project documentation** and the **business plan**.
 
 ## 1. The idea in one paragraph
 
-A customer enters their birth details and pays **$2,100**. We run a Devin
-playbook that computes their exact planetary positions with the Swiss Ephemeris
-and writes an original, professional astrology report, delivered as a PDF plus
-an interactive chart. The customer also receives an **encrypted reference
-number**. Later, they can pay **$1,100** to ask **two precise follow-up
-questions** — we decrypt the reference, resume their *same* Devin session (which
+A customer enters their birth details and pays **$31** (which includes **3
+questions**). We run a Devin playbook that computes their exact planetary
+positions with the Swiss Ephemeris and writes an original, professional
+astrology report, delivered as a PDF plus an interactive chart. The customer
+also receives an **encrypted reference number**. Later, they can pay for
+**1–3 precise follow-up questions** — priced **$8 / $11 / $13** for 1 / 2 / 3
+questions — we decrypt the reference, resume their *same* Devin session (which
 still holds their computed chart), and email back precise answers with no new
-report. **No database. No user accounts. No standing backend server.**
+report. Every question is capped at **18 words**. **No database. No user
+accounts. No standing backend server.**
 
 ---
 
@@ -38,8 +40,8 @@ inside the Devin session that produced it. We simply hand the customer an
                          │            ONE Astro app                 │
                          │  (UI pages + /api serverless functions)   │
    Browser  ───────────► │                                          │
-   (form + pay)          │  • /api/checkout/new     ($2100)         │
-                         │  • /api/checkout/followup($1100)         │
+   (form + pay)          │  • /api/checkout/new     ($31)           │
+                         │  • /api/checkout/followup($8-13)         │
                          │  • /api/stripe/webhook                   │
                          │  • /api/status                           │
                          └───────┬───────────────┬──────────────┬───┘
@@ -79,24 +81,26 @@ Devin cost; ACUs are billed per session run regardless of who triggers it.
 
 ## 3. User flows
 
-### Flow A — First-timer ($2,100 → full Kundli)
-1. UI collects **name, DOB, exact time (AM/PM), place**, email, optional questions.
-2. `POST /api/checkout/new` → Stripe Checkout ($2,100), details saved in metadata.
+### Flow A — First-timer ($31 → full Kundli, includes 3 questions)
+1. UI collects **name, DOB, exact time (AM/PM), place**, email, and up to 3
+   questions (max 18 words each, included in the price).
+2. `POST /api/checkout/new` → Stripe Checkout ($31), details saved in metadata.
 3. On `checkout.session.completed`, the webhook runs the **`!kundli`** playbook →
-   `session_id`.
+   `session_id` (3 included questions ride along in metadata).
 4. Backend immediately emails the **encrypted reference number** (their receipt for
    buying follow-ups later).
 5. Playbook computes the chart (Swiss Ephemeris), produces **PDF + interactive HTML**,
    and — minutes later, when done — **emails the finished PDF to the customer itself**
    (using the `RESEND_API_KEY` Devin secret). This closes the async gap without polling.
 
-### Flow B — Returning customer ($1,100 → 2 questions)
-1. UI collects **reference number + 2 questions** + email.
-2. `POST /api/checkout/followup` → we validate the reference decrypts, then
-   Stripe Checkout ($1,100).
+### Flow B — Returning customer ($8 / $11 / $13 → 1 / 2 / 3 questions)
+1. UI collects **reference number + 1–3 questions** (max 18 words each) + email.
+2. `POST /api/checkout/followup` → we validate the reference decrypts, price by
+   question count ($8 / $11 / $13), then Stripe Checkout.
 3. On success, the webhook **decrypts the reference → session_id**, and resumes
-   that session with the **`!kundli_followup`** playbook.
-4. Playbook reuses the already-computed chart and answers **only** those
+   that session (the original `!kundli` context; see [follow-up playbook
+   limitation](#environment-variables-env)).
+4. Playbook reuses the already-computed chart and answers **only** those 1–3
    questions (dasha/transit timing), **no new PDF**.
 5. Backend emails the precise answers.
 
@@ -107,7 +111,7 @@ Devin cost; ACUs are billed per session run regardless of who triggers it.
 | Playbook | Macro | Purpose | Output |
 |---|---|---|---|
 | Generate a Vedic Astrology (Kundli) Birth Chart | `!kundli` | Full chart + report, **emails the PDF** | PDF + interactive HTML |
-| Answer Follow-Up Questions on an Existing Chart | `!kundli_followup` | Resume session, answer 2 Qs | precise text answers |
+| Answer Follow-Up Questions on an Existing Chart | `!kundli_followup` | Resume session, answer 1–3 Qs | precise text answers |
 
 Both compute planetary positions with the **Swiss Ephemeris** (sidereal zodiac,
 Lahiri ayanamsa, whole-sign houses) — never guessed or hard-coded. The follow-up
@@ -125,11 +129,13 @@ playbook reuses the original session's chart and produces no new report.
 
 ## 5. Tech stack
 
-- **[Astro](https://astro.build) (SSR, Node adapter)** — UI + API in one app.
+- **[Astro](https://astro.build) (SSR, Cloudflare Workers adapter)** — UI + API
+  in one app.
 - **Stripe Checkout** — hosted payment, no accounts; metadata as our store.
 - **Devin REST API** — runs/ resumes playbook sessions.
 - **Resend** — transactional email + PDF delivery.
-- **AES-256-GCM** (Node `crypto`) — the encrypted reference number.
+- **AES-256-GCM** (Node `crypto` via Workers `nodejs_compat`) — the encrypted
+  reference number.
 - **TypeScript**, **Zod** — type-safe, validated inputs.
 
 ---
@@ -145,17 +151,22 @@ astro/
 │  │  ├─ devin.ts        # Devin API client (create / resume / get session)
 │  │  ├─ stripe.ts       # Stripe client factory
 │  │  ├─ email.ts        # Resend client + email templates
+│  │  ├─ pricing.ts      # runtime pricing store (Cloudflare KV + env fallback)
+│  │  ├─ orders.ts       # runtime order store (Cloudflare KV)
 │  │  └─ validation.ts   # Zod schemas for form input
 │  └─ pages/
-│     ├─ index.astro           # first-timer landing + form ($2100)
-│     ├─ returning.astro       # returning-user form ($1100)
+│     ├─ index.astro           # first-timer landing + form ($31)
+│     ├─ returning.astro       # returning-user form ($8/$11/$13)
 │     ├─ success.astro         # post-payment status/polling page
 │     └─ api/
-│        ├─ checkout/new.ts      # start $2100 checkout
-│        ├─ checkout/followup.ts # start $1100 checkout
+│        ├─ checkout/new.ts      # start $31 checkout
+│        ├─ checkout/followup.ts # start $8/$11/$13 checkout
 │        ├─ stripe/webhook.ts    # payment → trigger/resume Devin + email
+│        ├─ admin/pricing.ts     # protected GET/PUT runtime pricing config
+│        ├─ admin/orders.ts      # protected GET order query API
 │        └─ status.ts            # poll session state for the success page
 ├─ astro.config.mjs
+├─ wrangler.jsonc
 ├─ .env.example
 └─ README.md
 ```
@@ -174,24 +185,158 @@ npm run dev               # http://localhost:4321
 
 | Var | What it is |
 |---|---|
-| `PRICE_KUNDLI_USD` / `PRICE_FOLLOWUP_USD` | prices in dollars (default 2100 / 1100) |
+| `PRICE_KUNDLI_USD` | Kundli price in dollars (default 31, includes 3 questions) |
+| `PRICE_FOLLOWUP_1_USD` / `PRICE_FOLLOWUP_2_USD` / `PRICE_FOLLOWUP_3_USD` | follow-up prices for 1 / 2 / 3 questions (default 8 / 11 / 13) |
 | `PUBLIC_SITE_URL` | site URL for Stripe redirects |
 | `DEVIN_API_KEY` | Devin **service-user** key (prefix `cog_`, server only) — v3 API |
 | `DEVIN_ORG_ID` | Devin org id (prefix `org-`), required by v3 org-scoped endpoints |
-| `DEVIN_KUNDLI_PLAYBOOK` / `DEVIN_FOLLOWUP_PLAYBOOK` | playbook ids |
+| `DEVIN_KUNDLI_PLAYBOOK` | Playbook id for the `!kundli` chart-generation playbook (used at session creation) |
+| `DEVIN_FOLLOWUP_PLAYBOOK` | Playbook id for the `!kundli_followup` Q&A playbook (documented only — see note below) |
 | `REFERENCE_SECRET` | base64 of 32 random bytes — reference encryption key |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe keys |
-| `RESEND_API_KEY` / `EMAIL_FROM` | email delivery |
+| `RESEND_API_KEY` / `EMAIL_FROM` | email delivery — `EMAIL_FROM` defaults to `Siddh Jyotish <namaste@siddhjyotish.com>` (see note) |
+| `ADMIN_API_TOKEN` | bearer token protecting the runtime pricing/admin APIs (`/api/admin/pricing`, `/api/admin/orders`) — **required** |
+| `DOCS_AUTH_USER` / `DOCS_AUTH_PASS` | HTTP Basic Auth for `/docs` and `/api/openapi.json` |
+| `SIDDH_KV` | Cloudflare KV namespace binding for runtime pricing + orders (`wrangler kv namespace create SIDDH_KV`, id wired in `wrangler.jsonc`) |
+
+> **`EMAIL_FROM` / Resend verified domain:** the default sender is
+> `Siddh Jyotish <namaste@siddhjyotish.com>`. For mail to actually deliver,
+> **`siddhjyotish.com` must be a verified sending domain in Resend**
+> (Resend dashboard → Domains → add & verify DNS records). Until then, either
+> verify the domain or override `EMAIL_FROM` with a verified address.
+
+> **Follow-up playbook limitation:** The Devin v3 message API does not accept a
+> `playbook_id`, so `DEVIN_FOLLOWUP_PLAYBOOK` is not applied when resuming a
+> session for follow-up questions. Follow-ups reuse the original `!kundli`
+> session's context. If the API adds playbook-on-resume support in the future,
+> `askFollowup()` in `src/lib/devin.ts` should be updated to pass it.
 
 Generate a reference key:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
+### Runtime pricing admin API (`/api/admin/pricing`)
+
+Prices and currency can be changed **without a redeploy**. They live in a small
+persisted config layer (`src/lib/pricing.ts`) backed by Cloudflare KV namespace
+`SIDDH_KV` (create it with `wrangler kv namespace create SIDDH_KV` and copy the
+id into `wrangler.jsonc`). When no KV binding is available, reads transparently
+fall back to the `PRICE_*` env defaults so the app still works, but writes
+require KV.
+
+Both endpoints require `Authorization: Bearer $ADMIN_API_TOKEN`.
+
+Config shape:
+```json
+{
+  "currency": "usd",
+  "kundliCents": 3100,
+  "followupTierCents": { "1": 800, "2": 1100, "3": 1300 }
+}
+```
+
+**Read the current effective pricing:**
+```bash
+curl https://your-site.com/api/admin/pricing \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN"
+```
+
+**Change price and currency** (validated with zod: `currency` must be a
+3-letter ISO code; all amounts positive integers in the smallest currency unit):
+```bash
+# Switch to INR (amounts in paise): ₹2499 Kundli, ₹699/₹999/₹1199 follow-ups
+curl -X PUT https://your-site.com/api/admin/pricing \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "currency": "inr",
+    "kundliCents": 249900,
+    "followupTierCents": { "1": 69900, "2": 99900, "3": 119900 }
+  }'
+```
+
+A wrong/missing token returns `401`; invalid input returns `400` with the zod
+issues. On success the new config takes effect on the next checkout (reads are
+cached in-memory for ~30s).
+
+### API docs (`/docs`)
+
+The Swagger UI docs are protected by HTTP Basic Auth and load the OpenAPI spec
+from `/api/openapi.json`. Set `DOCS_AUTH_USER` and `DOCS_AUTH_PASS` locally in
+`.env` / `.dev.vars`, then open `/docs` in a browser. The same credentials
+protect the raw spec endpoint.
+
+### Admin orders API (`/api/admin/orders`)
+Orders live in the same `SIDDH_KV` namespace as pricing.
+
+Query one UTC day:
+```bash
+curl "https://your-site.com/api/admin/orders?date=2026-07-07" \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN"
+```
+
+Query an inclusive date range:
+```bash
+curl "https://your-site.com/api/admin/orders?from=2026-07-01&to=2026-07-07" \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN"
+```
+
+Sample response:
+```json
+{
+  "from": "2026-07-07T00:00:00.000Z",
+  "to": "2026-07-07T23:59:59.999Z",
+  "count": 2,
+  "totalsByCurrency": { "usd": 3100 },
+  "orders": [
+    {
+      "id": "cs_test_1",
+      "kind": "kundli",
+      "amountTotal": 3100,
+      "currency": "usd",
+      "email": "user@example.com",
+      "fullName": "User Name",
+      "createdAt": "2026-07-07T10:00:00.000Z",
+      "createdAtMs": 1783418400000
+    }
+  ]
+}
+```
+
+Invalid date input returns `400`; missing/invalid bearer returns `401`.
+
+> ⚠️ **Amounts follow the currency's minor unit.** Despite the field name
+> `*Cents`, `unit_amount` is always the **smallest unit of the chosen
+> currency**: USD/EUR cents (×100), **INR paise (×100)**, and **zero-decimal
+> currencies** like **JPY/KRW use whole units** (no ×100 — `¥3100` is
+> `3100`, not `310000`). When changing currency you must supply amounts in the
+> correct minor unit, or you will mis-charge customers.
+
 ### Deploy (serverless, free tier)
-Deploy the app to Vercel / Netlify / Cloudflare. Set the same env vars in the
-dashboard. Point a Stripe webhook at `/api/stripe/webhook`. That's the entire
-infra — no DB, no server to manage.
+Cloudflare Workers / Pages. `npm run build` produces `dist/_worker.js` plus
+static assets in `dist/`.
+
+Deploy to Workers with `npm run deploy` (`wrangler deploy`) using
+`wrangler.jsonc`, or deploy to Cloudflare Pages with
+`wrangler pages deploy dist`.
+
+Runtime secrets/vars from `.env.example` are set in Cloudflare with
+`wrangler secret put <NAME>` (or the Cloudflare dashboard / Pages env vars) —
+do **not** commit them.
+
+Local dev/preview uses a gitignored `.dev.vars` with the same vars:
+
+```bash
+npm run dev      # astro dev + platformProxy
+npm run preview  # wrangler dev
+```
+
+Point the Stripe webhook at `/api/stripe/webhook`. No DB, no server to manage.
+
+`nodejs_compat` + `compatibility_date = "2025-04-01"` are required so Workers
+exposes `node:crypto` / `Buffer` for the reference-token AES helper and
+populates `process.env` for `src/lib/env.ts`.
 
 ---
 
@@ -205,8 +350,8 @@ side). Premium positioning: this is a high-touch report, not a $5 app horoscope.
 ### 8.2 Pricing & unit economics
 | Product | Price | Variable cost (Devin ACUs + Stripe + email) | Gross margin |
 |---|---|---|---|
-| Full Kundli (`!kundli`) | **$2,100** | compute-heavy session | high once ACU/report is measured |
-| Follow-up 2 Qs (`!kundli_followup`) | **$1,100** | resumes session, lighter | very high |
+| Full Kundli (`!kundli`, incl. 3 questions) | **$31** | compute-heavy session | high once ACU/report is measured |
+| Follow-up 1–3 Qs (`!kundli_followup`) | **$8 / $11 / $13** | resumes session, lighter | very high |
 
 > **Action item:** measure real ACU cost per report on a few live runs to lock
 > in margin. Fixed cost is ~$0 (serverless free tier), so profitability is

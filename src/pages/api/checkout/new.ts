@@ -9,10 +9,11 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { stripe } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
+import { getPricing } from '../../../lib/pricing';
 import { birthDetailsSchema } from '../../../lib/validation';
 import { randomPandit } from '../../../lib/pandits';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   let payload: unknown;
   try {
     payload = await request.json();
@@ -26,6 +27,7 @@ export const POST: APIRoute = async ({ request }) => {
   }
   const d = parsed.data;
   const pandit = randomPandit();
+  const pricing = await getPricing(locals.runtime.env.SIDDH_KV);
 
   const session = await stripe().checkout.sessions.create({
     mode: 'payment',
@@ -34,10 +36,10 @@ export const POST: APIRoute = async ({ request }) => {
       {
         quantity: 1,
         price_data: {
-          currency: 'usd',
-          unit_amount: env.pricing.kundliCents,
+          currency: pricing.currency,
+          unit_amount: pricing.kundliCents,
           product_data: {
-            name: 'Janma Kundli — Full Vedic Birth Chart Report',
+            name: 'Siddh Jyotish — Full Vedic Birth Chart Report (includes 3 questions)',
             description: 'Detailed PDF + interactive chart, computed with Swiss Ephemeris.',
           },
         },

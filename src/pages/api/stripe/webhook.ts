@@ -11,7 +11,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
-import { stripe } from '../../../lib/stripe';
+import { stripe, cryptoProvider } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
 import {
   createKundliSession,
@@ -19,15 +19,24 @@ import {
   instructKundliDelivery,
 } from '../../../lib/devin';
 import { encodeReference, decodeReference } from '../../../lib/reference';
+import { recordOrder, type OrderRecord } from '../../../lib/orders';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   // Signature verification needs the RAW body — never call request.json() first.
   const raw = await request.text();
   const sig = request.headers.get('stripe-signature');
 
   let event: Stripe.Event;
   try {
-    event = stripe().webhooks.constructEvent(raw, sig ?? '', env.stripe.webhookSecret);
+    // Async verification: the Workers runtime only exposes WebCrypto (async),
+    // so we use constructEventAsync with the SubtleCrypto provider.
+    event = await stripe().webhooks.constructEventAsync(
+      raw,
+      sig ?? '',
+      env.stripe.webhookSecret,
+      undefined,
+      cryptoProvider,
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return json({ error: `Webhook signature verification failed: ${message}` }, 400);
@@ -40,6 +49,29 @@ export const POST: APIRoute = async ({ request }) => {
 
   const session = event.data.object as Stripe.Checkout.Session;
   const m = session.metadata ?? {};
+  const createdAt = new Date(event.created * 1000);
+  const order: OrderRecord = {
+    id: session.id,
+    kind: m.kind === 'followup' ? 'followup' : 'kundli',
+    amountTotal: session.amount_total ?? 0,
+    currency: session.currency ?? '',
+    email: session.customer_email ?? m.email ?? '',
+    fullName: m.fullName || undefined,
+    questionCount:
+      m.kind === 'kundli'
+        ? JSON.parse(m.questions || '[]').length
+        : m.kind === 'followup'
+          ? Number(m.questionCount)
+          : undefined,
+    createdAt: createdAt.toISOString(),
+    createdAtMs: createdAt.getTime(),
+  };
+
+  try {
+    await recordOrder(locals.runtime.env.SIDDH_KV, order);
+  } catch (err) {
+    console.error('Order persistence error:', err);
+  }
 
   try {
     if (m.kind === 'kundli') {
@@ -55,18 +87,31 @@ export const POST: APIRoute = async ({ request }) => {
         questions,
         pandit,
       });
+      console.info('Created Devin Kundli session:', devinSession.session_id);
       const reference = encodeReference(devinSession.session_id);
+      const delivery = instructKundliDelivery(devinSession.session_id, {
+        reference,
+        pandit,
+        email: m.email,
+        fullName: m.fullName,
+      })
+        .then(() => {
+          console.info('Kundli delivery instruction accepted:', devinSession.session_id);
+        })
+        .catch((err) => {
+          console.error('Kundli delivery instruction error:', err);
+        });
 
       // No backend email here (Stripe needs a fast 200). We hand the session the
       // reference + delivery instruction; the `!kundli` playbook then sends the
       // customer EXACTLY ONE email — framed as from their Pandit — with the PDF
       // attached and the reference number included. No polling needed.
-      await instructKundliDelivery(devinSession.session_id, {
-        reference,
-        pandit,
-        email: m.email,
-        fullName: m.fullName,
-      });
+      const waitUntil = (locals.runtime as { ctx?: { waitUntil(promise: Promise<unknown>): void } }).ctx?.waitUntil;
+      if (waitUntil) {
+        waitUntil(delivery);
+      } else {
+        await delivery;
+      }
     } else if (m.kind === 'followup') {
       const sessionId = decodeReference(m.reference);
       const questions = JSON.parse(m.questions || '[]') as string[];
