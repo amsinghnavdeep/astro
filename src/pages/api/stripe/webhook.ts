@@ -87,18 +87,31 @@ export const POST: APIRoute = async ({ request, locals }) => {
         questions,
         pandit,
       });
+      console.info('Created Devin Kundli session:', devinSession.session_id);
       const reference = encodeReference(devinSession.session_id);
+      const delivery = instructKundliDelivery(devinSession.session_id, {
+        reference,
+        pandit,
+        email: m.email,
+        fullName: m.fullName,
+      })
+        .then(() => {
+          console.info('Kundli delivery instruction accepted:', devinSession.session_id);
+        })
+        .catch((err) => {
+          console.error('Kundli delivery instruction error:', err);
+        });
 
       // No backend email here (Stripe needs a fast 200). We hand the session the
       // reference + delivery instruction; the `!kundli` playbook then sends the
       // customer EXACTLY ONE email — framed as from their Pandit — with the PDF
       // attached and the reference number included. No polling needed.
-      await instructKundliDelivery(devinSession.session_id, {
-        reference,
-        pandit,
-        email: m.email,
-        fullName: m.fullName,
-      });
+      const waitUntil = (locals.runtime as { ctx?: { waitUntil(promise: Promise<unknown>): void } }).ctx?.waitUntil;
+      if (waitUntil) {
+        waitUntil(delivery);
+      } else {
+        await delivery;
+      }
     } else if (m.kind === 'followup') {
       const sessionId = decodeReference(m.reference);
       const questions = JSON.parse(m.questions || '[]') as string[];
