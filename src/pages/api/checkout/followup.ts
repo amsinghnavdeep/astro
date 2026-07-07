@@ -9,6 +9,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { stripe } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
+import { getPricing } from '../../../lib/pricing';
 import { followupSchema } from '../../../lib/validation';
 import { decodeReference } from '../../../lib/reference';
 
@@ -34,10 +35,12 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ error: 'That reference number is invalid.' }, 400);
   }
 
-  const unitAmount = env.pricing.followupTierCents[count];
-  if (!unitAmount) {
+  if (count < 1 || count > 3) {
     return json({ error: 'You may ask between 1 and 3 questions.' }, 400);
   }
+
+  const pricing = await getPricing();
+  const unitAmount = pricing.followupTierCents[count as 1 | 2 | 3];
 
   const session = await stripe().checkout.sessions.create({
     mode: 'payment',
@@ -46,7 +49,7 @@ export const POST: APIRoute = async ({ request }) => {
       {
         quantity: 1,
         price_data: {
-          currency: 'usd',
+          currency: pricing.currency,
           unit_amount: unitAmount,
           product_data: {
             name: `Siddh Jyotish Follow-up — ${count} precise question${count === 1 ? '' : 's'}`,

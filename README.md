@@ -149,6 +149,7 @@ astro/
 │  │  ├─ devin.ts        # Devin API client (create / resume / get session)
 │  │  ├─ stripe.ts       # Stripe client factory
 │  │  ├─ email.ts        # Resend client + email templates
+│  │  ├─ pricing.ts      # runtime pricing store (Upstash KV + env fallback)
 │  │  └─ validation.ts   # Zod schemas for form input
 │  └─ pages/
 │     ├─ index.astro           # first-timer landing + form ($31)
@@ -158,6 +159,7 @@ astro/
 │        ├─ checkout/new.ts      # start $31 checkout
 │        ├─ checkout/followup.ts # start $8/$11/$13 checkout
 │        ├─ stripe/webhook.ts    # payment → trigger/resume Devin + email
+│        ├─ admin/pricing.ts     # protected GET/PUT runtime pricing config
 │        └─ status.ts            # poll session state for the success page
 ├─ astro.config.mjs
 ├─ .env.example
@@ -187,7 +189,15 @@ npm run dev               # http://localhost:4321
 | `DEVIN_FOLLOWUP_PLAYBOOK` | Playbook id for the `!kundli_followup` Q&A playbook (documented only — see note below) |
 | `REFERENCE_SECRET` | base64 of 32 random bytes — reference encryption key |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe keys |
-| `RESEND_API_KEY` / `EMAIL_FROM` | email delivery |
+| `RESEND_API_KEY` / `EMAIL_FROM` | email delivery — `EMAIL_FROM` defaults to `Siddh Jyotish <namaste@siddhjyotish.com>` (see note) |
+| `ADMIN_API_TOKEN` | bearer token protecting the runtime pricing admin API (`/api/admin/pricing`) — **required** |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Upstash Redis REST endpoint + token for the runtime pricing store. **Optional** — if unset, pricing falls back to the `PRICE_*` defaults and `PUT /api/admin/pricing` returns an error |
+
+> **`EMAIL_FROM` / Resend verified domain:** the default sender is
+> `Siddh Jyotish <namaste@siddhjyotish.com>`. For mail to actually deliver,
+> **`siddhjyotish.com` must be a verified sending domain in Resend**
+> (Resend dashboard → Domains → add & verify DNS records). Until then, either
+> verify the domain or override `EMAIL_FROM` with a verified address.
 
 > **Follow-up playbook limitation:** The Devin v3 message API does not accept a
 > `playbook_id`, so `DEVIN_FOLLOWUP_PLAYBOOK` is not applied when resuming a
@@ -199,6 +209,56 @@ Generate a reference key:
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
+
+### Runtime pricing admin API (`/api/admin/pricing`)
+
+Prices and currency can be changed **without a redeploy**. They live in a small
+persisted config layer (`src/lib/pricing.ts`) backed by a serverless KV
+(**Upstash Redis** over its REST API — works on any host). When no KV is
+configured, reads transparently fall back to the `PRICE_*` env defaults so the
+app still works, but writes require KV.
+
+Both endpoints require `Authorization: Bearer $ADMIN_API_TOKEN`.
+
+Config shape:
+```json
+{
+  "currency": "usd",
+  "kundliCents": 3100,
+  "followupTierCents": { "1": 800, "2": 1100, "3": 1300 }
+}
+```
+
+**Read the current effective pricing:**
+```bash
+curl https://your-site.com/api/admin/pricing \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN"
+```
+
+**Change price and currency** (validated with zod: `currency` must be a
+3-letter ISO code; all amounts positive integers in the smallest currency unit):
+```bash
+# Switch to INR (amounts in paise): ₹2499 Kundli, ₹699/₹999/₹1199 follow-ups
+curl -X PUT https://your-site.com/api/admin/pricing \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "currency": "inr",
+    "kundliCents": 249900,
+    "followupTierCents": { "1": 69900, "2": 99900, "3": 119900 }
+  }'
+```
+
+A wrong/missing token returns `401`; invalid input returns `400` with the zod
+issues. On success the new config takes effect on the next checkout (reads are
+cached in-memory for ~30s).
+
+> ⚠️ **Amounts follow the currency's minor unit.** Despite the field name
+> `*Cents`, `unit_amount` is always the **smallest unit of the chosen
+> currency**: USD/EUR cents (×100), **INR paise (×100)**, and **zero-decimal
+> currencies** like **JPY/KRW use whole units** (no ×100 — `¥3100` is
+> `3100`, not `310000`). When changing currency you must supply amounts in the
+> correct minor unit, or you will mis-charge customers.
 
 ### Deploy (serverless, free tier)
 Deploy the app to Vercel / Netlify / Cloudflare. Set the same env vars in the
