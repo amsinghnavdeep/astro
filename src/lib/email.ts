@@ -32,7 +32,7 @@ export async function sendEmail({ to, subject, html, attachments }: SendArgs): P
 export function kundliDeliveryHtml(fullName: string, reference: string): string {
   return `
   <div style="font-family:system-ui,sans-serif;max-width:560px;margin:auto">
-    <h2 style="color:#b8860b">Your Janma Kundli is ready 🪔</h2>
+    <h2 style="color:#b8860b">Your Janma Kundli from Siddh Jyotish is ready 🪔</h2>
     <p>Namaste ${escapeHtml(fullName)},</p>
     <p>Your full Vedic birth-chart report is attached as a PDF.</p>
     <p><b>Keep this reference safe.</b> You'll need it to purchase precise
@@ -40,6 +40,7 @@ export function kundliDeliveryHtml(fullName: string, reference: string): string 
     <pre style="background:#faf5e6;border:1px solid #e6d9a8;padding:14px;border-radius:8px;
     word-break:break-all;white-space:pre-wrap;font-size:13px">${escapeHtml(reference)}</pre>
     <p style="color:#666;font-size:13px">This reference is encrypted and unique to you.</p>
+    <p style="color:#8a7a3a;font-size:13px;margin-top:18px">🪔 Siddh Jyotish — precise, honest Vedic astrology from a living lineage of Jyotish scholars.</p>
   </div>`;
 }
 
@@ -47,8 +48,9 @@ export function kundliDeliveryHtml(fullName: string, reference: string): string 
 export function followupAnswersHtml(answers: string): string {
   return `
   <div style="font-family:system-ui,sans-serif;max-width:560px;margin:auto">
-    <h2 style="color:#b8860b">Your follow-up answers 🔮</h2>
+    <h2 style="color:#b8860b">Your follow-up answers from Siddh Jyotish 🔮</h2>
     <div style="white-space:pre-wrap;line-height:1.6">${escapeHtml(answers)}</div>
+    <p style="color:#8a7a3a;font-size:13px;margin-top:18px">🪔 Siddh Jyotish — precise, honest Vedic astrology from a living lineage of Jyotish scholars.</p>
   </div>`;
 }
 

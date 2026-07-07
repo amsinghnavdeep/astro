@@ -5,8 +5,8 @@ interface Props {
 }
 
 const {
-  title = 'Janma Kundli — Precise Vedic Astrology Reports',
-  description = 'Precise, ephemeris-computed Vedic Janma Kundli reports, prepared by respected astrologers. 100% accurate. 100% money-back guarantee. No account needed.',
+  title = 'Siddh Jyotish — Precise Vedic Astrology Reports',
+  description = 'Precise, ephemeris-computed Vedic Janma Kundli reports from Siddh Jyotish, prepared by respected astrologers. 100% accurate. 100% money-back guarantee. No account needed.',
 } = Astro.props;
 ---
 
@@ -34,7 +34,7 @@ const {
             <path d="M24 4 L27 21 L44 24 L27 27 L24 44 L21 27 L4 24 L21 21 Z" fill="currentColor" />
           </svg>
         </span>
-        <span class="brand-text">Janma<em>Kundli</em></span>
+        <span class="brand-text">Siddh<em>Jyotish</em></span>
       </a>
       <nav class="nav-links">
         <a href="/#how">How it works</a>
@@ -49,8 +49,15 @@ const {
 
     <footer class="site-footer">
       <div class="footer-inner">
-        <p class="footer-brand">🪔 Janma Kundli</p>
+        <p class="footer-brand">🪔 Siddh Jyotish</p>
         <p>Precise Vedic astrology, prepared by respected astrologers.</p>
+        <p class="footer-lineage">
+          Our astrologers are Siddh Yogis carrying forward a centuries-old
+          living tradition — descended from a <strong>Kashmiri Pandit</strong>
+          lineage and a <strong>Kerala Namboodiri Brahmin</strong> lineage of
+          Jyotish scholars. Every reading is computed with honesty and precision
+          and offered as a genuine guide — not a $5 horoscope app.
+        </p>
         <p class="footer-fine">
           No account needed · Your reading is private · 100% money-back guarantee
         </p>
@@ -285,6 +292,7 @@ const {
       .footer-inner { max-width: 1040px; margin: 0 auto; padding: 2rem 1.25rem; text-align: center; }
       .footer-brand { font-family: var(--serif); font-size: 1.3rem; color: #fff; margin: 0 0 0.3rem; }
       .footer-inner p { margin: 0.15rem 0; }
+      .footer-lineage { color: #cfc4f0; font-size: 0.95rem; max-width: 60ch; margin: 0.8rem auto; }
       .footer-fine { color: #a99fd6; font-size: 0.88rem; margin-top: 0.6rem; }
     </style>
   </body>

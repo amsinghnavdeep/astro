@@ -135,7 +135,7 @@ export async function instructKundliDelivery(
     `Reference number (their receipt to buy follow-up questions later): ${opts.reference}`,
     '',
     `When the report is ready, send EXACTLY ONE email to ${opts.email}, framed as personally`,
-    `from ${opts.pandit}, with subject "Your Janma Kundli from ${opts.pandit}". The email body`,
+    `from ${opts.pandit}, with subject "Your Janma Kundli from ${opts.pandit} at Siddh Jyotish". The email body`,
     'must prominently include the reference number above, and the Kundli_Report.pdf must be',
     'attached. Send via Resend using the RESEND_API_KEY secret. Do not send more than one email.',
   ].join('\n');
