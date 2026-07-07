@@ -44,6 +44,8 @@ const {
       </a>
       <nav class="nav-links">
         <a href="/#how">How it works</a>
+        <a href="/#about">About</a>
+        <a href="/contact">Contact</a>
         <a href="/#faq">FAQ</a>
         <a class="nav-cta" href="/returning">Follow-up</a>
       </nav>
@@ -202,7 +204,7 @@ const {
       .section-head p { color: var(--muted); }
 
       /* ---------- Trust badges ---------- */
-      .badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+      .badges { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
       .badge {
         background: var(--card); border: 1px solid var(--border); border-radius: 16px;
         padding: 1.3rem 1.1rem; text-align: center;
