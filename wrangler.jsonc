@@ -13,13 +13,22 @@
   // nodejs_compat provides node:crypto (reference.ts AES-256-GCM) + Buffer, and
   // (with the date above) populates process.env from vars/secrets.
   "compatibility_flags": ["nodejs_compat"],
+  // Namespace created with `wrangler kv namespace create SIDDH_KV`.
+  // Local `wrangler dev` uses a simulated store keyed by the binding name.
+  "kv_namespaces": [
+    {
+      "binding": "SIDDH_KV",
+      "id": "b885071c8bf3421cada98cef8e4cf5ac",
+      "preview_id": "b885071c8bf3421cada98cef8e4cf5ac"
+    }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist"
   },
   "observability": {
     "enabled": true
-  }
+  },
 
   // Runtime secrets/vars are NOT stored here. Set them with:
   //   wrangler secret put STRIPE_SECRET_KEY   (and the other vars in .env.example)

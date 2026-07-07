@@ -2,14 +2,15 @@
  * Runtime pricing configuration store.
  *
  * The app is otherwise "no-database", but prices and currency need to change
- * without a redeploy. This module provides a tiny persisted config layer backed
- * by a serverless KV (Upstash Redis over its REST API — works on any host).
+ * without a redeploy. This module provides a tiny persisted config layer
+ * backed by Cloudflare Workers KV.
  *
- * When no KV is configured (`KV_REST_API_URL` / `KV_REST_API_TOKEN` unset), we
- * transparently fall back to the env-var defaults in `env.ts`, so the app keeps
- * working with zero KV setup. Reads are cached in-memory with a short TTL to
- * avoid a KV round-trip on every checkout.
+ * When no KV binding is available, we transparently fall back to the env-var
+ * defaults in `env.ts`, so the app keeps working with zero KV setup. Reads
+ * are cached in-memory with a short TTL to avoid a KV round-trip on every
+ * checkout.
  */
+import type { KVNamespace } from '@cloudflare/workers-types';
 import { z } from 'zod';
 import { env } from './env';
 
@@ -55,42 +56,17 @@ function defaultPricing(): PricingConfig {
   };
 }
 
-function kvConfigured(): boolean {
-  return Boolean(env.kv.restUrl && env.kv.restToken);
-}
-
-/**
- * Minimal Upstash Redis REST helper. Command is sent as a path-segment array,
- * e.g. `['GET', key]` or `['SET', key, value]`.
- */
-async function kvCommand(command: string[]): Promise<unknown> {
-  const url = `${env.kv.restUrl!.replace(/\/$/, '')}/${command
-    .map((c) => encodeURIComponent(c))
-    .join('/')}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${env.kv.restToken!}` },
-  });
-  if (!res.ok) {
-    throw new Error(`KV request failed: ${res.status} ${await res.text()}`);
-  }
-  const body = (await res.json()) as { result?: unknown; error?: string };
-  if (body.error) {
-    throw new Error(`KV error: ${body.error}`);
-  }
-  return body.result;
-}
-
 /** Returns the current effective pricing config (cached briefly). */
-export async function getPricing(): Promise<PricingConfig> {
+export async function getPricing(kv?: KVNamespace): Promise<PricingConfig> {
   if (cache && cache.expiresAt > Date.now()) {
     return cache.value;
   }
 
   let value = defaultPricing();
 
-  if (kvConfigured()) {
+  if (kv) {
     try {
-      const stored = await kvCommand(['GET', KV_KEY]);
+      const stored = await kv.get(KV_KEY);
       if (typeof stored === 'string' && stored.length > 0) {
         const parsed = pricingConfigSchema.safeParse(JSON.parse(stored));
         if (parsed.success) {
@@ -107,16 +83,17 @@ export async function getPricing(): Promise<PricingConfig> {
 }
 
 /** Persists a new pricing config to KV and refreshes the in-memory cache. */
-export async function setPricing(config: PricingConfig): Promise<PricingConfig> {
+export async function setPricing(
+  kv: KVNamespace | undefined,
+  config: PricingConfig,
+): Promise<PricingConfig> {
   const value = pricingConfigSchema.parse(config);
 
-  if (!kvConfigured()) {
-    throw new Error(
-      'No KV configured: set KV_REST_API_URL and KV_REST_API_TOKEN to persist pricing changes.',
-    );
+  if (!kv) {
+    throw new Error('KV not configured');
   }
 
-  await kvCommand(['SET', KV_KEY, JSON.stringify(value)]);
+  await kv.put(KV_KEY, JSON.stringify(value));
   cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
   return value;
 }

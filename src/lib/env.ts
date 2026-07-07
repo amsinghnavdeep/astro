@@ -81,11 +81,4 @@ export const env = {
   get adminApiToken() {
     return required('ADMIN_API_TOKEN');
   },
-
-  // Serverless KV (Upstash Redis REST) for the runtime pricing config store.
-  // Optional: when unset, pricing falls back to the env-var defaults above.
-  kv: {
-    restUrl: optional('KV_REST_API_URL'),
-    restToken: optional('KV_REST_API_TOKEN'),
-  },
 } as const;

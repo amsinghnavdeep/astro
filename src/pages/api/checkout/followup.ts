@@ -13,7 +13,7 @@ import { getPricing } from '../../../lib/pricing';
 import { followupSchema } from '../../../lib/validation';
 import { decodeReference } from '../../../lib/reference';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   let payload: unknown;
   try {
     payload = await request.json();
@@ -39,7 +39,7 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ error: 'You may ask between 1 and 3 questions.' }, 400);
   }
 
-  const pricing = await getPricing();
+  const pricing = await getPricing(locals.runtime.env.SIDDH_KV);
   const unitAmount = pricing.followupTierCents[count as 1 | 2 | 3];
 
   const session = await stripe().checkout.sessions.create({

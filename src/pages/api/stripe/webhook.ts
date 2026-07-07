@@ -19,8 +19,9 @@ import {
   instructKundliDelivery,
 } from '../../../lib/devin';
 import { encodeReference, decodeReference } from '../../../lib/reference';
+import { recordOrder, type OrderRecord } from '../../../lib/orders';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   // Signature verification needs the RAW body — never call request.json() first.
   const raw = await request.text();
   const sig = request.headers.get('stripe-signature');
@@ -48,6 +49,29 @@ export const POST: APIRoute = async ({ request }) => {
 
   const session = event.data.object as Stripe.Checkout.Session;
   const m = session.metadata ?? {};
+  const createdAt = new Date(event.created * 1000);
+  const order: OrderRecord = {
+    id: session.id,
+    kind: m.kind === 'followup' ? 'followup' : 'kundli',
+    amountTotal: session.amount_total ?? 0,
+    currency: session.currency ?? '',
+    email: session.customer_email ?? m.email ?? '',
+    fullName: m.fullName || undefined,
+    questionCount:
+      m.kind === 'kundli'
+        ? JSON.parse(m.questions || '[]').length
+        : m.kind === 'followup'
+          ? Number(m.questionCount)
+          : undefined,
+    createdAt: createdAt.toISOString(),
+    createdAtMs: createdAt.getTime(),
+  };
+
+  try {
+    await recordOrder(locals.runtime.env.SIDDH_KV, order);
+  } catch (err) {
+    console.error('Order persistence error:', err);
+  }
 
   try {
     if (m.kind === 'kundli') {

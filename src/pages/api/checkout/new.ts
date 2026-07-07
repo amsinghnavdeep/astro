@@ -13,7 +13,7 @@ import { getPricing } from '../../../lib/pricing';
 import { birthDetailsSchema } from '../../../lib/validation';
 import { randomPandit } from '../../../lib/pandits';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
   let payload: unknown;
   try {
     payload = await request.json();
@@ -27,7 +27,7 @@ export const POST: APIRoute = async ({ request }) => {
   }
   const d = parsed.data;
   const pandit = randomPandit();
-  const pricing = await getPricing();
+  const pricing = await getPricing(locals.runtime.env.SIDDH_KV);
 
   const session = await stripe().checkout.sessions.create({
     mode: 'payment',
