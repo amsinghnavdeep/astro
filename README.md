@@ -98,7 +98,8 @@ Devin cost; ACUs are billed per session run regardless of who triggers it.
 2. `POST /api/checkout/followup` → we validate the reference decrypts, price by
    question count ($8 / $11 / $13), then Stripe Checkout.
 3. On success, the webhook **decrypts the reference → session_id**, and resumes
-   that session with the **`!kundli_followup`** playbook.
+   that session (the original `!kundli` context; see [follow-up playbook
+   limitation](#environment-variables-env)).
 4. Playbook reuses the already-computed chart and answers **only** those 1–3
    questions (dasha/transit timing), **no new PDF**.
 5. Backend emails the precise answers.
@@ -182,10 +183,17 @@ npm run dev               # http://localhost:4321
 | `PUBLIC_SITE_URL` | site URL for Stripe redirects |
 | `DEVIN_API_KEY` | Devin **service-user** key (prefix `cog_`, server only) — v3 API |
 | `DEVIN_ORG_ID` | Devin org id (prefix `org-`), required by v3 org-scoped endpoints |
-| `DEVIN_KUNDLI_PLAYBOOK` / `DEVIN_FOLLOWUP_PLAYBOOK` | playbook ids |
+| `DEVIN_KUNDLI_PLAYBOOK` | Playbook id for the `!kundli` chart-generation playbook (used at session creation) |
+| `DEVIN_FOLLOWUP_PLAYBOOK` | Playbook id for the `!kundli_followup` Q&A playbook (documented only — see note below) |
 | `REFERENCE_SECRET` | base64 of 32 random bytes — reference encryption key |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe keys |
 | `RESEND_API_KEY` / `EMAIL_FROM` | email delivery |
+
+> **Follow-up playbook limitation:** The Devin v3 message API does not accept a
+> `playbook_id`, so `DEVIN_FOLLOWUP_PLAYBOOK` is not applied when resuming a
+> session for follow-up questions. Follow-ups reuse the original `!kundli`
+> session's context. If the API adds playbook-on-resume support in the future,
+> `askFollowup()` in `src/lib/devin.ts` should be updated to pass it.
 
 Generate a reference key:
 ```bash

@@ -48,6 +48,9 @@ export const env = {
     },
     apiBase: optional('DEVIN_API_BASE', 'https://api.devin.ai'),
     kundliPlaybook: optional('DEVIN_KUNDLI_PLAYBOOK'),
+    // Not consumed at runtime — the v3 message API does not accept a
+    // playbook_id, so follow-ups resume the original session's context.
+    // Retained for documentation; will be wired in if the API adds support.
     followupPlaybook: optional('DEVIN_FOLLOWUP_PLAYBOOK'),
   },
 
