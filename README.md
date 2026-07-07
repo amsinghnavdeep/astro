@@ -129,11 +129,13 @@ playbook reuses the original session's chart and produces no new report.
 
 ## 5. Tech stack
 
-- **[Astro](https://astro.build) (SSR, Node adapter)** — UI + API in one app.
+- **[Astro](https://astro.build) (SSR, Cloudflare Workers adapter)** — UI + API
+  in one app.
 - **Stripe Checkout** — hosted payment, no accounts; metadata as our store.
 - **Devin REST API** — runs/ resumes playbook sessions.
 - **Resend** — transactional email + PDF delivery.
-- **AES-256-GCM** (Node `crypto`) — the encrypted reference number.
+- **AES-256-GCM** (Node `crypto` via Workers `nodejs_compat`) — the encrypted
+  reference number.
 - **TypeScript**, **Zod** — type-safe, validated inputs.
 
 ---
@@ -162,6 +164,7 @@ astro/
 │        ├─ admin/pricing.ts     # protected GET/PUT runtime pricing config
 │        └─ status.ts            # poll session state for the success page
 ├─ astro.config.mjs
+├─ wrangler.jsonc
 ├─ .env.example
 └─ README.md
 ```
@@ -261,9 +264,29 @@ cached in-memory for ~30s).
 > correct minor unit, or you will mis-charge customers.
 
 ### Deploy (serverless, free tier)
-Deploy the app to Vercel / Netlify / Cloudflare. Set the same env vars in the
-dashboard. Point a Stripe webhook at `/api/stripe/webhook`. That's the entire
-infra — no DB, no server to manage.
+Cloudflare Workers / Pages. `npm run build` produces `dist/_worker.js` plus
+static assets in `dist/`.
+
+Deploy to Workers with `npm run deploy` (`wrangler deploy`) using
+`wrangler.jsonc`, or deploy to Cloudflare Pages with
+`wrangler pages deploy dist`.
+
+Runtime secrets/vars from `.env.example` are set in Cloudflare with
+`wrangler secret put <NAME>` (or the Cloudflare dashboard / Pages env vars) —
+do **not** commit them.
+
+Local dev/preview uses a gitignored `.dev.vars` with the same vars:
+
+```bash
+npm run dev      # astro dev + platformProxy
+npm run preview  # wrangler dev
+```
+
+Point the Stripe webhook at `/api/stripe/webhook`. No DB, no server to manage.
+
+`nodejs_compat` + `compatibility_date = "2025-04-01"` are required so Workers
+exposes `node:crypto` / `Buffer` for the reference-token AES helper and
+populates `process.env` for `src/lib/env.ts`.
 
 ---
 

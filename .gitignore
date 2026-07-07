@@ -6,3 +6,8 @@ dist/
 .DS_Store
 *.log
 .astro/
+
+# Cloudflare / Wrangler
+.wrangler/
+.dev.vars
+.dev.vars.*
