@@ -13,9 +13,12 @@ import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
 import { stripe } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
-import { createKundliSession, askFollowup } from '../../../lib/devin';
+import {
+  createKundliSession,
+  askFollowup,
+  instructKundliDelivery,
+} from '../../../lib/devin';
 import { encodeReference, decodeReference } from '../../../lib/reference';
-import { sendEmail, kundliDeliveryHtml } from '../../../lib/email';
 
 export const POST: APIRoute = async ({ request }) => {
   // Signature verification needs the RAW body — never call request.json() first.
@@ -41,23 +44,28 @@ export const POST: APIRoute = async ({ request }) => {
   try {
     if (m.kind === 'kundli') {
       const questions = JSON.parse(m.questions || '[]') as string[];
+      const pandit = m.pandit || 'our senior astrologer';
       const devinSession = await createKundliSession({
         fullName: m.fullName,
+        gender: (m.gender as 'Male' | 'Female' | 'Other') || 'Other',
         dateOfBirth: m.dateOfBirth,
         timeOfBirth: m.timeOfBirth,
         placeOfBirth: m.placeOfBirth,
         email: m.email,
         questions,
+        pandit,
       });
       const reference = encodeReference(devinSession.session_id);
 
-      // We email the reference NOW (Stripe needs a fast 200). The PDF itself is
-      // produced asynchronously and emailed by the `!kundli` playbook once ready
-      // (the customer email is passed into the session prompt), so no polling here.
-      await sendEmail({
-        to: m.email,
-        subject: 'Your Kundli reference number',
-        html: kundliDeliveryHtml(m.fullName, reference),
+      // No backend email here (Stripe needs a fast 200). We hand the session the
+      // reference + delivery instruction; the `!kundli` playbook then sends the
+      // customer EXACTLY ONE email — framed as from their Pandit — with the PDF
+      // attached and the reference number included. No polling needed.
+      await instructKundliDelivery(devinSession.session_id, {
+        reference,
+        pandit,
+        email: m.email,
+        fullName: m.fullName,
       });
     } else if (m.kind === 'followup') {
       const sessionId = decodeReference(m.reference);

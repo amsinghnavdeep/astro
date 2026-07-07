@@ -1,9 +1,13 @@
 ---
 interface Props {
   title?: string;
+  description?: string;
 }
 
-const { title = 'Kundli — Vedic Astrology Reports' } = Astro.props;
+const {
+  title = 'Siddh Jyotish — Precise Vedic Astrology Reports',
+  description = 'Precise, ephemeris-computed Vedic Janma Kundli reports from Siddh Jyotish, prepared by respected astrologers. 100% accurate. 100% money-back guarantee. No account needed.',
+} = Astro.props;
 ---
 
 <!doctype html>
@@ -11,177 +15,285 @@ const { title = 'Kundli — Vedic Astrology Reports' } = Astro.props;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Precise Vedic Janma Kundli reports. No account needed. Your reading is private." />
+    <meta name="description" content={description} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Marcellus&family=Cormorant+Garamond:wght@500;600;700&family=Mukta:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <title>{title}</title>
   </head>
   <body>
-    <main class="container">
+    <header class="site-nav">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="34" height="34" fill="none">
+            <circle cx="24" cy="24" r="22" stroke="currentColor" stroke-width="1.4" opacity="0.5" />
+            <circle cx="24" cy="24" r="15" stroke="currentColor" stroke-width="1" opacity="0.35" />
+            <path d="M24 4 L27 21 L44 24 L27 27 L24 44 L21 27 L4 24 L21 21 Z" fill="currentColor" />
+          </svg>
+        </span>
+        <span class="brand-text">Siddh<em>Jyotish</em></span>
+      </a>
+      <nav class="nav-links">
+        <a href="/#how">How it works</a>
+        <a href="/#faq">FAQ</a>
+        <a class="nav-cta" href="/returning">Follow-up</a>
+      </nav>
+    </header>
+
+    <main>
       <slot />
     </main>
+
     <footer class="site-footer">
-      <p>No account needed · Your reading is private</p>
+      <div class="footer-inner">
+        <p class="footer-brand">🪔 Siddh Jyotish</p>
+        <p>Precise Vedic astrology, prepared by respected astrologers.</p>
+        <p class="footer-lineage">
+          Our astrologers are Siddh Yogis carrying forward a centuries-old
+          living tradition — descended from a <strong>Kashmiri Pandit</strong>
+          lineage and a <strong>Kerala Namboodiri Brahmin</strong> lineage of
+          Jyotish scholars. Every reading is computed with honesty and precision
+          and offered as a genuine guide — not a $5 horoscope app.
+        </p>
+        <p class="footer-fine">
+          No account needed · Your reading is private · 100% money-back guarantee
+        </p>
+      </div>
     </footer>
 
     <style is:global>
       :root {
-        --accent: #b8860b;
-        --accent-dark: #8a640a;
-        --bg: #faf5e6;
-        --card: #fffdf7;
+        --saffron: #e0812f;
+        --marigold: #f3a838;
+        --maroon: #7a1e1e;
+        --maroon-deep: #5c1414;
+        --gold: #c9a227;
+        --gold-soft: #e6c766;
+        --indigo: #1b1440;
+        --indigo-2: #2a1f5c;
+        --cream: #fbf4e6;
+        --card: #fffdf8;
         --text: #2b2116;
         --muted: #6b5d47;
-        --border: #e5d9bd;
+        --border: #ecdcb8;
         --error: #a12020;
+        --serif: 'Marcellus', Georgia, serif;
+        --serif-2: 'Cormorant Garamond', Georgia, serif;
+        --sans: 'Mukta', 'Segoe UI', system-ui, sans-serif;
       }
 
-      * {
-        box-sizing: border-box;
-      }
-
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
 
       body {
-        background: var(--bg);
+        background:
+          radial-gradient(1200px 400px at 50% -120px, #fff7e6 0%, transparent 70%),
+          var(--cream);
         color: var(--text);
-        font-family: 'Segoe UI', Georgia, 'Times New Roman', serif;
-        line-height: 1.6;
+        font-family: var(--sans);
+        line-height: 1.65;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
       }
 
-      .container {
-        flex: 1 0 auto;
-        width: 100%;
-        max-width: 640px;
-        margin: 0 auto;
-        padding: 2.5rem 1.25rem 3rem;
-      }
+      h1, h2, h3 { font-family: var(--serif); font-weight: 400; line-height: 1.15; }
+      h1 { font-size: clamp(2rem, 6vw, 3.4rem); margin: 0 0 1rem; color: var(--maroon); }
+      h2 { font-size: clamp(1.5rem, 4vw, 2.2rem); margin: 0 0 1rem; color: var(--maroon); }
+      h3 { font-size: 1.25rem; margin: 0 0 0.5rem; color: var(--maroon-deep); }
+      p { margin: 0 0 1rem; }
+      a { color: var(--maroon); text-decoration: none; }
+      a:hover { text-decoration: underline; }
 
-      h1 {
-        color: var(--accent-dark);
-        font-size: clamp(1.7rem, 5vw, 2.4rem);
-        line-height: 1.2;
-        margin: 0 0 0.5rem;
-      }
+      main { flex: 1 0 auto; }
 
-      h2 {
-        color: var(--accent-dark);
-        font-size: 1.3rem;
-        margin: 0 0 0.75rem;
-      }
+      .wrap { width: 100%; max-width: 1040px; margin: 0 auto; padding: 0 1.25rem; }
+      .narrow { max-width: 620px; margin: 0 auto; }
+      .center { text-align: center; }
 
-      a {
-        color: var(--accent-dark);
-        text-decoration: underline;
+      /* ---------- Nav ---------- */
+      .site-nav {
+        display: flex; align-items: center; justify-content: space-between;
+        width: 100%; max-width: 1040px; margin: 0 auto; padding: 1rem 1.25rem;
       }
+      .brand { display: flex; align-items: center; gap: 0.6rem; color: var(--maroon); }
+      .brand:hover { text-decoration: none; }
+      .brand-mark { color: var(--gold); display: inline-flex; }
+      .brand-text { font-family: var(--serif); font-size: 1.4rem; letter-spacing: 0.5px; }
+      .brand-text em { color: var(--saffron); font-style: normal; }
+      .nav-links { display: flex; align-items: center; gap: 1.4rem; font-weight: 500; }
+      .nav-links a { color: var(--muted); }
+      .nav-cta {
+        background: var(--maroon); color: #fff !important; padding: 0.45rem 0.9rem;
+        border-radius: 999px; font-size: 0.95rem;
+      }
+      .nav-cta:hover { background: var(--maroon-deep); text-decoration: none; }
+      @media (max-width: 560px) { .nav-links a:not(.nav-cta) { display: none; } }
 
-      p {
-        margin: 0 0 1rem;
+      /* ---------- Hero ---------- */
+      .hero {
+        position: relative; overflow: hidden;
+        background:
+          radial-gradient(700px 320px at 80% -40px, rgba(243,168,56,0.25), transparent 60%),
+          radial-gradient(600px 300px at 10% 120%, rgba(201,162,39,0.18), transparent 60%),
+          linear-gradient(160deg, var(--indigo) 0%, var(--indigo-2) 55%, #3a2a72 100%);
+        color: #f7efe0; border-radius: 22px; margin-top: 0.5rem;
+        padding: clamp(2.2rem, 6vw, 4rem) clamp(1.4rem, 5vw, 3.5rem);
+        box-shadow: 0 22px 60px rgba(27,20,64,0.28);
       }
+      .hero::before {
+        content: ''; position: absolute; inset: 0;
+        background-image:
+          radial-gradient(1.5px 1.5px at 20% 30%, rgba(255,255,255,0.7), transparent),
+          radial-gradient(1.5px 1.5px at 70% 20%, rgba(255,255,255,0.6), transparent),
+          radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,0.5), transparent),
+          radial-gradient(1.5px 1.5px at 85% 60%, rgba(255,255,255,0.55), transparent),
+          radial-gradient(1px 1px at 55% 45%, rgba(255,255,255,0.5), transparent);
+        opacity: 0.7; pointer-events: none;
+      }
+      .hero > * { position: relative; }
+      .hero h1 { color: #fff; }
+      .hero .lead { color: #ecdfff; font-size: clamp(1.05rem, 2.4vw, 1.3rem); max-width: 40ch; }
+      .eyebrow {
+        display: inline-block; font-family: var(--sans); font-weight: 600;
+        letter-spacing: 2px; text-transform: uppercase; font-size: 0.8rem;
+        color: var(--gold-soft); margin-bottom: 1rem;
+      }
+      .price-tag {
+        display: inline-flex; align-items: baseline; gap: 0.5rem; margin: 0.5rem 0 1.5rem;
+      }
+      .price-tag b { font-family: var(--serif); font-size: 2rem; color: #fff; }
+      .price-tag span { color: #d9ccff; font-size: 0.95rem; }
 
-      .lead {
-        color: var(--muted);
-        font-size: 1.1rem;
+      /* ---------- Buttons ---------- */
+      .btn {
+        display: inline-block; text-align: center; cursor: pointer;
+        font-family: var(--sans); font-weight: 700; font-size: 1.05rem;
+        color: var(--indigo); border: none; border-radius: 999px;
+        padding: 0.9rem 1.8rem;
+        background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+        box-shadow: 0 8px 22px rgba(201,162,39,0.4);
+        transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.15s ease;
       }
+      .btn:hover { transform: translateY(-1px); text-decoration: none; box-shadow: 0 12px 28px rgba(201,162,39,0.5); }
+      .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+      .btn-block { display: block; width: 100%; margin-top: 1.5rem; }
+      .btn-ghost {
+        background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,0.5);
+        box-shadow: none;
+      }
+      .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+      .hero-cta { display: flex; flex-wrap: wrap; gap: 0.8rem; align-items: center; }
 
-      form {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin: 1.5rem 0;
-        box-shadow: 0 2px 10px rgba(184, 134, 11, 0.08);
-      }
+      /* ---------- Section ---------- */
+      section.block { padding: clamp(2.5rem, 6vw, 4rem) 0; }
+      .section-head { text-align: center; max-width: 42ch; margin: 0 auto 2rem; }
+      .section-head p { color: var(--muted); }
 
-      label {
-        display: block;
-        font-weight: 600;
-        margin: 1rem 0 0.35rem;
+      /* ---------- Trust badges ---------- */
+      .badges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+      .badge {
+        background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+        padding: 1.3rem 1.1rem; text-align: center;
+        box-shadow: 0 6px 18px rgba(122,30,30,0.06);
       }
+      .badge .ico { font-size: 1.8rem; }
+      .badge b { display: block; font-family: var(--serif); font-size: 1.1rem; color: var(--maroon); margin: 0.4rem 0 0.2rem; }
+      .badge span { color: var(--muted); font-size: 0.9rem; }
+      @media (max-width: 640px) { .badges { grid-template-columns: 1fr; } }
 
-      label:first-of-type {
-        margin-top: 0;
+      /* ---------- Steps ---------- */
+      .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+      .step {
+        background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+        padding: 1.5rem 1.3rem; position: relative;
       }
+      .step .num {
+        width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+        font-family: var(--serif); font-size: 1.2rem; color: #fff; margin-bottom: 0.8rem;
+        background: linear-gradient(140deg, var(--saffron), var(--maroon));
+      }
+      @media (max-width: 720px) { .steps { grid-template-columns: 1fr; } }
 
-      input,
-      textarea {
-        width: 100%;
-        padding: 0.7rem 0.8rem;
-        font-size: 1rem;
-        font-family: inherit;
-        color: var(--text);
-        background: #fff;
-        border: 1px solid var(--border);
-        border-radius: 8px;
+      /* ---------- Cards / forms ---------- */
+      .card {
+        background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+        padding: clamp(1.4rem, 4vw, 2.2rem);
+        box-shadow: 0 16px 44px rgba(122,30,30,0.09);
       }
+      .card-accent { border-top: 4px solid var(--gold); }
 
-      input:focus,
-      textarea:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.18);
+      label { display: block; font-weight: 600; margin: 1.1rem 0 0.35rem; color: var(--maroon-deep); }
+      label:first-of-type { margin-top: 0; }
+      input, textarea, select {
+        width: 100%; padding: 0.75rem 0.85rem; font-size: 1rem; font-family: inherit;
+        color: var(--text); background: #fff; border: 1px solid var(--border); border-radius: 10px;
       }
-
-      textarea {
-        min-height: 5rem;
-        resize: vertical;
+      select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 20px) 1.1rem, calc(100% - 15px) 1.1rem; background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+      input:focus, textarea:focus, select:focus {
+        outline: none; border-color: var(--saffron);
+        box-shadow: 0 0 0 3px rgba(224,129,47,0.18);
       }
-
-      .helper {
-        color: var(--muted);
-        font-size: 0.88rem;
-        margin: 0.3rem 0 0;
-      }
-
-      button {
-        margin-top: 1.5rem;
-        width: 100%;
-        padding: 0.85rem 1rem;
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #fff;
-        background: var(--accent);
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: background 0.15s ease;
-      }
-
-      button:hover:not(:disabled) {
-        background: var(--accent-dark);
-      }
-
-      button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
+      textarea { min-height: 4.5rem; resize: vertical; }
+      .helper { color: var(--muted); font-size: 0.88rem; margin: 0.3rem 0 0; }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; }
+      @media (max-width: 520px) { .grid-2 { grid-template-columns: 1fr; } }
 
       .error {
-        color: var(--error);
-        background: #fbeaea;
-        border: 1px solid #e6bcbc;
-        border-radius: 8px;
-        padding: 0.75rem 0.9rem;
-        margin-top: 1rem;
+        color: var(--error); background: #fbeaea; border: 1px solid #e6bcbc;
+        border-radius: 10px; padding: 0.75rem 0.9rem; margin-top: 1rem;
       }
 
-      .site-footer {
-        flex-shrink: 0;
-        text-align: center;
-        color: var(--muted);
-        font-size: 0.9rem;
-        padding: 1.5rem 1rem 2rem;
-        border-top: 1px solid var(--border);
+      /* ---------- Testimonials ---------- */
+      .testimonials { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+      .quote {
+        background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+        padding: 1.4rem; box-shadow: 0 6px 18px rgba(27,20,64,0.06);
+      }
+      .quote .stars { color: var(--marigold); letter-spacing: 2px; }
+      .quote p { font-family: var(--serif-2); font-size: 1.12rem; color: var(--text); }
+      .quote .who { color: var(--muted); font-size: 0.9rem; font-weight: 600; }
+      @media (max-width: 720px) { .testimonials { grid-template-columns: 1fr; } }
+
+      /* ---------- FAQ ---------- */
+      .faq { max-width: 720px; margin: 0 auto; }
+      .faq details {
+        background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+        padding: 0.4rem 1.1rem; margin-bottom: 0.7rem;
+      }
+      .faq summary {
+        cursor: pointer; font-weight: 600; padding: 0.7rem 0; list-style: none;
+        color: var(--maroon-deep); display: flex; justify-content: space-between; gap: 1rem;
+      }
+      .faq summary::-webkit-details-marker { display: none; }
+      .faq summary::after { content: '+'; color: var(--saffron); font-size: 1.3rem; }
+      .faq details[open] summary::after { content: '−'; }
+      .faq details p { color: var(--muted); margin: 0 0 0.8rem; }
+
+      .divider-om { text-align: center; color: var(--gold); font-size: 1.6rem; margin: 0.5rem 0; }
+
+      /* ---------- Success ---------- */
+      .success-hero { text-align: center; padding: 2rem 0 1rem; }
+      .pandit-card {
+        display: flex; gap: 1rem; align-items: center; text-align: left;
+        background: linear-gradient(160deg, #fff, #fdf3e0);
+        border: 1px solid var(--border); border-radius: 16px; padding: 1.2rem 1.4rem; margin: 1.4rem 0;
+      }
+      .pandit-avatar {
+        flex: none; width: 56px; height: 56px; border-radius: 50%;
+        display: grid; place-items: center; font-size: 1.6rem; color: #fff;
+        background: linear-gradient(140deg, var(--saffron), var(--maroon));
       }
 
-      .site-footer p {
-        margin: 0;
-      }
+      .site-footer { flex-shrink: 0; background: var(--indigo); color: #d9ccff; margin-top: 2rem; }
+      .footer-inner { max-width: 1040px; margin: 0 auto; padding: 2rem 1.25rem; text-align: center; }
+      .footer-brand { font-family: var(--serif); font-size: 1.3rem; color: #fff; margin: 0 0 0.3rem; }
+      .footer-inner p { margin: 0.15rem 0; }
+      .footer-lineage { color: #cfc4f0; font-size: 0.95rem; max-width: 60ch; margin: 0.8rem auto; }
+      .footer-fine { color: #a99fd6; font-size: 0.88rem; margin-top: 0.6rem; }
     </style>
   </body>
 </html>

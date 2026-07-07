@@ -20,7 +20,12 @@ export const GET: APIRoute = async ({ url }) => {
     return json({ state: 'unpaid' });
   }
 
-  return json({ state: 'paid', kind: session.metadata?.kind });
+  return json({
+    state: 'paid',
+    kind: session.metadata?.kind,
+    pandit: session.metadata?.pandit,
+    fullName: session.metadata?.fullName,
+  });
 };
 
 function json(body: unknown, status = 200): Response {

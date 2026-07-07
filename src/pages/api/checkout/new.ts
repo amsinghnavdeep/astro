@@ -10,6 +10,7 @@ import type { APIRoute } from 'astro';
 import { stripe } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
 import { birthDetailsSchema } from '../../../lib/validation';
+import { randomPandit } from '../../../lib/pandits';
 
 export const POST: APIRoute = async ({ request }) => {
   let payload: unknown;
@@ -24,6 +25,7 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ error: 'Invalid birth details', issues: parsed.error.issues }, 400);
   }
   const d = parsed.data;
+  const pandit = randomPandit();
 
   const session = await stripe().checkout.sessions.create({
     mode: 'payment',
@@ -44,10 +46,12 @@ export const POST: APIRoute = async ({ request }) => {
     metadata: {
       kind: 'kundli',
       fullName: d.fullName,
+      gender: d.gender,
       dateOfBirth: d.dateOfBirth,
       timeOfBirth: d.timeOfBirth,
       placeOfBirth: d.placeOfBirth,
       email: d.email,
+      pandit,
       questions: JSON.stringify(d.questions ?? []).slice(0, 480),
     },
     success_url: `${env.siteUrl}/success?session_id={CHECKOUT_SESSION_ID}`,

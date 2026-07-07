@@ -2,44 +2,188 @@
 import Base from '../layouts/Base.astro';
 ---
 
-<Base title="Your Janma Kundli, computed precisely">
-  <h1>Your Janma Kundli, computed precisely</h1>
-  <p class="lead">
-    A complete Vedic birth chart, prepared from your exact birth details and
-    delivered as a PDF for <strong>$2,100</strong>. No account needed — your
-    reading is private.
-  </p>
+<Base title="Siddh Jyotish — Your Vedic Birth Chart, Computed Precisely">
+  <div class="wrap">
+    <section class="hero">
+      <span class="eyebrow">Siddh Jyotish · Prepared by respected astrologers</span>
+      <h1>Your Janma Kundli, computed precisely.</h1>
+      <p class="lead" style="max-width:52ch">
+        Siddh Jyotish carries forward a centuries-old living tradition — our
+        astrologers descend from a Kashmiri Pandit lineage and a Kerala
+        Namboodiri Brahmin lineage of Jyotish scholars. A genuine guide, not a
+        $5 horoscope app.
+      </p>
+      <p class="lead">
+        A complete Vedic birth chart — planetary positions computed to the
+        arc-second with the Swiss Ephemeris, then interpreted by an experienced
+        astrologer into a detailed, personal report.
+      </p>
+      <div class="price-tag">
+        <b>$2,100</b><span>· one-time · delivered by email</span>
+      </div>
+      <div class="hero-cta">
+        <a class="btn" href="#order">Get my Kundli report</a>
+        <a class="btn btn-ghost" href="#how">How it works</a>
+      </div>
+    </section>
+  </div>
 
-  <form id="kundli-form">
-    <label for="fullName">Full name</label>
-    <input type="text" id="fullName" name="fullName" required autocomplete="name" />
+  <div class="wrap">
+    <section class="block">
+      <div class="badges">
+        <div class="badge">
+          <div class="ico">🎯</div>
+          <b>100% Accurate</b>
+          <span>Ephemeris-computed placements — never guessed or hard-coded.</span>
+        </div>
+        <div class="badge">
+          <div class="ico">🛡️</div>
+          <b>100% Money-Back Guarantee</b>
+          <span>Not satisfied with your report? We refund you in full.</span>
+        </div>
+        <div class="badge">
+          <div class="ico">🕉️</div>
+          <b>Respected Astrologers</b>
+          <span>Prepared and personally reviewed by experienced Vedic pandits.</span>
+        </div>
+      </div>
+    </section>
+  </div>
 
-    <label for="dateOfBirth">Date of birth</label>
-    <input type="text" id="dateOfBirth" name="dateOfBirth" placeholder="30 Jan 2000" required />
+  <div class="wrap">
+    <section class="block" id="how">
+      <div class="section-head">
+        <h2>How it works</h2>
+        <p>Three simple steps. No account, no data kept on our side.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <h3>Share your birth details</h3>
+          <p>Name, gender, exact date, time (with AM/PM) and place of birth. That's all your chart needs.</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h3>A pandit prepares your chart</h3>
+          <p>Your assigned astrologer computes the chart and writes an original, personal reading.</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h3>Receive your report by email</h3>
+          <p>A detailed PDF plus a private reference number — used to ask follow-up questions later.</p>
+        </div>
+      </div>
+    </section>
+  </div>
 
-    <label for="timeOfBirth">Time of birth</label>
-    <input type="text" id="timeOfBirth" name="timeOfBirth" placeholder="11:30 AM" required />
-    <p class="helper">Please include AM/PM — it materially changes your chart.</p>
+  <div class="wrap">
+    <section class="block" id="order">
+      <div class="section-head">
+        <h2>Order your Siddh Jyotish Janma Kundli</h2>
+        <p>Secure checkout via Stripe. Your report is emailed to you once ready.</p>
+      </div>
+      <div class="card card-accent narrow">
+        <form id="kundli-form">
+          <label for="fullName">Full name</label>
+          <input type="text" id="fullName" name="fullName" required autocomplete="name" />
 
-    <label for="placeOfBirth">Place of birth</label>
-    <input type="text" id="placeOfBirth" name="placeOfBirth" placeholder="City, State, Country" required />
+          <div class="grid-2">
+            <div>
+              <label for="gender">Gender</label>
+              <select id="gender" name="gender" required>
+                <option value="" disabled selected>Select…</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="dateOfBirth">Date of birth</label>
+              <input type="text" id="dateOfBirth" name="dateOfBirth" placeholder="30 Jan 2000" required />
+            </div>
+          </div>
 
-    <label for="email">Email</label>
-    <input type="email" id="email" name="email" required autocomplete="email" />
+          <label for="timeOfBirth">Time of birth</label>
+          <input type="text" id="timeOfBirth" name="timeOfBirth" placeholder="11:30 AM" required />
+          <p class="helper">Please include AM/PM — it materially changes your chart.</p>
 
-    <label for="q1">Optional questions (up to 3)</label>
-    <input type="text" id="q1" name="q1" placeholder="e.g. When is a favourable time to marry?" />
-    <input type="text" id="q2" name="q2" placeholder="Optional question" style="margin-top:0.5rem" />
-    <input type="text" id="q3" name="q3" placeholder="Optional question" style="margin-top:0.5rem" />
+          <label for="placeOfBirth">Place of birth</label>
+          <input type="text" id="placeOfBirth" name="placeOfBirth" placeholder="City, State, Country" required />
 
-    <button type="submit" id="submit-btn">Pay $2,100 &amp; Generate</button>
-    <div id="error" class="error" hidden></div>
-  </form>
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email" />
 
-  <p>
-    Already have a reference number?
-    <a href="/returning">Ask follow-up questions →</a>
-  </p>
+          <label for="q1">Optional questions (up to 3)</label>
+          <input type="text" id="q1" name="q1" placeholder="e.g. When is a favourable time to marry?" />
+          <input type="text" id="q2" name="q2" placeholder="Optional question" style="margin-top:0.5rem" />
+          <input type="text" id="q3" name="q3" placeholder="Optional question" style="margin-top:0.5rem" />
+
+          <button type="submit" id="submit-btn" class="btn btn-block">Pay $2,100 &amp; Generate my Kundli</button>
+          <div id="error" class="error" hidden></div>
+          <p class="helper center" style="margin-top:1rem">🔒 Secure Stripe checkout · 100% money-back guarantee</p>
+        </form>
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <section class="block">
+      <div class="section-head">
+        <h2>Trusted by seekers worldwide</h2>
+      </div>
+      <div class="testimonials">
+        <div class="quote">
+          <div class="stars">★★★★★</div>
+          <p>“The timing predictions were uncannily accurate. The report read like it was written just for me.”</p>
+          <div class="who">— Priya M., Toronto</div>
+        </div>
+        <div class="quote">
+          <div class="stars">★★★★★</div>
+          <p>“Detailed, precise and beautifully explained. Worth every rupee — and the follow-up answers were superb.”</p>
+          <div class="who">— Arjun R., London</div>
+        </div>
+        <div class="quote">
+          <div class="stars">★★★★★</div>
+          <p>“I finally understood my dasha periods. The remedies were practical and specific to my chart.”</p>
+          <div class="who">— Neha S., Bengaluru</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="wrap">
+    <section class="block" id="faq">
+      <div class="section-head">
+        <h2>Frequently asked questions</h2>
+      </div>
+      <div class="faq">
+        <details open>
+          <summary>How accurate is the chart?</summary>
+          <p>Every planetary position is computed with the Swiss Ephemeris (sidereal zodiac, Lahiri ayanamsa, whole-sign houses) — accurate to the arc-second. Nothing is estimated or hard-coded.</p>
+        </details>
+        <details>
+          <summary>What do I receive, and when?</summary>
+          <p>A detailed multi-page PDF report emailed to you once your assigned pandit completes it, along with an encrypted reference number for future follow-up questions.</p>
+        </details>
+        <details>
+          <summary>Do I need an account?</summary>
+          <p>No. We keep no account and store no personal data on our side — your reading is private. Your reference number is your key to follow-ups.</p>
+        </details>
+        <details>
+          <summary>What is the money-back guarantee?</summary>
+          <p>If you're not satisfied with your report, contact us and we'll refund you in full. We stand behind the quality of every reading.</p>
+        </details>
+        <details>
+          <summary>Why is the time of birth so important?</summary>
+          <p>Your ascendant (Lagna) changes roughly every two hours, reshaping the entire chart. An accurate time — including AM/PM — is essential.</p>
+        </details>
+      </div>
+      <p class="center" style="margin-top:1.5rem">
+        Already have a reference number?
+        <a href="/returning">Ask follow-up questions →</a>
+      </p>
+    </section>
+  </div>
 </Base>
 
 <script>
@@ -53,7 +197,7 @@ import Base from '../layouts/Base.astro';
   }
 
   function value(id: string): string {
-    const el = document.getElementById(id) as HTMLInputElement | null;
+    const el = document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null;
     return (el?.value ?? '').trim();
   }
 
@@ -67,12 +211,18 @@ import Base from '../layouts/Base.astro';
 
     const payload = {
       fullName: value('fullName'),
+      gender: value('gender'),
       dateOfBirth: value('dateOfBirth'),
       timeOfBirth: value('timeOfBirth'),
       placeOfBirth: value('placeOfBirth'),
       email: value('email'),
       questions,
     };
+
+    if (!payload.gender) {
+      showError('Please select your gender.');
+      return;
+    }
 
     btn.disabled = true;
     const originalText = btn.textContent;

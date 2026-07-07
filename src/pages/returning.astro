@@ -2,31 +2,42 @@
 import Base from '../layouts/Base.astro';
 ---
 
-<Base title="Ask 2 follow-up questions — $1,100">
-  <h1>Ask 2 follow-up questions — $1,100</h1>
-  <p class="lead">
-    Already have your Kundli? Paste your reference number and ask two more
-    questions. We reuse your existing chart — no new PDF.
-  </p>
+<Base title="Siddh Jyotish — Ask 2 follow-up questions — $1,100">
+  <div class="wrap">
+    <section class="block">
+      <div class="section-head">
+        <span class="eyebrow">Returning seeker</span>
+        <h2>Ask 2 follow-up questions</h2>
+        <p>
+          Already have your Kundli? Paste your reference number and ask two more
+          questions. Your assigned pandit reuses your existing chart — no new PDF,
+          just precise answers for <strong>$1,100</strong>.
+        </p>
+      </div>
 
-  <form id="followup-form">
-    <label for="reference">Reference number</label>
-    <textarea id="reference" name="reference" placeholder="Paste your reference number" required></textarea>
+      <div class="card card-accent narrow">
+        <form id="followup-form">
+          <label for="reference">Reference number</label>
+          <textarea id="reference" name="reference" placeholder="Paste your encrypted reference number" required></textarea>
 
-    <label for="email">Email</label>
-    <input type="email" id="email" name="email" required autocomplete="email" />
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email" />
 
-    <label for="q1">Question 1</label>
-    <input type="text" id="q1" name="q1" required />
+          <label for="q1">Question 1</label>
+          <input type="text" id="q1" name="q1" placeholder="e.g. Is the coming year favourable for a career change?" required />
 
-    <label for="q2">Question 2</label>
-    <input type="text" id="q2" name="q2" required />
+          <label for="q2">Question 2</label>
+          <input type="text" id="q2" name="q2" placeholder="e.g. When is an auspicious time to buy property?" required />
 
-    <button type="submit" id="submit-btn">Pay $1,100 &amp; Get Answers</button>
-    <div id="error" class="error" hidden></div>
-  </form>
+          <button type="submit" id="submit-btn" class="btn btn-block">Pay $1,100 &amp; Get Answers</button>
+          <div id="error" class="error" hidden></div>
+          <p class="helper center" style="margin-top:1rem">🔒 Secure Stripe checkout · Answers delivered by email</p>
+        </form>
+      </div>
 
-  <p><a href="/">← Back to a new Kundli reading</a></p>
+      <p class="center" style="margin-top:1.5rem"><a href="/">← Back to a new Siddh Jyotish reading</a></p>
+    </section>
+  </div>
 </Base>
 
 <script>

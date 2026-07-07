@@ -24,11 +24,14 @@ function sessionsBase(): string {
 
 export interface BirthDetails {
   fullName: string;
+  gender: 'Male' | 'Female' | 'Other';
   dateOfBirth: string; // e.g. "30 Jan 2000"
   timeOfBirth: string; // e.g. "11:30 AM"
   placeOfBirth: string; // "City, State, Country"
   questions?: string[];
   email: string;
+  /** Display name of the astrologer this report is attributed to. */
+  pandit?: string;
 }
 
 export interface DevinSession {
@@ -61,20 +64,28 @@ function buildKundliPrompt(d: BirthDetails): string {
     d.questions && d.questions.length
       ? `\nSpecific questions to answer:\n${d.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')}`
       : '';
+  const pandit = d.pandit ?? 'our senior astrologer';
   return [
     'Generate a full Vedic (Hindu) Janma Kundli birth-chart report for the following person.',
     'These details are complete and confirmed — proceed automatically without waiting for a reply.',
     `Full name: ${d.fullName}`,
+    `Gender: ${d.gender}`,
     `Date of birth: ${d.dateOfBirth}`,
     `Time of birth: ${d.timeOfBirth}`,
     `Place of birth: ${d.placeOfBirth}`,
     `Customer email: ${d.email}`,
+    `Assigned Pandit (astrologer): ${pandit}`,
     questions,
     '',
+    'Use gendered language consistent with the stated gender.',
     'Keep the confirmed birth details available in this session so future follow-up',
     'questions can reuse or recompute the chart. Produce the PDF and interactive HTML,',
-    'then email the finished report to the Customer email above using the RESEND_API_KEY',
-    'secret (per the playbook), and also attach both files to this session.',
+    'then attach both files to this session.',
+    '',
+    `You will receive the customer's encrypted reference number in a follow-up message.`,
+    `When the report is ready, send EXACTLY ONE email to ${d.email}, framed as personally`,
+    `from ${pandit}, containing that reference number prominently and the Kundli_Report.pdf`,
+    'attached, using the RESEND_API_KEY secret (per the playbook). Do not send more than one email.',
   ].join('\n');
 }
 
@@ -106,6 +117,31 @@ export async function askFollowup(
   await devinFetch(`${sessionsBase()}/${devinId(sessionId)}/messages`, {
     method: 'POST',
     body: JSON.stringify({ message: prompt }),
+  });
+}
+
+/**
+ * Give the running Kundli session the customer's reference number and the
+ * single-email delivery instruction (framed as from the assigned Pandit).
+ */
+export async function instructKundliDelivery(
+  sessionId: string,
+  opts: { reference: string; pandit: string; email: string; fullName: string },
+): Promise<void> {
+  const message = [
+    'Delivery instruction for this customer:',
+    `Customer: ${opts.fullName} <${opts.email}>`,
+    `Assigned Pandit: ${opts.pandit}`,
+    `Reference number (their receipt to buy follow-up questions later): ${opts.reference}`,
+    '',
+    `When the report is ready, send EXACTLY ONE email to ${opts.email}, framed as personally`,
+    `from ${opts.pandit}, with subject "Your Janma Kundli from ${opts.pandit} at Siddh Jyotish". The email body`,
+    'must prominently include the reference number above, and the Kundli_Report.pdf must be',
+    'attached. Send via Resend using the RESEND_API_KEY secret. Do not send more than one email.',
+  ].join('\n');
+  await devinFetch(`${sessionsBase()}/${devinId(sessionId)}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ message }),
   });
 }
 

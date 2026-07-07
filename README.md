@@ -1,4 +1,8 @@
-# 🪔 Kundli — AI-Computed Vedic Astrology, as a Business
+# 🪔 Siddh Jyotish — AI-Computed Vedic Astrology, as a Business
+
+> **Brand:** Siddh Jyotish (`siddhjyotish.com`, alias `sidhjyotish.com`).
+> *Siddh* = "accomplished/proven"; paired with *Jyotish* (Vedic astrology) to
+> signal proven, precise astrology from a living lineage of scholars.
 
 > A no-database, no-accounts, near-zero-fixed-cost product that sells
 > **precisely-computed Janma Kundli (Vedic birth chart) reports** and
