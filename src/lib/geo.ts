@@ -1,41 +1,99 @@
-const EUROZONE = new Set([
+const ASIA = new Set([
+  'AF',
+  'AM',
+  'AZ',
+  'BD',
+  'BT',
+  'BN',
+  'KH',
+  'CN',
+  'HK',
+  'IN',
+  'ID',
+  'JP',
+  'KZ',
+  'KG',
+  'LA',
+  'MO',
+  'MY',
+  'MV',
+  'MN',
+  'MM',
+  'NP',
+  'KP',
+  'KR',
+  'PK',
+  'PH',
+  'SG',
+  'LK',
+  'TW',
+  'TJ',
+  'TH',
+  'TM',
+  'UZ',
+  'VN',
+]);
+
+const EUROPE = new Set([
+  'AL',
+  'AD',
   'AT',
+  'BA',
   'BE',
+  'BG',
+  'BY',
+  'CH',
   'CY',
+  'CZ',
   'DE',
+  'DK',
   'EE',
   'ES',
   'FI',
+  'FO',
   'FR',
+  'GB',
+  'GE',
+  'GI',
   'GR',
+  'HR',
+  'HU',
   'IE',
+  'IS',
   'IT',
+  'LI',
   'LT',
   'LU',
   'LV',
+  'MC',
+  'MD',
+  'ME',
+  'MK',
   'MT',
   'NL',
+  'NO',
+  'PL',
   'PT',
+  'RO',
+  'RS',
+  'RU',
+  'SE',
   'SI',
   'SK',
-  'HR',
+  'SM',
+  'TR',
+  'UA',
+  'VA',
+  'XK',
 ]);
-
-const DIRECT: Record<string, string> = {
-  IN: 'inr',
-  US: 'usd',
-  GB: 'gbp',
-  AU: 'aud',
-  CA: 'cad',
-};
 
 export function countryToCurrency(country?: string): string {
   const code = country?.trim().toUpperCase();
   if (!code) return '';
-  if (Object.prototype.hasOwnProperty.call(DIRECT, code)) {
-    return DIRECT[code];
+  if (ASIA.has(code)) {
+    return 'inr';
   }
-  if (EUROZONE.has(code)) {
+  if (EUROPE.has(code)) {
     return 'eur';
   }
   return '';

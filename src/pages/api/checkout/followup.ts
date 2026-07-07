@@ -10,7 +10,8 @@ import type { APIRoute } from 'astro';
 import { stripe } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
 import { detectCountry } from '../../../lib/geo';
-import { getCurrencyPricing } from '../../../lib/pricing';
+import { getPricing, resolveCurrency } from '../../../lib/pricing';
+import { isUnsupportedCurrencyError } from '../../../lib/stripe';
 import { followupSchema } from '../../../lib/validation';
 import { decodeReference } from '../../../lib/reference';
 
@@ -41,18 +42,22 @@ export const POST: APIRoute = async ({ request, locals }) => {
   }
 
   const country = detectCountry(request, locals.runtime);
-  const { currency, pricing } = await getCurrencyPricing(locals.runtime.env.SIDDH_KV, country);
+  const config = await getPricing(locals.runtime.env.SIDDH_KV);
+  const currency = resolveCurrency(config, country);
+  const pricing = config.currencies[currency];
+  const usdBlock = config.currencies.usd ?? config.currencies[config.defaultCurrency];
   const unitAmount = pricing.followupTierCents[count as 1 | 2 | 3];
+  const usdUnitAmount = usdBlock.followupTierCents[count as 1 | 2 | 3];
 
-  const session = await stripe().checkout.sessions.create({
-    mode: 'payment',
+  const makeSessionArgs = (sessionCurrency: string, amount: number) => ({
+    mode: 'payment' as const,
     customer_email: email,
     line_items: [
       {
         quantity: 1,
         price_data: {
-          currency,
-          unit_amount: unitAmount,
+          currency: sessionCurrency,
+          unit_amount: amount,
           product_data: {
             name: `Siddh Jyotish Follow-up — ${count} precise question${count === 1 ? '' : 's'}`,
             description: 'Answered from your existing chart. No new report.',
@@ -70,6 +75,20 @@ export const POST: APIRoute = async ({ request, locals }) => {
     success_url: `${env.siteUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${env.siteUrl}/returning?canceled=1`,
   });
+
+  const createSession = async (sessionCurrency: string, amount: number) =>
+    stripe().checkout.sessions.create(makeSessionArgs(sessionCurrency, amount));
+
+  let session;
+  try {
+    session = await createSession(currency, unitAmount);
+  } catch (err) {
+    if (currency !== 'usd' && isUnsupportedCurrencyError(err)) {
+      session = await createSession('usd', usdUnitAmount);
+    } else {
+      throw err;
+    }
+  }
 
   return json({ url: session.url });
 };
