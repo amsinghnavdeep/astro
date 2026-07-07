@@ -8,22 +8,15 @@
  */
 export const prerender = false;
 import type { APIRoute } from 'astro';
-import { env } from '../../../lib/env';
+import { authorized } from '../../../lib/adminAuth';
 import { getPricing, setPricing, pricingConfigSchema } from '../../../lib/pricing';
 
-function authorized(request: Request): boolean {
-  const header = request.headers.get('authorization') ?? '';
-  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
-  if (!match) return false;
-  return match[1] === env.adminApiToken;
-}
-
-export const GET: APIRoute = async ({ request }) => {
+export const GET: APIRoute = async ({ request, locals }) => {
   if (!authorized(request)) return json({ error: 'Unauthorized' }, 401);
-  return json(await getPricing());
+  return json(await getPricing(locals.runtime.env.SIDDH_KV));
 };
 
-export const PUT: APIRoute = async ({ request }) => {
+export const PUT: APIRoute = async ({ request, locals }) => {
   if (!authorized(request)) return json({ error: 'Unauthorized' }, 401);
 
   let payload: unknown;
@@ -39,10 +32,13 @@ export const PUT: APIRoute = async ({ request }) => {
   }
 
   try {
-    const saved = await setPricing(parsed.data);
+    const saved = await setPricing(locals.runtime.env.SIDDH_KV, parsed.data);
     return json(saved);
   } catch (err) {
-    return json({ error: err instanceof Error ? err.message : 'Failed to persist pricing' }, 500);
+    return json(
+      { error: err instanceof Error ? err.message : 'Failed to persist pricing' },
+      500,
+    );
   }
 };
 

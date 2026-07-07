@@ -151,7 +151,8 @@ astro/
 │  │  ├─ devin.ts        # Devin API client (create / resume / get session)
 │  │  ├─ stripe.ts       # Stripe client factory
 │  │  ├─ email.ts        # Resend client + email templates
-│  │  ├─ pricing.ts      # runtime pricing store (Upstash KV + env fallback)
+│  │  ├─ pricing.ts      # runtime pricing store (Cloudflare KV + env fallback)
+│  │  ├─ orders.ts       # runtime order store (Cloudflare KV)
 │  │  └─ validation.ts   # Zod schemas for form input
 │  └─ pages/
 │     ├─ index.astro           # first-timer landing + form ($31)
@@ -162,6 +163,7 @@ astro/
 │        ├─ checkout/followup.ts # start $8/$11/$13 checkout
 │        ├─ stripe/webhook.ts    # payment → trigger/resume Devin + email
 │        ├─ admin/pricing.ts     # protected GET/PUT runtime pricing config
+│        ├─ admin/orders.ts      # protected GET order query API
 │        └─ status.ts            # poll session state for the success page
 ├─ astro.config.mjs
 ├─ wrangler.jsonc
@@ -193,8 +195,8 @@ npm run dev               # http://localhost:4321
 | `REFERENCE_SECRET` | base64 of 32 random bytes — reference encryption key |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Stripe keys |
 | `RESEND_API_KEY` / `EMAIL_FROM` | email delivery — `EMAIL_FROM` defaults to `Siddh Jyotish <namaste@siddhjyotish.com>` (see note) |
-| `ADMIN_API_TOKEN` | bearer token protecting the runtime pricing admin API (`/api/admin/pricing`) — **required** |
-| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Upstash Redis REST endpoint + token for the runtime pricing store. **Optional** — if unset, pricing falls back to the `PRICE_*` defaults and `PUT /api/admin/pricing` returns an error |
+| `ADMIN_API_TOKEN` | bearer token protecting the runtime pricing/admin APIs (`/api/admin/pricing`, `/api/admin/orders`) — **required** |
+| `SIDDH_KV` | Cloudflare KV namespace binding for runtime pricing + orders (`wrangler kv namespace create SIDDH_KV`, id wired in `wrangler.jsonc`) |
 
 > **`EMAIL_FROM` / Resend verified domain:** the default sender is
 > `Siddh Jyotish <namaste@siddhjyotish.com>`. For mail to actually deliver,
@@ -216,10 +218,11 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ### Runtime pricing admin API (`/api/admin/pricing`)
 
 Prices and currency can be changed **without a redeploy**. They live in a small
-persisted config layer (`src/lib/pricing.ts`) backed by a serverless KV
-(**Upstash Redis** over its REST API — works on any host). When no KV is
-configured, reads transparently fall back to the `PRICE_*` env defaults so the
-app still works, but writes require KV.
+persisted config layer (`src/lib/pricing.ts`) backed by Cloudflare KV namespace
+`SIDDH_KV` (create it with `wrangler kv namespace create SIDDH_KV` and copy the
+id into `wrangler.jsonc`). When no KV binding is available, reads transparently
+fall back to the `PRICE_*` env defaults so the app still works, but writes
+require KV.
 
 Both endpoints require `Authorization: Bearer $ADMIN_API_TOKEN`.
 
@@ -255,6 +258,45 @@ curl -X PUT https://your-site.com/api/admin/pricing \
 A wrong/missing token returns `401`; invalid input returns `400` with the zod
 issues. On success the new config takes effect on the next checkout (reads are
 cached in-memory for ~30s).
+
+### Admin orders API (`/api/admin/orders`)
+Orders live in the same `SIDDH_KV` namespace as pricing.
+
+Query one UTC day:
+```bash
+curl "https://your-site.com/api/admin/orders?date=2026-07-07" \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN"
+```
+
+Query an inclusive date range:
+```bash
+curl "https://your-site.com/api/admin/orders?from=2026-07-01&to=2026-07-07" \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN"
+```
+
+Sample response:
+```json
+{
+  "from": "2026-07-07T00:00:00.000Z",
+  "to": "2026-07-07T23:59:59.999Z",
+  "count": 2,
+  "totalsByCurrency": { "usd": 3100 },
+  "orders": [
+    {
+      "id": "cs_test_1",
+      "kind": "kundli",
+      "amountTotal": 3100,
+      "currency": "usd",
+      "email": "user@example.com",
+      "fullName": "User Name",
+      "createdAt": "2026-07-07T10:00:00.000Z",
+      "createdAtMs": 1783418400000
+    }
+  ]
+}
+```
+
+Invalid date input returns `400`; missing/invalid bearer returns `401`.
 
 > ⚠️ **Amounts follow the currency's minor unit.** Despite the field name
 > `*Cents`, `unit_amount` is always the **smallest unit of the chosen
