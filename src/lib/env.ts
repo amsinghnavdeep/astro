@@ -76,6 +76,11 @@ export const env = {
     from: optional('EMAIL_FROM', 'Siddh Jyotish <namaste@siddhjyotish.com>'),
   },
 
+  docs: {
+    authUser: optional('DOCS_AUTH_USER'),
+    authPass: optional('DOCS_AUTH_PASS'),
+  },
+
   // Bearer token protecting the runtime pricing admin API
   // (`PUT /api/admin/pricing`). Required in production.
   get adminApiToken() {

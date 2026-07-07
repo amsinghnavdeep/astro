@@ -22,6 +22,11 @@ function sessionsBase(): string {
   return `${env.devin.apiBase}/v3/organizations/${env.devin.orgId}/sessions`;
 }
 
+/** The v3 API expects the `playbook-` prefixed id; tolerate a bare uuid in config. */
+function playbookId(id: string): string {
+  return id.startsWith('playbook-') ? id : `playbook-${id}`;
+}
+
 export interface BirthDetails {
   fullName: string;
   gender: 'Male' | 'Female' | 'Other';
@@ -56,6 +61,42 @@ async function devinFetch<T>(fullUrl: string, init: RequestInit): Promise<T> {
     throw new Error(`Devin API ${res.status} on ${fullUrl}: ${body}`);
   }
   return (await res.json()) as T;
+}
+
+function isInitializingError(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    err.message.includes('Devin API 400') &&
+    err.message.toLowerCase().includes('still initializing')
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function postSessionMessage(
+  sessionId: string,
+  message: string,
+  opts: { retryOnInitializing?: boolean } = {},
+): Promise<void> {
+  const url = `${sessionsBase()}/${devinId(sessionId)}/messages`;
+  const attempts = opts.retryOnInitializing ? 8 : 1;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await devinFetch(url, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      });
+      return;
+    } catch (err) {
+      if (!opts.retryOnInitializing || !isInitializingError(err) || attempt === attempts) {
+        throw err;
+      }
+      await delay(8000);
+    }
+  }
 }
 
 /** Build the prompt that drives the first-time Kundli playbook. */
@@ -95,7 +136,7 @@ export async function createKundliSession(d: BirthDetails): Promise<DevinSession
     prompt: buildKundliPrompt(d),
     title: `Kundli — ${d.fullName}`,
   };
-  if (env.devin.kundliPlaybook) body.playbook_id = env.devin.kundliPlaybook;
+  if (env.devin.kundliPlaybook) body.playbook_id = playbookId(env.devin.kundliPlaybook);
   return devinFetch<DevinSession>(sessionsBase(), {
     method: 'POST',
     body: JSON.stringify(body),
@@ -122,10 +163,7 @@ export async function askFollowup(
     'Answer ONLY these questions, precisely, with dasha/transit timing:',
     ...questions.map((q, i) => `${i + 1}. ${q}`),
   ].join('\n');
-  await devinFetch(`${sessionsBase()}/${devinId(sessionId)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({ message: prompt }),
-  });
+  await postSessionMessage(sessionId, prompt);
 }
 
 /**
@@ -147,10 +185,7 @@ export async function instructKundliDelivery(
     'must prominently include the reference number above, and the Kundli_Report.pdf must be',
     'attached. Send via Resend using the RESEND_API_KEY secret. Do not send more than one email.',
   ].join('\n');
-  await devinFetch(`${sessionsBase()}/${devinId(sessionId)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({ message }),
-  });
+  await postSessionMessage(sessionId, message, { retryOnInitializing: true });
 }
 
 /** Fetch the current state of a session. */

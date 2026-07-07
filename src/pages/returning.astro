@@ -17,16 +17,27 @@ import Base from '../layouts/Base.astro';
       </div>
 
       <div class="card card-accent narrow">
-        <form id="followup-form">
-          <label for="reference">Reference number</label>
-          <textarea id="reference" name="reference" placeholder="Paste your encrypted reference number" required></textarea>
+        <form id="followup-form" novalidate>
+          <div class="field">
+            <label for="reference">Reference number</label>
+            <textarea id="reference" name="reference" placeholder="Paste your encrypted reference number" required></textarea>
+            <p class="field-error" id="reference-error" aria-live="polite"></p>
+          </div>
 
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" required autocomplete="email" />
+          <div class="field">
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required autocomplete="email" />
+            <p class="field-error" id="email-error" aria-live="polite"></p>
+          </div>
 
-          <label>Your questions (max 18 words each)</label>
-          <div id="questions">
-            <input type="text" class="question" placeholder="e.g. When will my health improve?" required />
+          <div class="field">
+            <label>Your questions (max 18 words each)</label>
+            <div id="questions">
+              <div class="question-field">
+                <input type="text" class="question" placeholder="e.g. When will my health improve?" required />
+                <p class="field-error question-error" aria-live="polite"></p>
+              </div>
+            </div>
           </div>
           <button type="button" id="add-question" class="btn btn-outline" style="margin-top:0.5rem">+ Add another question</button>
 
@@ -59,6 +70,24 @@ import Base from '../layouts/Base.astro';
     position: relative;
     z-index: 1;
   }
+  .field { margin-bottom: 1rem; }
+  .field:last-child { margin-bottom: 0; }
+  .field-error {
+    min-height: 1.1rem;
+    margin: 0.35rem 0 0;
+    color: var(--error);
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+  .field-error:empty { display: block; }
+  .field input.is-invalid,
+  .field textarea.is-invalid {
+    border-color: var(--error);
+    box-shadow: 0 0 0 3px rgba(161, 32, 32, 0.14);
+  }
+  .question-field + .question-field {
+    margin-top: 0.5rem;
+  }
 </style>
 
 <script>
@@ -69,6 +98,12 @@ import Base from '../layouts/Base.astro';
   };
   const MAX_QUESTIONS = 3;
 
+  type QuestionField = {
+    wrapper: HTMLDivElement;
+    input: HTMLInputElement;
+    error: HTMLElement;
+  };
+
   const form = document.getElementById('followup-form') as HTMLFormElement;
   const btn = document.getElementById('submit-btn') as HTMLButtonElement;
   const errorEl = document.getElementById('error') as HTMLDivElement;
@@ -78,10 +113,17 @@ import Base from '../layouts/Base.astro';
   const nowPrice = document.getElementById('now-price') as HTMLElement;
   const priceNote = document.getElementById('price-note') as HTMLElement;
   const btnPrice = document.getElementById('btn-price') as HTMLElement;
+  const referenceInput = document.getElementById('reference') as HTMLTextAreaElement;
+  const emailInput = document.getElementById('email') as HTMLInputElement;
 
   function showError(message: string) {
     errorEl.textContent = message;
     errorEl.hidden = false;
+  }
+
+  function clearServerError() {
+    errorEl.textContent = '';
+    errorEl.hidden = true;
   }
 
   function value(id: string): string {
@@ -89,12 +131,116 @@ import Base from '../layouts/Base.astro';
     return (el?.value ?? '').trim();
   }
 
-  function questionInputs(): HTMLInputElement[] {
-    return Array.from(questionsEl.querySelectorAll<HTMLInputElement>('input.question'));
+  function words(value: string): number {
+    return value.trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  function getQuestionFields(): QuestionField[] {
+    return Array.from(questionsEl.querySelectorAll<HTMLDivElement>('.question-field')).map((wrapper) => {
+      const input = wrapper.querySelector<HTMLInputElement>('input.question');
+      const error = wrapper.querySelector<HTMLElement>('.field-error');
+      if (!input || !error) {
+        throw new Error('Question field markup is incomplete');
+      }
+      return { wrapper, input, error };
+    });
+  }
+
+  function setQuestionError(field: QuestionField, message = '') {
+    field.error.textContent = message;
+    field.input.classList.toggle('is-invalid', Boolean(message));
+    field.input.setAttribute('aria-invalid', message ? 'true' : 'false');
+  }
+
+  function validateQuestionField(field: QuestionField): boolean {
+    const value = field.input.value.trim();
+    if (!value) {
+      setQuestionError(field, '');
+      return true;
+    }
+    if (words(value) > 18) {
+      setQuestionError(field, 'Each question must be 18 words or fewer.');
+      return false;
+    }
+    setQuestionError(field, '');
+    return true;
+  }
+
+  function validateQuestions(showRequired = false): boolean {
+    const fields = getQuestionFields();
+    const values = fields.map((field) => field.input.value.trim());
+    const anyFilled = values.some((value) => value.length > 0);
+
+    if (!anyFilled) {
+      fields.forEach((field) => setQuestionError(field, ''));
+      if (showRequired && fields[0]) {
+        setQuestionError(fields[0], 'Please enter at least one question.');
+        return false;
+      }
+      return true;
+    }
+
+    let valid = true;
+    fields.forEach((field) => {
+      if (!validateQuestionField(field)) valid = false;
+    });
+    return valid;
+  }
+
+  function setReferenceError(message = '') {
+    referenceInput.classList.toggle('is-invalid', Boolean(message));
+    referenceInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+    const error = document.getElementById('reference-error');
+    if (error) error.textContent = message;
+  }
+
+  function setEmailError(message = '') {
+    emailInput.classList.toggle('is-invalid', Boolean(message));
+    emailInput.setAttribute('aria-invalid', message ? 'true' : 'false');
+    const error = document.getElementById('email-error');
+    if (error) error.textContent = message;
+  }
+
+  function validateReference(): boolean {
+    if (!value('reference')) {
+      setReferenceError('Please enter your reference number.');
+      return false;
+    }
+    setReferenceError('');
+    return true;
+  }
+
+  function validateEmail(): boolean {
+    if (!value('email')) {
+      setEmailError('Please enter your email address.');
+      return false;
+    }
+    if (!emailInput.checkValidity()) {
+      setEmailError('Enter a valid email address.');
+      return false;
+    }
+    setEmailError('');
+    return true;
+  }
+
+  referenceInput.addEventListener('input', () => {
+    if (referenceInput.classList.contains('is-invalid')) validateReference();
+    clearServerError();
+  });
+  referenceInput.addEventListener('blur', validateReference);
+  emailInput.addEventListener('input', () => {
+    if (emailInput.classList.contains('is-invalid')) validateEmail();
+    clearServerError();
+  });
+  emailInput.addEventListener('blur', validateEmail);
+
+  function focusFirstInvalid(): void {
+    const fields = [referenceInput, emailInput, ...getQuestionFields().map((field) => field.input)];
+    fields.find((field) => field.classList.contains('is-invalid'))?.focus();
   }
 
   function refreshPrice() {
-    const count = Math.min(Math.max(questionInputs().length, 1), MAX_QUESTIONS);
+    const count = Math.min(Math.max(getQuestionFields().length, 1), MAX_QUESTIONS);
     const tier = TIERS[count];
     wasPrice.textContent = tier.was;
     nowPrice.textContent = tier.now;
@@ -103,42 +249,74 @@ import Base from '../layouts/Base.astro';
     addBtn.style.display = count >= MAX_QUESTIONS ? 'none' : '';
   }
 
-  function addQuestion() {
-    if (questionInputs().length >= MAX_QUESTIONS) return;
+  function wireQuestionField(field: QuestionField) {
+    field.input.addEventListener('input', () => {
+      validateQuestionField(field);
+      clearServerError();
+    });
+    field.input.addEventListener('blur', () => {
+      const fields = getQuestionFields();
+      const anyFilled = fields.some((item) => item.input.value.trim().length > 0);
+      if (!anyFilled && field === fields[0]) {
+        setQuestionError(field, 'Please enter at least one question.');
+        return;
+      }
+      validateQuestionField(field);
+    });
+  }
+
+  function createQuestionField(): QuestionField {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'question-field';
+
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'question';
     input.placeholder = 'Another question (max 18 words)';
-    input.style.marginTop = '0.5rem';
-    questionsEl.appendChild(input);
+    input.required = true;
+
+    const error = document.createElement('p');
+    error.className = 'field-error question-error';
+    error.setAttribute('aria-live', 'polite');
+
+    wrapper.append(input, error);
+    return { wrapper, input, error };
+  }
+
+  function addQuestion() {
+    if (getQuestionFields().length >= MAX_QUESTIONS) return;
+    const field = createQuestionField();
+    questionsEl.appendChild(field.wrapper);
+    wireQuestionField(field);
+    clearServerError();
     refreshPrice();
   }
 
+  function validateAll(): boolean {
+    clearServerError();
+    const referenceOk = validateReference();
+    const emailOk = validateEmail();
+    const questionsOk = validateQuestions(true);
+    const isValid = referenceOk && emailOk && questionsOk;
+    if (!isValid) focusFirstInvalid();
+    return isValid;
+  }
+
   addBtn.addEventListener('click', addQuestion);
+  getQuestionFields().forEach(wireQuestionField);
   refreshPrice();
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     errorEl.hidden = true;
 
-    const reference = value('reference');
-    const email = value('email');
-    const questions = questionInputs()
-      .map((el) => el.value.trim())
-      .filter((q) => q.length > 0);
+    if (!validateAll()) return;
 
-    if (!reference || !email || questions.length === 0) {
-      showError('Please fill in your reference number, email, and at least one question.');
-      return;
-    }
-
-    const tooLong = questions.find((q) => q.split(/\s+/).length > 18);
-    if (tooLong) {
-      showError('Each question must be 18 words or fewer.');
-      return;
-    }
-
-    const payload = { reference, email, questions };
+    const payload = {
+      reference: value('reference'),
+      email: value('email'),
+      questions: getQuestionFields().map((field) => field.input.value.trim()).filter((q) => q.length > 0),
+    };
 
     btn.disabled = true;
     const originalText = btn.textContent;
