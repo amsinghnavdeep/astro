@@ -13,14 +13,13 @@
   // nodejs_compat provides node:crypto (reference.ts AES-256-GCM) + Buffer, and
   // (with the date above) populates process.env from vars/secrets.
   "compatibility_flags": ["nodejs_compat"],
-  // Fill the real namespace id at deploy time:
-  //   wrangler kv namespace create SIDDH_KV
-  // Local wrangler dev uses the binding name and the placeholder is fine.
+  // Namespace created with `wrangler kv namespace create SIDDH_KV`.
+  // Local `wrangler dev` uses a simulated store keyed by the binding name.
   "kv_namespaces": [
     {
       "binding": "SIDDH_KV",
-      "id": "REPLACE_WITH_REAL_ID_AT_DEPLOY",
-      "preview_id": "REPLACE_WITH_REAL_ID_AT_DEPLOY"
+      "id": "b885071c8bf3421cada98cef8e4cf5ac",
+      "preview_id": "b885071c8bf3421cada98cef8e4cf5ac"
     }
   ],
   "assets": {
