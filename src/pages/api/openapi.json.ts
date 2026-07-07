@@ -84,6 +84,12 @@ const spec = {
           '400': {
             description: 'Missing session_id.',
           },
+          '404': {
+            description: 'No such checkout session.',
+          },
+          '502': {
+            description: 'Failed to look up the checkout session upstream.',
+          },
         },
       },
     },

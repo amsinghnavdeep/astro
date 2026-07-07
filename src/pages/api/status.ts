@@ -6,6 +6,7 @@
  */
 export const prerender = false;
 import type { APIRoute } from 'astro';
+import Stripe from 'stripe';
 import { stripe } from '../../lib/stripe';
 
 export const GET: APIRoute = async ({ url }) => {
@@ -14,7 +15,18 @@ export const GET: APIRoute = async ({ url }) => {
     return json({ error: 'Missing session_id' }, 400);
   }
 
-  const session = await stripe().checkout.sessions.retrieve(checkoutId);
+  let session;
+  try {
+    session = await stripe().checkout.sessions.retrieve(checkoutId);
+  } catch (err) {
+    // A bogus/expired session id makes Stripe throw. Return a clean JSON error
+    // instead of letting the exception surface as a bare 500 with no body.
+    if (err instanceof Stripe.errors.StripeInvalidRequestError) {
+      return json({ error: 'No such checkout session' }, 404);
+    }
+    console.error('Status lookup error:', err);
+    return json({ error: 'Failed to look up checkout session' }, 502);
+  }
 
   if (session.payment_status !== 'paid') {
     return json({ state: 'unpaid' });
