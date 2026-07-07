@@ -64,6 +64,6 @@ export const env = {
     get apiKey() {
       return required('RESEND_API_KEY');
     },
-    from: optional('EMAIL_FROM', 'Kundli <onboarding@resend.dev>'),
+    from: optional('EMAIL_FROM', 'Siddh Jyotish <onboarding@resend.dev>'),
   },
 } as const;

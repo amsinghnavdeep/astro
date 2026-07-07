@@ -1,4 +1,4 @@
-# Copilot Build Prompts — Kundli (combined frontend + backend)
+# Copilot Build Prompts — Siddh Jyotish (combined frontend + backend)
 
 These are **copy-paste prompts** for GitHub Copilot / Copilot Chat to build the
 whole app **one file at a time**, in order. Copilot is not very smart, so each
