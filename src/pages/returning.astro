@@ -2,16 +2,17 @@
 import Base from '../layouts/Base.astro';
 ---
 
-<Base title="Siddh Jyotish — Ask 2 follow-up questions — $1,100">
+<Base title="Siddh Jyotish — Ask follow-up questions">
   <div class="wrap">
     <section class="block">
       <div class="section-head">
         <span class="eyebrow">Returning seeker</span>
-        <h2>Ask 2 follow-up questions</h2>
+        <h2>Ask follow-up questions</h2>
         <p>
-          Already have your Kundli? Paste your reference number and ask two more
-          questions. Your assigned pandit reuses your existing chart — no new PDF,
-          just precise answers for <strong>$1,100</strong>.
+          Already have your Kundli? Paste your reference number and ask up to
+          three precise questions. Your assigned pandit reuses your existing
+          chart — no new PDF, just precise answers. Pricing:
+          <strong>1 → $8 · 2 → $11 · 3 → $13</strong> (max 18 words each).
         </p>
       </div>
 
@@ -23,13 +24,18 @@ import Base from '../layouts/Base.astro';
           <label for="email">Email</label>
           <input type="email" id="email" name="email" required autocomplete="email" />
 
-          <label for="q1">Question 1</label>
-          <input type="text" id="q1" name="q1" placeholder="e.g. Is the coming year favourable for a career change?" required />
+          <label>Your questions (max 18 words each)</label>
+          <div id="questions">
+            <input type="text" class="question" placeholder="e.g. Is the coming year favourable for a career change?" required />
+          </div>
+          <button type="button" id="add-question" class="btn btn-ghost" style="margin-top:0.5rem">+ Add another question</button>
 
-          <label for="q2">Question 2</label>
-          <input type="text" id="q2" name="q2" placeholder="e.g. When is an auspicious time to buy property?" required />
+          <div class="price-tag" style="margin-top:1.25rem">
+            <s class="was" id="was-price">$13</s> <b id="now-price">$8</b>
+            <span id="price-note">· 1 question</span>
+          </div>
 
-          <button type="submit" id="submit-btn" class="btn btn-block">Pay $1,100 &amp; Get Answers</button>
+          <button type="submit" id="submit-btn" class="btn btn-block">Pay <span id="btn-price">$8</span> &amp; Get Answers</button>
           <div id="error" class="error" hidden></div>
           <p class="helper center" style="margin-top:1rem">🔒 Secure Stripe checkout · Answers delivered by email</p>
         </form>
@@ -41,9 +47,22 @@ import Base from '../layouts/Base.astro';
 </Base>
 
 <script>
+  const TIERS: Record<number, { now: string; was: string }> = {
+    1: { now: '$8', was: '$13' },
+    2: { now: '$11', was: '$18' },
+    3: { now: '$13', was: '$21' },
+  };
+  const MAX_QUESTIONS = 3;
+
   const form = document.getElementById('followup-form') as HTMLFormElement;
   const btn = document.getElementById('submit-btn') as HTMLButtonElement;
   const errorEl = document.getElementById('error') as HTMLDivElement;
+  const questionsEl = document.getElementById('questions') as HTMLDivElement;
+  const addBtn = document.getElementById('add-question') as HTMLButtonElement;
+  const wasPrice = document.getElementById('was-price') as HTMLElement;
+  const nowPrice = document.getElementById('now-price') as HTMLElement;
+  const priceNote = document.getElementById('price-note') as HTMLElement;
+  const btnPrice = document.getElementById('btn-price') as HTMLElement;
 
   function showError(message: string) {
     errorEl.textContent = message;
@@ -55,21 +74,56 @@ import Base from '../layouts/Base.astro';
     return (el?.value ?? '').trim();
   }
 
+  function questionInputs(): HTMLInputElement[] {
+    return Array.from(questionsEl.querySelectorAll<HTMLInputElement>('input.question'));
+  }
+
+  function refreshPrice() {
+    const count = Math.min(Math.max(questionInputs().length, 1), MAX_QUESTIONS);
+    const tier = TIERS[count];
+    wasPrice.textContent = tier.was;
+    nowPrice.textContent = tier.now;
+    btnPrice.textContent = tier.now;
+    priceNote.textContent = `· ${count} question${count === 1 ? '' : 's'}`;
+    addBtn.style.display = count >= MAX_QUESTIONS ? 'none' : '';
+  }
+
+  function addQuestion() {
+    if (questionInputs().length >= MAX_QUESTIONS) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'question';
+    input.placeholder = 'Another question (max 18 words)';
+    input.style.marginTop = '0.5rem';
+    questionsEl.appendChild(input);
+    refreshPrice();
+  }
+
+  addBtn.addEventListener('click', addQuestion);
+  refreshPrice();
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     errorEl.hidden = true;
 
     const reference = value('reference');
     const email = value('email');
-    const q1 = value('q1');
-    const q2 = value('q2');
+    const questions = questionInputs()
+      .map((el) => el.value.trim())
+      .filter((q) => q.length > 0);
 
-    if (!reference || !email || !q1 || !q2) {
-      showError('Please fill in your reference number, email, and both questions.');
+    if (!reference || !email || questions.length === 0) {
+      showError('Please fill in your reference number, email, and at least one question.');
       return;
     }
 
-    const payload = { reference, email, questions: [q1, q2] };
+    const tooLong = questions.find((q) => q.split(/\s+/).length > 18);
+    if (tooLong) {
+      showError('Each question must be 18 words or fewer.');
+      return;
+    }
+
+    const payload = { reference, email, questions };
 
     btn.disabled = true;
     const originalText = btn.textContent;

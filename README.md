@@ -15,14 +15,16 @@ This README is both the **project documentation** and the **business plan**.
 
 ## 1. The idea in one paragraph
 
-A customer enters their birth details and pays **$2,100**. We run a Devin
-playbook that computes their exact planetary positions with the Swiss Ephemeris
-and writes an original, professional astrology report, delivered as a PDF plus
-an interactive chart. The customer also receives an **encrypted reference
-number**. Later, they can pay **$1,100** to ask **two precise follow-up
-questions** — we decrypt the reference, resume their *same* Devin session (which
+A customer enters their birth details and pays **$31** (which includes **3
+questions**). We run a Devin playbook that computes their exact planetary
+positions with the Swiss Ephemeris and writes an original, professional
+astrology report, delivered as a PDF plus an interactive chart. The customer
+also receives an **encrypted reference number**. Later, they can pay for
+**1–3 precise follow-up questions** — priced **$8 / $11 / $13** for 1 / 2 / 3
+questions — we decrypt the reference, resume their *same* Devin session (which
 still holds their computed chart), and email back precise answers with no new
-report. **No database. No user accounts. No standing backend server.**
+report. Every question is capped at **18 words**. **No database. No user
+accounts. No standing backend server.**
 
 ---
 
@@ -38,8 +40,8 @@ inside the Devin session that produced it. We simply hand the customer an
                          │            ONE Astro app                 │
                          │  (UI pages + /api serverless functions)   │
    Browser  ───────────► │                                          │
-   (form + pay)          │  • /api/checkout/new     ($2100)         │
-                         │  • /api/checkout/followup($1100)         │
+   (form + pay)          │  • /api/checkout/new     ($31)           │
+                         │  • /api/checkout/followup($8-13)         │
                          │  • /api/stripe/webhook                   │
                          │  • /api/status                           │
                          └───────┬───────────────┬──────────────┬───┘
@@ -79,24 +81,25 @@ Devin cost; ACUs are billed per session run regardless of who triggers it.
 
 ## 3. User flows
 
-### Flow A — First-timer ($2,100 → full Kundli)
-1. UI collects **name, DOB, exact time (AM/PM), place**, email, optional questions.
-2. `POST /api/checkout/new` → Stripe Checkout ($2,100), details saved in metadata.
+### Flow A — First-timer ($31 → full Kundli, includes 3 questions)
+1. UI collects **name, DOB, exact time (AM/PM), place**, email, and up to 3
+   questions (max 18 words each, included in the price).
+2. `POST /api/checkout/new` → Stripe Checkout ($31), details saved in metadata.
 3. On `checkout.session.completed`, the webhook runs the **`!kundli`** playbook →
-   `session_id`.
+   `session_id` (3 included questions ride along in metadata).
 4. Backend immediately emails the **encrypted reference number** (their receipt for
    buying follow-ups later).
 5. Playbook computes the chart (Swiss Ephemeris), produces **PDF + interactive HTML**,
    and — minutes later, when done — **emails the finished PDF to the customer itself**
    (using the `RESEND_API_KEY` Devin secret). This closes the async gap without polling.
 
-### Flow B — Returning customer ($1,100 → 2 questions)
-1. UI collects **reference number + 2 questions** + email.
-2. `POST /api/checkout/followup` → we validate the reference decrypts, then
-   Stripe Checkout ($1,100).
+### Flow B — Returning customer ($8 / $11 / $13 → 1 / 2 / 3 questions)
+1. UI collects **reference number + 1–3 questions** (max 18 words each) + email.
+2. `POST /api/checkout/followup` → we validate the reference decrypts, price by
+   question count ($8 / $11 / $13), then Stripe Checkout.
 3. On success, the webhook **decrypts the reference → session_id**, and resumes
    that session with the **`!kundli_followup`** playbook.
-4. Playbook reuses the already-computed chart and answers **only** those
+4. Playbook reuses the already-computed chart and answers **only** those 1–3
    questions (dasha/transit timing), **no new PDF**.
 5. Backend emails the precise answers.
 
@@ -107,7 +110,7 @@ Devin cost; ACUs are billed per session run regardless of who triggers it.
 | Playbook | Macro | Purpose | Output |
 |---|---|---|---|
 | Generate a Vedic Astrology (Kundli) Birth Chart | `!kundli` | Full chart + report, **emails the PDF** | PDF + interactive HTML |
-| Answer Follow-Up Questions on an Existing Chart | `!kundli_followup` | Resume session, answer 2 Qs | precise text answers |
+| Answer Follow-Up Questions on an Existing Chart | `!kundli_followup` | Resume session, answer 1–3 Qs | precise text answers |
 
 Both compute planetary positions with the **Swiss Ephemeris** (sidereal zodiac,
 Lahiri ayanamsa, whole-sign houses) — never guessed or hard-coded. The follow-up
@@ -147,12 +150,12 @@ astro/
 │  │  ├─ email.ts        # Resend client + email templates
 │  │  └─ validation.ts   # Zod schemas for form input
 │  └─ pages/
-│     ├─ index.astro           # first-timer landing + form ($2100)
-│     ├─ returning.astro       # returning-user form ($1100)
+│     ├─ index.astro           # first-timer landing + form ($31)
+│     ├─ returning.astro       # returning-user form ($8/$11/$13)
 │     ├─ success.astro         # post-payment status/polling page
 │     └─ api/
-│        ├─ checkout/new.ts      # start $2100 checkout
-│        ├─ checkout/followup.ts # start $1100 checkout
+│        ├─ checkout/new.ts      # start $31 checkout
+│        ├─ checkout/followup.ts # start $8/$11/$13 checkout
 │        ├─ stripe/webhook.ts    # payment → trigger/resume Devin + email
 │        └─ status.ts            # poll session state for the success page
 ├─ astro.config.mjs
@@ -174,7 +177,8 @@ npm run dev               # http://localhost:4321
 
 | Var | What it is |
 |---|---|
-| `PRICE_KUNDLI_USD` / `PRICE_FOLLOWUP_USD` | prices in dollars (default 2100 / 1100) |
+| `PRICE_KUNDLI_USD` | Kundli price in dollars (default 31, includes 3 questions) |
+| `PRICE_FOLLOWUP_1_USD` / `PRICE_FOLLOWUP_2_USD` / `PRICE_FOLLOWUP_3_USD` | follow-up prices for 1 / 2 / 3 questions (default 8 / 11 / 13) |
 | `PUBLIC_SITE_URL` | site URL for Stripe redirects |
 | `DEVIN_API_KEY` | Devin **service-user** key (prefix `cog_`, server only) — v3 API |
 | `DEVIN_ORG_ID` | Devin org id (prefix `org-`), required by v3 org-scoped endpoints |
@@ -205,8 +209,8 @@ side). Premium positioning: this is a high-touch report, not a $5 app horoscope.
 ### 8.2 Pricing & unit economics
 | Product | Price | Variable cost (Devin ACUs + Stripe + email) | Gross margin |
 |---|---|---|---|
-| Full Kundli (`!kundli`) | **$2,100** | compute-heavy session | high once ACU/report is measured |
-| Follow-up 2 Qs (`!kundli_followup`) | **$1,100** | resumes session, lighter | very high |
+| Full Kundli (`!kundli`, incl. 3 questions) | **$31** | compute-heavy session | high once ACU/report is measured |
+| Follow-up 1–3 Qs (`!kundli_followup`) | **$8 / $11 / $13** | resumes session, lighter | very high |
 
 > **Action item:** measure real ACU cost per report on a few live runs to lock
 > in margin. Fixed cost is ~$0 (serverless free tier), so profitability is

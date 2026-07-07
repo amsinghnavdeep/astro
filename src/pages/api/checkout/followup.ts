@@ -1,5 +1,6 @@
 /**
- * Returning-customer checkout: reference + 2 questions, $1100 Stripe Checkout.
+ * Returning-customer checkout: reference + 1-3 questions, tiered-price Stripe
+ * Checkout ($8 / $11 / $13 for 1 / 2 / 3 questions).
  *
  * We validate the reference decrypts to a session id BEFORE taking payment, so a
  * bad reference fails fast. The reference + questions ride along in metadata.
@@ -24,12 +25,18 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ error: 'Invalid input', issues: parsed.error.issues }, 400);
   }
   const { reference, email, questions } = parsed.data;
+  const count = questions.length;
 
   // Fail fast on a forged/expired reference before charging anyone.
   try {
     decodeReference(reference);
   } catch {
     return json({ error: 'That reference number is invalid.' }, 400);
+  }
+
+  const unitAmount = env.pricing.followupTierCents[count];
+  if (!unitAmount) {
+    return json({ error: 'You may ask between 1 and 3 questions.' }, 400);
   }
 
   const session = await stripe().checkout.sessions.create({
@@ -40,9 +47,9 @@ export const POST: APIRoute = async ({ request }) => {
         quantity: 1,
         price_data: {
           currency: 'usd',
-          unit_amount: env.pricing.followupCents,
+          unit_amount: unitAmount,
           product_data: {
-            name: 'Kundli Follow-up — 2 Precise Questions',
+            name: `Siddh Jyotish Follow-up — ${count} precise question${count === 1 ? '' : 's'}`,
             description: 'Answered from your existing chart. No new report.',
           },
         },
@@ -52,6 +59,7 @@ export const POST: APIRoute = async ({ request }) => {
       kind: 'followup',
       email,
       reference: reference.slice(0, 480),
+      questionCount: String(count),
       questions: JSON.stringify(questions).slice(0, 480),
     },
     success_url: `${env.siteUrl}/success?session_id={CHECKOUT_SESSION_ID}`,

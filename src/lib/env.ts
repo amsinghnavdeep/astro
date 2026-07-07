@@ -31,8 +31,12 @@ export const env = {
   siteUrl: optional('PUBLIC_SITE_URL', 'http://localhost:4321'),
 
   pricing: {
-    kundliCents: usdToCents('PRICE_KUNDLI_USD', 2100),
-    followupCents: usdToCents('PRICE_FOLLOWUP_USD', 1100),
+    kundliCents: usdToCents('PRICE_KUNDLI_USD', 31),
+    followupTierCents: {
+      1: usdToCents('PRICE_FOLLOWUP_1_USD', 8),
+      2: usdToCents('PRICE_FOLLOWUP_2_USD', 11),
+      3: usdToCents('PRICE_FOLLOWUP_3_USD', 13),
+    } as Record<number, number>,
   },
 
   devin: {
