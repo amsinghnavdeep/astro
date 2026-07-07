@@ -11,7 +11,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
-import { stripe } from '../../../lib/stripe';
+import { stripe, cryptoProvider } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
 import {
   createKundliSession,
@@ -27,7 +27,15 @@ export const POST: APIRoute = async ({ request }) => {
 
   let event: Stripe.Event;
   try {
-    event = stripe().webhooks.constructEvent(raw, sig ?? '', env.stripe.webhookSecret);
+    // Async verification: the Workers runtime only exposes WebCrypto (async),
+    // so we use constructEventAsync with the SubtleCrypto provider.
+    event = await stripe().webhooks.constructEventAsync(
+      raw,
+      sig ?? '',
+      env.stripe.webhookSecret,
+      undefined,
+      cryptoProvider,
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     return json({ error: `Webhook signature verification failed: ${message}` }, 400);
