@@ -102,13 +102,21 @@ export async function createKundliSession(d: BirthDetails): Promise<DevinSession
   });
 }
 
-/** Resume an existing session to answer follow-up questions (no new PDF). */
+/**
+ * Resume an existing session to answer follow-up questions (no new PDF).
+ *
+ * NOTE: The Devin v3 message API does not accept a playbook_id, so we cannot
+ * attach DEVIN_FOLLOWUP_PLAYBOOK here. The session keeps its original !kundli
+ * playbook context, and the prompt itself instructs the agent to behave as a
+ * follow-up handler. If the API adds playbook-on-resume support, pass
+ * env.devin.followupPlaybook in the request body.
+ */
 export async function askFollowup(
   sessionId: string,
   questions: string[],
 ): Promise<void> {
   const prompt = [
-    'Follow-up request from a returning customer using the kundli_followup playbook.',
+    'Follow-up request from a returning customer.',
     'Reuse the already-computed chart from this session (recompute from the same birth',
     'details only if a value is missing). Do NOT produce a new PDF or HTML.',
     'Answer ONLY these questions, precisely, with dasha/transit timing:',
