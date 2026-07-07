@@ -2,32 +2,50 @@
 import Base from '../layouts/Base.astro';
 ---
 
-<Base title="Siddh Jyotish — Your Vedic Birth Chart, Computed Precisely">
-  <div class="wrap">
-    <section class="hero">
-      <span class="eyebrow">Siddh Jyotish · Prepared by respected astrologers</span>
-      <h1>Your Janma Kundli, computed precisely.</h1>
-      <p class="lead" style="max-width:56ch">
-        Not a generic horoscope. A genuine, ephemeris-computed Vedic birth chart
-        — interpreted by astrologers descended from a living lineage of Siddh
-        Yogis. <strong>Know your path with clarity and precision.</strong>
-      </p>
-      <div class="price-tag">
-        <s class="was">$51</s> <b>$31</b><span>· complete Kundli + 3 questions · delivered by email</span>
-      </div>
+<Base title="Siddh Jyotish — Your Vedic Birth Chart, Created with Precision">
+  <div class="wrap wrap-wide">
+    <section class="hero hero-split">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">Siddh Jyotish · Prepared by respected and siddh astrologers</span>
+          <h1>Your Janma Kundli, created &amp; analysed by hand.</h1>
+          <p class="lead" style="max-width:56ch">
+            Not a generic horoscope. A genuine Vedic birth chart, cast from your exact birth details and interpreted by hand. <strong>Know your path with clarity and precision.</strong>
+          </p>
+          <div class="price-tag">
+            <s class="was">$51</s> <b>$31</b><span>· complete Kundli + 3 questions · delivered by email</span>
+          </div>
 
-      <div class="hero-ctas-dual">
-        <a class="cta-card cta-primary" href="#order">
-          <span class="cta-badge">Most popular</span>
-          <span class="cta-heading">Create my Kundli &amp; ask questions</span>
-          <span class="cta-desc">Fill out your birth details, ask up to 3 questions, and receive a complete Janma Kundli PDF plus personal answers — all for $31.</span>
-          <span class="cta-action">Start my reading &darr;</span>
-        </a>
-        <a class="cta-card cta-secondary" href="/returning">
-          <span class="cta-heading">I already have a Kundli — ask more questions</span>
-          <span class="cta-desc">Already received your report? Use your reference number to ask 1–3 follow-up questions ($8 / $11 / $13). Your pandit picks up exactly where you left off.</span>
-          <span class="cta-action">Go to follow-up form &rarr;</span>
-        </a>
+          <div class="hero-ctas-dual">
+            <a class="cta-card cta-primary" href="#order">
+              <span class="cta-badge">Most popular</span>
+              <span class="cta-kicker">New to Siddh Jyotish?</span>
+              <span class="cta-heading">Create my Kundli &amp; ask 3 questions</span>
+              <span class="cta-desc">Fill in your birth details, ask up to 3 questions, and get a complete Janma Kundli PDF plus personal answers — $31.</span>
+              <span class="cta-action cta-action-primary">Start my reading &darr;</span>
+            </a>
+            <a class="cta-card cta-secondary" href="/returning">
+              <span class="cta-kicker">Already ordered before?</span>
+              <span class="cta-heading">Ask additional questions</span>
+              <span class="cta-desc">You'll have a reference number in the email from your last order — paste it in to ask 1–3 follow-up questions ($8 / $11 / $13). Your pandit picks up exactly where you left off.</span>
+              <span class="cta-action cta-action-secondary">Ask additional questions &rarr;</span>
+            </a>
+          </div>
+
+          <div class="question-chips" aria-label="Popular question examples">
+            <span>When will I get married?</span>
+            <span>When will I get a good job?</span>
+            <span>When will we have a child?</span>
+            <span>When will my health improve?</span>
+            <span>Is this a good year to buy a home?</span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="hero-wheel-frame">
+            <img src="/zodiac-wheel.png" alt="" class="hero-wheel" />
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -38,7 +56,7 @@ import Base from '../layouts/Base.astro';
         <div class="badge">
           <div class="ico">🎯</div>
           <b>100% Accurate</b>
-          <span>Ephemeris-computed placements — never guessed or hard-coded.</span>
+          <span>Precisely calculated placements — never guessed or hard-coded.</span>
         </div>
         <div class="badge">
           <div class="ico">🛡️</div>
@@ -63,8 +81,8 @@ import Base from '../layouts/Base.astro';
     <section class="block social-proof-strip">
       <div class="proof-stats">
         <div class="stat"><b>2,400+</b><span>readings delivered</span></div>
-        <div class="stat"><b>98%</b><span>satisfaction rate</span></div>
-        <div class="stat"><b>48 hrs</b><span>average delivery</span></div>
+        <div class="stat"><b>99%</b><span>satisfaction rate</span></div>
+        <div class="stat"><b>1 hr</b><span>average delivery</span></div>
       </div>
     </section>
   </div>
@@ -144,7 +162,7 @@ import Base from '../layouts/Base.astro';
   </div>
 
   <div class="wrap">
-    <section class="block" id="order">
+    <section class="block order-section" id="order">
       <div class="section-head">
         <h2>Order your Siddh Jyotish Janma Kundli</h2>
         <p>Secure checkout via Stripe. Your report is emailed to you once ready.</p>
@@ -181,9 +199,9 @@ import Base from '../layouts/Base.astro';
           <input type="email" id="email" name="email" required autocomplete="email" />
 
           <label for="q1">3 questions included with your report (max 18 words each)</label>
-          <input type="text" id="q1" name="q1" placeholder="e.g. When is a favourable time to marry?" />
-          <input type="text" id="q2" name="q2" placeholder="Optional question" style="margin-top:0.5rem" />
-          <input type="text" id="q3" name="q3" placeholder="Optional question" style="margin-top:0.5rem" />
+          <input type="text" id="q1" name="q1" placeholder="When will I get married?" />
+          <input type="text" id="q2" name="q2" placeholder="When will I get a good job / promotion?" style="margin-top:0.5rem" />
+          <input type="text" id="q3" name="q3" placeholder="When will we be blessed with a child?" style="margin-top:0.5rem" />
 
           <button type="submit" id="submit-btn" class="btn btn-block"><s class="was-btn">$51</s> Pay $31 &amp; Generate my Kundli</button>
           <div id="error" class="error" hidden></div>
@@ -286,33 +304,116 @@ import Base from '../layouts/Base.astro';
 </Base>
 
 <style>
-  /* Dual CTA cards in hero */
-  .hero-ctas-dual {
+  /* Hero split */
+  .hero-split { padding-bottom: clamp(2.2rem, 5vw, 4rem); }
+  .hero-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-top: 1.2rem;
+    grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+    gap: clamp(1.5rem, 4vw, 3rem);
+    align-items: center;
   }
+  .wrap-wide {
+    max-width: 1240px;
+  }
+  .hero-copy { position: relative; z-index: 1; }
+  .hero-visual {
+    position: relative;
+    min-height: 420px;
+    display: grid;
+    place-items: center;
+  }
+  .hero-wheel-frame {
+    position: relative;
+    width: min(100%, 460px);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    padding: 10px;
+    background:
+      radial-gradient(circle at center, rgba(255, 239, 191, 0.14) 0%, rgba(255, 239, 191, 0.08) 58%, rgba(255, 239, 191, 0) 74%),
+      linear-gradient(145deg, rgba(233, 196, 109, 0.96), rgba(201, 162, 39, 0.9));
+    box-shadow:
+      0 0 0 1px rgba(255, 236, 193, 0.35) inset,
+      0 0 0 7px rgba(255, 236, 193, 0.06) inset,
+      0 18px 40px rgba(10, 10, 30, 0.28),
+      0 0 45px rgba(201, 162, 39, 0.16);
+    overflow: hidden;
+  }
+  .hero-wheel {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    animation: spin 120s linear infinite;
+    -webkit-mask-image: radial-gradient(circle, #000 0 74%, rgba(0, 0, 0, 0.9) 80%, transparent 100%);
+    mask-image: radial-gradient(circle, #000 0 74%, rgba(0, 0, 0, 0.9) 80%, transparent 100%);
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-wheel { animation: none; }
+  }
+  .hero .lead { color: #ecdfff; font-size: clamp(1.05rem, 2.4vw, 1.3rem); max-width: 40ch; }
+  .hero .price-tag { margin-bottom: 1.2rem; }
+  .eyebrow {
+    display: inline-block; font-family: var(--sans); font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase; font-size: 0.8rem;
+    color: var(--gold-soft); margin-bottom: 1rem;
+  }
+  .price-tag {
+    display: inline-flex; align-items: baseline; gap: 0.5rem; margin: 0.5rem 0 1.5rem;
+  }
+  .price-tag b { font-family: var(--serif); font-size: 2rem; color: #fff; }
+  .price-tag span { color: #d9ccff; font-size: 0.95rem; }
+  .was { color: #b9a6e6; text-decoration: line-through; font-size: 1.25rem; opacity: 0.75; }
+  .was-btn { color: inherit; opacity: 0.7; text-decoration: line-through; margin-right: 0.35rem; font-weight: 600; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    display: inline-block; text-align: center; cursor: pointer;
+    font-family: var(--sans); font-weight: 700; font-size: 1.05rem;
+    color: var(--indigo); border: none; border-radius: 999px;
+    padding: 0.9rem 1.8rem;
+    background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+    box-shadow: 0 8px 22px rgba(201,162,39,0.4);
+    transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+  }
+  .btn:hover { transform: translateY(-1px); text-decoration: none; box-shadow: 0 12px 28px rgba(201,162,39,0.5); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .btn-block { display: block; width: 100%; margin-top: 1.5rem; }
+  .btn-ghost {
+    background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,0.5);
+    box-shadow: none;
+  }
+  .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+  .btn-outline {
+    background: transparent;
+    color: var(--maroon);
+    border: 1.5px solid var(--maroon);
+    box-shadow: none;
+  }
+  .btn-outline:hover {
+    background: rgba(122, 30, 30, 0.08);
+    color: var(--maroon-deep);
+    text-decoration: none;
+  }
+  .hero-ctas-dual { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.2rem; }
   .cta-card {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
     padding: 1.4rem 1.3rem;
-    border-radius: 16px;
+    border-radius: 18px;
     text-decoration: none;
-    transition: transform 0.12s ease, box-shadow 0.12s ease;
-  }
-  .cta-card:hover {
-    transform: translateY(-2px);
-    text-decoration: none;
-  }
-  .cta-primary {
-    background: linear-gradient(160deg, var(--gold-soft), var(--gold));
-    color: var(--indigo);
-    box-shadow: 0 8px 24px rgba(201,162,39,0.4);
     position: relative;
+    overflow: hidden;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
   }
-  .cta-primary:hover { box-shadow: 0 12px 30px rgba(201,162,39,0.55); }
+  .cta-card:hover { transform: translateY(-2px); text-decoration: none; }
   .cta-badge {
     position: absolute;
     top: -0.5rem;
@@ -326,12 +427,42 @@ import Base from '../layouts/Base.astro';
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
-  .cta-secondary {
-    background: rgba(255,255,255,0.08);
-    border: 1.5px solid rgba(255,255,255,0.35);
-    color: #f0e6ff;
+  .cta-kicker {
+    display: inline-flex;
+    align-self: flex-start;
+    border-radius: 999px;
+    padding: 0.28rem 0.7rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
   }
-  .cta-secondary:hover { background: rgba(255,255,255,0.14); }
+  .cta-primary {
+    background: linear-gradient(145deg, var(--green), var(--green-2));
+    color: #fff;
+    box-shadow: 0 14px 30px rgba(31, 122, 77, 0.34), 0 0 0 1px rgba(255,255,255,0.08) inset;
+  }
+  .cta-primary .cta-kicker {
+    background: rgba(255,255,255,0.14);
+    color: #f2fff7;
+  }
+  .cta-primary .cta-desc,
+  .cta-primary .cta-heading { color: #fff; }
+  .cta-primary .cta-heading { text-shadow: 0 1px 0 rgba(0,0,0,0.08); }
+  .cta-primary:hover { box-shadow: 0 18px 38px rgba(31, 122, 77, 0.42), 0 0 0 1px rgba(255,255,255,0.08) inset; }
+  .cta-secondary {
+    background: linear-gradient(145deg, #ffd47a, #f3a838 62%, #ffbf4d);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    color: var(--indigo);
+    box-shadow: 0 14px 30px rgba(224, 129, 47, 0.22);
+  }
+  .cta-secondary .cta-kicker {
+    background: rgba(42, 31, 92, 0.1);
+    color: var(--indigo);
+  }
+  .cta-secondary .cta-heading,
+  .cta-secondary .cta-desc { color: var(--indigo); }
+  .cta-secondary:hover { box-shadow: 0 18px 36px rgba(224,129,47,0.28); }
   .cta-heading {
     font-family: var(--serif);
     font-size: 1.15rem;
@@ -339,14 +470,55 @@ import Base from '../layouts/Base.astro';
     line-height: 1.3;
   }
   .cta-desc {
-    font-size: 0.9rem;
-    opacity: 0.88;
-    line-height: 1.5;
+    font-size: 0.92rem;
+    opacity: 0.9;
+    line-height: 1.55;
   }
   .cta-action {
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 0.96rem;
     margin-top: auto;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.72rem 1rem;
+    border-radius: 999px;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, color 0.18s ease;
+  }
+  .cta-action-primary {
+    background: linear-gradient(180deg, #fff8e6, #f4dea0);
+    color: var(--indigo);
+  }
+  .cta-action-secondary {
+    background: linear-gradient(180deg, var(--indigo), var(--maroon-deep));
+    color: #fff;
+  }
+  .cta-card:hover .cta-action {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(0,0,0,0.16);
+  }
+  .question-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    margin-top: 1rem;
+  }
+  .question-chips span {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.46rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #f7efe0;
+    font-size: 0.88rem;
+    line-height: 1.2;
+  }
+  @media (max-width: 900px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .hero-visual { display: none; }
   }
   @media (max-width: 680px) {
     .hero-ctas-dual { grid-template-columns: 1fr; }
@@ -393,6 +565,24 @@ import Base from '../layouts/Base.astro';
     border-radius: 12px;
     padding: 1rem 1.2rem;
     margin-top: 1.5rem !important;
+  }
+
+  /* Order section background */
+  .order-section {
+    background: url('/astro-bg.png') center/cover no-repeat;
+    border-radius: 24px;
+    padding-top: clamp(2.4rem, 5vw, 3.3rem);
+    padding-bottom: clamp(2.4rem, 5vw, 3.3rem);
+  }
+  .order-section .section-head,
+  .order-section .gifting-note {
+    position: relative;
+    z-index: 1;
+  }
+  .order-section .card {
+    position: relative;
+    z-index: 1;
+    background: var(--card);
   }
 
   /* Gifting note */
