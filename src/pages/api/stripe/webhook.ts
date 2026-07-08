@@ -83,6 +83,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         dateOfBirth: m.dateOfBirth,
         timeOfBirth: m.timeOfBirth,
         placeOfBirth: m.placeOfBirth,
+        timezone: m.timezone || undefined,
         email: m.email,
         questions,
         pandit,

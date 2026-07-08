@@ -12,6 +12,7 @@ export const birthDetailsSchema = z.object({
   dateOfBirth: z.string().min(1).max(40),
   timeOfBirth: z.string().min(1).max(20),
   placeOfBirth: z.string().min(1).max(160),
+  timezone: z.string().min(1).max(64),
   email: z.string().email().max(200),
   questions: z.array(question).max(3).optional().default([]),
 });
