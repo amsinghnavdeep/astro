@@ -14,6 +14,7 @@ import { getPricing, resolveCurrency } from '../../../lib/pricing';
 import { isUnsupportedCurrencyError } from '../../../lib/stripe';
 import { birthDetailsSchema } from '../../../lib/validation';
 import { randomPandit } from '../../../lib/pandits';
+import { recordLead, type LeadRecord } from '../../../lib/leads';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   let payload: unknown;
@@ -78,6 +79,29 @@ export const POST: APIRoute = async ({ request, locals }) => {
     } else {
       throw err;
     }
+  }
+
+  try {
+    const createdAt = new Date();
+    const lead: LeadRecord = {
+      id: session.id,
+      kind: 'kundli',
+      email: d.email,
+      fullName: d.fullName,
+      gender: d.gender,
+      dateOfBirth: d.dateOfBirth,
+      timeOfBirth: d.timeOfBirth,
+      placeOfBirth: d.placeOfBirth,
+      timezone: d.timezone,
+      questions: d.questions ?? [],
+      amountTotal: session.amount_total ?? pricing.kundliCents,
+      currency: session.currency ?? currency,
+      createdAt: createdAt.toISOString(),
+      createdAtMs: createdAt.getTime(),
+    };
+    await recordLead(locals.runtime.env.SIDDH_KV, lead);
+  } catch (err) {
+    console.error('Lead capture error (kundli):', err);
   }
 
   return json({ url: session.url });

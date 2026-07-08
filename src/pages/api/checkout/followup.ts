@@ -14,6 +14,7 @@ import { getPricing, resolveCurrency } from '../../../lib/pricing';
 import { isUnsupportedCurrencyError } from '../../../lib/stripe';
 import { followupSchema } from '../../../lib/validation';
 import { decodeReference } from '../../../lib/reference';
+import { recordLead, type LeadRecord } from '../../../lib/leads';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   let payload: unknown;
@@ -88,6 +89,24 @@ export const POST: APIRoute = async ({ request, locals }) => {
     } else {
       throw err;
     }
+  }
+
+  try {
+    const createdAt = new Date();
+    const lead: LeadRecord = {
+      id: session.id,
+      kind: 'followup',
+      email,
+      reference,
+      questions,
+      amountTotal: session.amount_total ?? unitAmount,
+      currency: session.currency ?? currency,
+      createdAt: createdAt.toISOString(),
+      createdAtMs: createdAt.getTime(),
+    };
+    await recordLead(locals.runtime.env.SIDDH_KV, lead);
+  } catch (err) {
+    console.error('Lead capture error (followup):', err);
   }
 
   return json({ url: session.url });

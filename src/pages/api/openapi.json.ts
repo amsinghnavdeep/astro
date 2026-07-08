@@ -204,6 +204,46 @@ const spec = {
         },
       },
     },
+    '/api/admin/leads': {
+      get: {
+        summary: 'Query persisted abandoned leads from Cloudflare KV',
+        security: [{ AdminBearer: [] }],
+        parameters: [
+          {
+            name: 'date',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', example: '2026-07-07' },
+            description: 'Single UTC day. Mutually exclusive with from/to.',
+          },
+          {
+            name: 'from',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', example: '2026-07-01' },
+          },
+          {
+            name: 'to',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', example: '2026-07-31' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Matching leads with totals by currency.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/LeadQueryResponse' },
+              },
+            },
+          },
+          '400': { $ref: '#/components/responses/ValidationError' },
+          '401': { $ref: '#/components/responses/Unauthorized' },
+          '500': { description: 'KV not configured.' },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {
@@ -387,6 +427,47 @@ const spec = {
           orders: {
             type: 'array',
             items: { $ref: '#/components/schemas/OrderRecord' },
+          },
+        },
+      },
+      LeadRecord: {
+        type: 'object',
+        required: ['id', 'kind', 'email', 'questions', 'amountTotal', 'currency', 'createdAt', 'createdAtMs'],
+        properties: {
+          id: { type: 'string' },
+          kind: { type: 'string', enum: ['kundli', 'followup'] },
+          email: { type: 'string' },
+          fullName: { type: 'string' },
+          gender: { type: 'string', enum: ['Male', 'Female', 'Other'] },
+          dateOfBirth: { type: 'string' },
+          timeOfBirth: { type: 'string' },
+          placeOfBirth: { type: 'string' },
+          timezone: { type: 'string' },
+          reference: { type: 'string' },
+          questions: {
+            type: 'array',
+            items: { type: 'string' },
+          },
+          amountTotal: { type: 'integer', minimum: 0 },
+          currency: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          createdAtMs: { type: 'integer' },
+        },
+      },
+      LeadQueryResponse: {
+        type: 'object',
+        required: ['from', 'to', 'count', 'totalsByCurrency', 'leads'],
+        properties: {
+          from: { type: ['string', 'null'], format: 'date-time' },
+          to: { type: ['string', 'null'], format: 'date-time' },
+          count: { type: 'integer', minimum: 0 },
+          totalsByCurrency: {
+            type: 'object',
+            additionalProperties: { type: 'integer', minimum: 0 },
+          },
+          leads: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/LeadRecord' },
           },
         },
       },

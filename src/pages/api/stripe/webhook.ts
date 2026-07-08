@@ -20,6 +20,7 @@ import {
 } from '../../../lib/devin';
 import { encodeReference, decodeReference } from '../../../lib/reference';
 import { recordOrder, type OrderRecord } from '../../../lib/orders';
+import { deleteLead } from '../../../lib/leads';
 import { computeChart, chartToPromptText } from '../../../lib/kundli/chart';
 
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -72,6 +73,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
     await recordOrder(locals.runtime.env.SIDDH_KV, order);
   } catch (err) {
     console.error('Order persistence error:', err);
+  }
+
+  try {
+    await deleteLead(locals.runtime.env.SIDDH_KV, session.id);
+  } catch (err) {
+    console.error('Lead deletion error:', err);
   }
 
   try {
