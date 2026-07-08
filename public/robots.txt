@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /docs
+Disallow: /success
+Sitemap: https://siddhjyotish.com/sitemap.xml
