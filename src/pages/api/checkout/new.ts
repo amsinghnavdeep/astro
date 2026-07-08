@@ -57,6 +57,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       dateOfBirth: d.dateOfBirth,
       timeOfBirth: d.timeOfBirth,
       placeOfBirth: d.placeOfBirth,
+      timezone: d.timezone,
       email: d.email,
       pandit,
       questions: JSON.stringify(d.questions ?? []).slice(0, 480),

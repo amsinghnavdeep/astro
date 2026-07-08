@@ -235,13 +235,14 @@ const spec = {
       BirthDetailsInput: {
         type: 'object',
         additionalProperties: false,
-        required: ['fullName', 'gender', 'dateOfBirth', 'timeOfBirth', 'placeOfBirth', 'email'],
+        required: ['fullName', 'gender', 'dateOfBirth', 'timeOfBirth', 'placeOfBirth', 'timezone', 'email'],
         properties: {
           fullName: { type: 'string', maxLength: 120 },
           gender: { type: 'string', enum: ['Male', 'Female', 'Other'] },
           dateOfBirth: { type: 'string', maxLength: 40, examples: ['30 Jan 2000'] },
           timeOfBirth: { type: 'string', maxLength: 20, examples: ['11:30 PM'] },
           placeOfBirth: { type: 'string', maxLength: 160, examples: ['Toronto, Ontario, Canada'] },
+          timezone: { type: 'string', minLength: 1, maxLength: 64, description: 'IANA timezone of the birthplace.', examples: ['Asia/Kolkata'] },
           email: { type: 'string', format: 'email', maxLength: 200 },
           questions: {
             type: 'array',
