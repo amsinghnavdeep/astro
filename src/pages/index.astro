@@ -110,7 +110,7 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
         <div class="step">
           <div class="num">1</div>
           <h3>Share your birth details</h3>
-          <p>Name, gender, exact date, time (with AM/PM) and place of birth. That's all your chart needs.</p>
+          <p>Name, gender, exact date, time (with AM/PM), place of birth and its timezone. That's all your chart needs.</p>
         </div>
         <div class="step">
           <div class="num">2</div>
@@ -219,6 +219,88 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
               <div id="placeOfBirth-suggestions" class="autocomplete-list" role="listbox" aria-label="Place suggestions" hidden></div>
             </div>
             <p class="field-error" id="placeOfBirth-error" aria-live="polite"></p>
+          </div>
+
+          <div class="field">
+            <label for="timezone">Timezone of birthplace</label>
+            <select id="timezone" name="timezone" required>
+              <option value="" disabled selected>Select the timezone of your birthplace…</option>
+              <optgroup label="India &amp; South Asia">
+                <option value="Asia/Kolkata">India — Asia/Kolkata (IST, UTC+5:30)</option>
+                <option value="Asia/Karachi">Pakistan — Asia/Karachi (UTC+5)</option>
+                <option value="Asia/Dhaka">Bangladesh — Asia/Dhaka (UTC+6)</option>
+                <option value="Asia/Kathmandu">Nepal — Asia/Kathmandu (UTC+5:45)</option>
+                <option value="Asia/Colombo">Sri Lanka — Asia/Colombo (UTC+5:30)</option>
+                <option value="Asia/Thimphu">Bhutan — Asia/Thimphu (UTC+6)</option>
+                <option value="Asia/Kabul">Afghanistan — Asia/Kabul (UTC+4:30)</option>
+              </optgroup>
+              <optgroup label="Middle East &amp; West Asia">
+                <option value="Asia/Dubai">UAE — Asia/Dubai (UTC+4)</option>
+                <option value="Asia/Riyadh">Saudi Arabia — Asia/Riyadh (UTC+3)</option>
+                <option value="Asia/Qatar">Qatar — Asia/Qatar (UTC+3)</option>
+                <option value="Asia/Kuwait">Kuwait — Asia/Kuwait (UTC+3)</option>
+                <option value="Asia/Muscat">Oman — Asia/Muscat (UTC+4)</option>
+                <option value="Asia/Tehran">Iran — Asia/Tehran (UTC+3:30)</option>
+                <option value="Asia/Jerusalem">Israel — Asia/Jerusalem (UTC+2)</option>
+              </optgroup>
+              <optgroup label="East &amp; Southeast Asia">
+                <option value="Asia/Shanghai">China — Asia/Shanghai (UTC+8)</option>
+                <option value="Asia/Hong_Kong">Hong Kong — Asia/Hong_Kong (UTC+8)</option>
+                <option value="Asia/Singapore">Singapore — Asia/Singapore (UTC+8)</option>
+                <option value="Asia/Kuala_Lumpur">Malaysia — Asia/Kuala_Lumpur (UTC+8)</option>
+                <option value="Asia/Jakarta">Indonesia (west) — Asia/Jakarta (UTC+7)</option>
+                <option value="Asia/Bangkok">Thailand — Asia/Bangkok (UTC+7)</option>
+                <option value="Asia/Ho_Chi_Minh">Vietnam — Asia/Ho_Chi_Minh (UTC+7)</option>
+                <option value="Asia/Manila">Philippines — Asia/Manila (UTC+8)</option>
+                <option value="Asia/Tokyo">Japan — Asia/Tokyo (UTC+9)</option>
+                <option value="Asia/Seoul">South Korea — Asia/Seoul (UTC+9)</option>
+              </optgroup>
+              <optgroup label="Europe">
+                <option value="Europe/London">UK / Ireland — Europe/London (UTC+0)</option>
+                <option value="Europe/Paris">France — Europe/Paris (UTC+1)</option>
+                <option value="Europe/Berlin">Germany — Europe/Berlin (UTC+1)</option>
+                <option value="Europe/Madrid">Spain — Europe/Madrid (UTC+1)</option>
+                <option value="Europe/Rome">Italy — Europe/Rome (UTC+1)</option>
+                <option value="Europe/Amsterdam">Netherlands — Europe/Amsterdam (UTC+1)</option>
+                <option value="Europe/Athens">Greece — Europe/Athens (UTC+2)</option>
+                <option value="Europe/Istanbul">Turkey — Europe/Istanbul (UTC+3)</option>
+                <option value="Europe/Moscow">Russia (Moscow) — Europe/Moscow (UTC+3)</option>
+              </optgroup>
+              <optgroup label="Africa">
+                <option value="Africa/Lagos">Nigeria — Africa/Lagos (UTC+1)</option>
+                <option value="Africa/Cairo">Egypt — Africa/Cairo (UTC+2)</option>
+                <option value="Africa/Johannesburg">South Africa — Africa/Johannesburg (UTC+2)</option>
+                <option value="Africa/Nairobi">Kenya — Africa/Nairobi (UTC+3)</option>
+                <option value="Indian/Mauritius">Mauritius — Indian/Mauritius (UTC+4)</option>
+              </optgroup>
+              <optgroup label="North America">
+                <option value="America/New_York">US Eastern — America/New_York (UTC−5)</option>
+                <option value="America/Chicago">US Central — America/Chicago (UTC−6)</option>
+                <option value="America/Denver">US Mountain — America/Denver (UTC−7)</option>
+                <option value="America/Los_Angeles">US Pacific — America/Los_Angeles (UTC−8)</option>
+                <option value="America/Toronto">Canada Eastern — America/Toronto (UTC−5)</option>
+                <option value="America/Vancouver">Canada Pacific — America/Vancouver (UTC−8)</option>
+                <option value="America/Mexico_City">Mexico — America/Mexico_City (UTC−6)</option>
+              </optgroup>
+              <optgroup label="Central &amp; South America">
+                <option value="America/Sao_Paulo">Brazil (São Paulo) — America/Sao_Paulo (UTC−3)</option>
+                <option value="America/Argentina/Buenos_Aires">Argentina — America/Argentina/Buenos_Aires (UTC−3)</option>
+                <option value="America/Bogota">Colombia — America/Bogota (UTC−5)</option>
+                <option value="America/Lima">Peru — America/Lima (UTC−5)</option>
+                <option value="America/Santiago">Chile — America/Santiago (UTC−4)</option>
+              </optgroup>
+              <optgroup label="Oceania">
+                <option value="Australia/Sydney">Australia Eastern — Australia/Sydney (UTC+10)</option>
+                <option value="Australia/Perth">Australia Western — Australia/Perth (UTC+8)</option>
+                <option value="Pacific/Auckland">New Zealand — Pacific/Auckland (UTC+12)</option>
+                <option value="Pacific/Fiji">Fiji — Pacific/Fiji (UTC+12)</option>
+              </optgroup>
+              <optgroup label="Other">
+                <option value="UTC">UTC (Coordinated Universal Time)</option>
+              </optgroup>
+            </select>
+            <p class="helper" style="margin-top:0.35rem">The timezone of the town/city where you were born — not where you live now.</p>
+            <p class="field-error" id="timezone-error" aria-live="polite"></p>
           </div>
 
           <div class="field">
@@ -734,6 +816,7 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
   const timeInput = document.getElementById('timeOfBirth') as HTMLInputElement;
   const placeInput = document.getElementById('placeOfBirth') as HTMLInputElement;
   const placeMenu = document.getElementById('placeOfBirth-suggestions') as HTMLDivElement;
+  const timezoneSelect = document.getElementById('timezone') as HTMLSelectElement;
   const emailInput = document.getElementById('email') as HTMLInputElement;
   const questionInputs = ['q1', 'q2', 'q3']
     .map((id) => document.getElementById(id) as HTMLInputElement)
@@ -860,6 +943,15 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
     return true;
   }
 
+  function validateTimezoneField(): boolean {
+    if (!timezoneSelect.value) {
+      setFieldError(timezoneSelect, 'timezone', 'Please select the timezone of your birthplace.');
+      return false;
+    }
+    clearFieldError(timezoneSelect, 'timezone');
+    return true;
+  }
+
   function validateQuestionField(input: HTMLInputElement): boolean {
     const value = trimValue(input);
     if (!value) {
@@ -910,13 +1002,14 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
       validateDateField(),
       validateTimeField(),
       validatePlaceField(),
+      validateTimezoneField(),
       validateEmailField(),
       validateQuestions(),
     ];
 
     const isValid = validFields.every(Boolean);
     if (!isValid) {
-      focusFirstInvalid([fullNameInput, genderSelect, dateInput, timeInput, placeInput, emailInput, ...questionInputs]);
+      focusFirstInvalid([fullNameInput, genderSelect, dateInput, timeInput, placeInput, timezoneSelect, emailInput, ...questionInputs]);
     }
     return isValid;
   }
@@ -933,6 +1026,7 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
   bindLiveValidation(dateInput, validateDateField, 'input');
   bindLiveValidation(timeInput, validateTimeField, 'input');
   bindLiveValidation(placeInput, validatePlaceField, 'input');
+  bindLiveValidation(timezoneSelect, validateTimezoneField, 'change');
   bindLiveValidation(emailInput, validateEmailField, 'input');
   questionInputs.forEach((input) => {
     input.addEventListener('blur', () => validateQuestionField(input));
@@ -1103,6 +1197,7 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
       dateOfBirth: formatBirthDate(dateInput.value),
       timeOfBirth: formatTime(timeInput.value),
       placeOfBirth: placeInput.value.trim(),
+      timezone: timezoneSelect.value,
       email: emailInput.value.trim(),
       questions: collectQuestions(),
     };

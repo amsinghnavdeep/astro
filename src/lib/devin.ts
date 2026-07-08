@@ -33,6 +33,8 @@ export interface BirthDetails {
   dateOfBirth: string; // e.g. "30 Jan 2000"
   timeOfBirth: string; // e.g. "11:30 AM"
   placeOfBirth: string; // "City, State, Country"
+  /** IANA timezone of the birthplace (e.g. "Asia/Kolkata"), used for UT conversion. */
+  timezone?: string;
   questions?: string[];
   email: string;
   /** Display name of the astrologer this report is attributed to. */
@@ -114,6 +116,9 @@ function buildKundliPrompt(d: BirthDetails): string {
     `Date of birth: ${d.dateOfBirth}`,
     `Time of birth: ${d.timeOfBirth}`,
     `Place of birth: ${d.placeOfBirth}`,
+    ...(d.timezone
+      ? [`Birthplace timezone (IANA): ${d.timezone} — the customer confirmed this is the timezone in effect at the birthplace on the birth date; use it for the local-time-to-UT conversion (still apply the correct historical DST/offset for that date).`]
+      : []),
     `Customer email: ${d.email}`,
     `Assigned Pandit (astrologer): ${pandit}`,
     questions,
