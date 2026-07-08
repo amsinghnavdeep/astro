@@ -13,9 +13,78 @@ const kundliWas = formatMoney(pricing.kundliWasCents, currency);
 const f1 = formatMoney(pricing.followupTierCents[1], currency);
 const f2 = formatMoney(pricing.followupTierCents[2], currency);
 const f3 = formatMoney(pricing.followupTierCents[3], currency);
+
+const faqItems = [
+  {
+    question: 'How accurate is the chart?',
+    answer:
+      'Every planetary position is computed with a professional astronomical ephemeris (sidereal zodiac, Lahiri ayanamsa, whole-sign houses) — accurate to the arc-second. Nothing is estimated or hard-coded.',
+  },
+  {
+    question: 'What do I receive, and when?',
+    answer:
+      'A detailed multi-page PDF report emailed to you once your assigned pandit completes it, along with an encrypted reference number for future follow-up questions.',
+  },
+  {
+    question: 'Do I need an account?',
+    answer:
+      'No. We keep no account and store no personal data on our side — your reading is private. Your reference number is your key to follow-ups.',
+  },
+  {
+    question: 'What is the money-back guarantee?',
+    answer:
+      "If you're not satisfied with your report, contact us and we'll refund you in full. We stand behind the quality of every reading.",
+  },
+  {
+    question: 'Why is the time of birth so important?',
+    answer:
+      'Your ascendant (Lagna) changes roughly every two hours, reshaping the entire chart. An accurate time — including AM/PM — is essential.',
+  },
+  {
+    question: 'Can I gift this to someone?',
+    answer:
+      "Absolutely. Enter your loved one's birth details and your own email. You'll receive the report so you can present it personally — a truly meaningful and personal gift.",
+  },
+];
+
+const homeStructuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Service',
+      name: 'Siddh Jyotish Janma Kundli Report',
+      description:
+        'A precise, hand-crafted Vedic Janma Kundli report with up to 3 included questions, prepared by respected astrologers.',
+      url: 'https://siddhjyotish.com/#order',
+      provider: { '@id': 'https://siddhjyotish.com#organization' },
+      areaServed: 'Worldwide',
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: currency.toUpperCase(),
+        price: (pricing.kundliCents / 100).toFixed(2),
+        availability: 'https://schema.org/InStock',
+        url: 'https://siddhjyotish.com/#order',
+      },
+    },
+    {
+      '@type': 'FAQPage',
+      mainEntity: faqItems.map((item) => ({
+        '@type': 'Question',
+        name: item.question,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: item.answer,
+        },
+      })),
+    },
+  ],
+};
 ---
 
-<Base title="Siddh Jyotish — Your Vedic Birth Chart, Created with Precision">
+<Base
+  title="Vedic Janma Kundli Reports | Siddh Jyotish"
+  description="Order a precise Vedic Janma Kundli report with 3 included questions, or return later to ask follow-up astrology questions from the same chart."
+>
   <div class="wrap wrap-wide">
     <section class="hero hero-split">
       <div class="hero-grid">
@@ -368,30 +437,12 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
         <h2>Frequently asked questions</h2>
       </div>
       <div class="faq">
-        <details open>
-          <summary>How accurate is the chart?</summary>
-          <p>Every planetary position is computed with a professional astronomical ephemeris (sidereal zodiac, Lahiri ayanamsa, whole-sign houses) — accurate to the arc-second. Nothing is estimated or hard-coded.</p>
-        </details>
-        <details>
-          <summary>What do I receive, and when?</summary>
-          <p>A detailed multi-page PDF report emailed to you once your assigned pandit completes it, along with an encrypted reference number for future follow-up questions.</p>
-        </details>
-        <details>
-          <summary>Do I need an account?</summary>
-          <p>No. We keep no account and store no personal data on our side — your reading is private. Your reference number is your key to follow-ups.</p>
-        </details>
-        <details>
-          <summary>What is the money-back guarantee?</summary>
-          <p>If you're not satisfied with your report, contact us and we'll refund you in full. We stand behind the quality of every reading.</p>
-        </details>
-        <details>
-          <summary>Why is the time of birth so important?</summary>
-          <p>Your ascendant (Lagna) changes roughly every two hours, reshaping the entire chart. An accurate time — including AM/PM — is essential.</p>
-        </details>
-        <details>
-          <summary>Can I gift this to someone?</summary>
-          <p>Absolutely. Enter your loved one's birth details and your own email. You'll receive the report so you can present it personally — a truly meaningful and personal gift.</p>
-        </details>
+        {faqItems.map((item, index) => (
+          <details open={index === 0}>
+            <summary>{item.question}</summary>
+            <p>{item.answer}</p>
+          </details>
+        ))}
       </div>
       <p class="center" style="margin-top:1.5rem">
         Already have a reference number?
@@ -399,6 +450,8 @@ const f3 = formatMoney(pricing.followupTierCents[3], currency);
       </p>
     </section>
   </div>
+
+  <script type="application/ld+json" set:html={JSON.stringify(homeStructuredData)}></script>
 
   <div class="wrap">
     <section class="block final-cta-section">
