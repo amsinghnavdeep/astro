@@ -1,4 +1,8 @@
 /// <reference path="../.astro/types.d.ts" />
+declare module '*.wasm' {
+  const wasmModule: WebAssembly.Module;
+  export default wasmModule;
+}
 type KVNamespace = import('@cloudflare/workers-types').KVNamespace;
 interface ENV {
   SIDDH_KV: KVNamespace;

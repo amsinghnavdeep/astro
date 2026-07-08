@@ -45,7 +45,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
           unit_amount: unitAmount,
           product_data: {
             name: 'Siddh Jyotish — Full Vedic Birth Chart Report (includes 3 questions)',
-            description: 'Detailed PDF + interactive chart, computed with Swiss Ephemeris.',
+            description: 'Detailed PDF birth-chart report, computed to arc-second precision.',
           },
         },
       },

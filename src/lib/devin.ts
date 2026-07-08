@@ -39,6 +39,12 @@ export interface BirthDetails {
   email: string;
   /** Display name of the astrologer this report is attributed to. */
   pandit?: string;
+  /**
+   * Pre-computed chart analysis (positions, Lagna, dasha, D-9, doshas) rendered
+   * as a labelled text block. When present, the playbook uses these figures
+   * verbatim instead of computing the ephemeris itself.
+   */
+  precomputedChart?: string;
 }
 
 export interface DevinSession {
@@ -125,9 +131,23 @@ function buildKundliPrompt(d: BirthDetails): string {
     '',
     'Use gendered language consistent with the stated gender.',
     'Keep the confirmed birth details available in this session so future follow-up',
-    'questions can reuse or recompute the chart. Produce the PDF and interactive HTML,',
-    'then attach both files to this session.',
+    'questions can reuse the chart. Produce the branded PDF report (Kundli_Report.pdf)',
+    'and attach it to this session.',
     '',
+    ...(d.precomputedChart
+      ? [
+          'The birth chart has ALREADY been computed for you with high precision.',
+          'Use these figures verbatim as the factual basis of the entire reading —',
+          'do NOT install an ephemeris or recompute planetary positions. Your job is',
+          'the interpretation, predictions, remedies, PDF and email; the raw analysis',
+          'below is authoritative:',
+          '',
+          '----- BEGIN PRECOMPUTED CHART -----',
+          d.precomputedChart,
+          '----- END PRECOMPUTED CHART -----',
+          '',
+        ]
+      : []),
     `You will receive the customer's encrypted reference number in a follow-up message.`,
     `When the report is ready, send EXACTLY ONE email to ${d.email}, framed as personally`,
     `from ${pandit}, containing that reference number prominently and the Kundli_Report.pdf`,
@@ -183,7 +203,7 @@ export async function instructKundliDelivery(
     'Delivery instruction for this customer:',
     `Customer: ${opts.fullName} <${opts.email}>`,
     `Assigned Pandit: ${opts.pandit}`,
-    `Reference number (their receipt to buy follow-up questions later): ${opts.reference}`,
+    `Reference number (their key to ask the Pandit follow-up questions at https://siddhjyotish.com/returning): ${opts.reference}`,
     '',
     `When the report is ready, send EXACTLY ONE email to ${opts.email}, framed as personally`,
     `from ${opts.pandit}, with subject "Your Janma Kundli from ${opts.pandit} at Siddh Jyotish". The email body`,
