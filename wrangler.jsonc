@@ -22,6 +22,11 @@
       "preview_id": "b885071c8bf3421cada98cef8e4cf5ac"
     }
   ],
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "siddhjyotish.com", "custom_domain": true },
+    { "pattern": "www.siddhjyotish.com", "custom_domain": true }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist"
