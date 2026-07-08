@@ -20,6 +20,7 @@ import {
 } from '../../../lib/devin';
 import { encodeReference, decodeReference } from '../../../lib/reference';
 import { recordOrder, type OrderRecord } from '../../../lib/orders';
+import { computeChart, chartToPromptText } from '../../../lib/kundli/chart';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   // Signature verification needs the RAW body — never call request.json() first.
@@ -77,6 +78,25 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (m.kind === 'kundli') {
       const questions = JSON.parse(m.questions || '[]') as string[];
       const pandit = m.pandit || 'our senior astrologer';
+
+      // Pre-compute the chart in the Worker so the Devin session only has to
+      // interpret it (big ACU saving). If anything fails (geocoding, parsing),
+      // fall back gracefully: the playbook computes the chart itself.
+      let precomputedChart: string | undefined;
+      try {
+        if (m.timezone && m.dateOfBirth && m.timeOfBirth && m.placeOfBirth) {
+          const chart = await computeChart({
+            dateOfBirth: m.dateOfBirth,
+            timeOfBirth: m.timeOfBirth,
+            placeOfBirth: m.placeOfBirth,
+            timezone: m.timezone,
+          });
+          precomputedChart = chartToPromptText(chart);
+        }
+      } catch (err) {
+        console.error('Chart pre-computation failed; playbook will compute it:', err);
+      }
+
       const devinSession = await createKundliSession({
         fullName: m.fullName,
         gender: (m.gender as 'Male' | 'Female' | 'Other') || 'Other',
@@ -87,6 +107,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         email: m.email,
         questions,
         pandit,
+        precomputedChart,
       });
       console.info('Created Devin Kundli session:', devinSession.session_id);
       const reference = encodeReference(devinSession.session_id);
