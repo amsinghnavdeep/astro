@@ -416,7 +416,28 @@ def render_report(data: dict[str, Any]) -> str:
       align-items: end;
     }
     .title-row > div:first-child { flex: 1 1 auto; min-width: 0; }
-    .title-row > div:last-child { flex: 0 0 auto; }
+    .title-row > div:last-child {
+      flex: 0 1 240px;
+      max-width: 240px;
+      min-width: 0;
+      text-align: right;
+    }
+    .prepared-by {
+      margin: 0;
+      white-space: nowrap;
+    }
+    .reference-label {
+      margin: 0;
+      text-align: right;
+    }
+    .cover-reference-token {
+      display: block;
+      font-size: 18px;
+      font-weight: 700;
+      color: $maroon_deep;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+    }
     .meta-grid {
       display: flex;
       flex-wrap: wrap;
@@ -534,8 +555,8 @@ def render_report(data: dict[str, Any]) -> str:
       text-align: center;
     }
     .reference {
+      display: block;
       margin: 14px auto 18px;
-      display: inline-block;
       padding: 12px 16px;
       border-radius: 16px;
       border: 1px dashed $gold;
@@ -543,6 +564,9 @@ def render_report(data: dict[str, Any]) -> str:
       font-size: 15px;
       font-weight: 700;
       color: $maroon_deep;
+      max-width: min(100%, 360px);
+      word-break: break-all;
+      overflow-wrap: anywhere;
     }
     .cta-row {
       display: flex;
@@ -572,11 +596,11 @@ def render_report(data: dict[str, Any]) -> str:
       <div class="title-row">
         <div>
           <h1>$full_name</h1>
-          <p class="subtle">Prepared by $pandit_name</p>
+          <p class="subtle prepared-by">Prepared by $pandit_name</p>
         </div>
         <div>
-          <p class="subtle" style="text-align:right;margin:0;">Reference number</p>
-          <div style="text-align:right;font-size:18px;font-weight:700;color:$maroon_deep;">$reference_number</div>
+          <p class="subtle reference-label">Reference number</p>
+          <div class="cover-reference-token">$reference_number</div>
         </div>
       </div>
       <p class="intro">Namaste. This is your personal Janma Kundli — your Vedic birth chart, studied and prepared for you with care. Within these pages you will find your planetary placements, the charts that shape your life, and guidance on the path ahead.</p>
