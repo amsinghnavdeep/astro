@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+"""Siddh Jyotish — Janma Kundli PDF report generator.
+
+This renders a FIXED, brand-consistent report template. The AI/backend only ever
+fills the *values* inside ``data.json`` — it must never add, remove or rename keys.
+Every heading, the cover, the North-Indian square chart diagrams, the tables, the
+footers and all static copy live here in the template and stay identical for every
+customer. Supply the data; the layout is not yours to change.
+
+Usage:
+    python scripts/kundli/generate_report.py data.json
+It writes ``Kundli_Report.pdf`` (and ``report.html``) next to the input JSON and
+prints ``VALIDATION PASS`` when the rendered PDF passes the mechanical gate.
+"""
 from __future__ import annotations
 
 import json
@@ -6,20 +19,19 @@ import os
 import re
 import subprocess
 import sys
-from datetime import datetime, timezone
 from html import escape
 from pathlib import Path
-from string import Template
 from typing import Any
 
 PDF_NAME = 'Kundli_Report.pdf'
 HTML_NAME = 'report.html'
-# Structural floor only: a real report always has at least the cover, the
-# chart page, and a reading page. The substantive quality gate is the marker
-# and blank-page checks below — NOT a fixed page count, since a correct report
-# can legitimately paginate to 4 pages when the interpretation is more concise.
-MIN_PAGE_COUNT = 3
+MIN_PAGE_COUNT = 6
+WHATSAPP_NUMBER = '+91 7051300168'
 WHATSAPP_URL = 'https://wa.me/917051300168'
+RETURNING_URL = 'https://siddhjyotish.com/returning'
+CONTACT_EMAIL = 'namaste@siddhjyotish.com'
+SITE = 'siddhjyotish.com'
+
 BRAND = {
     'maroon': '#7a1e1e',
     'maroon_deep': '#5c1414',
@@ -29,6 +41,7 @@ BRAND = {
     'gold_soft': '#e6c766',
     'green': '#1f7a4d',
     'cream': '#fbf4e6',
+    'page': '#fffdf9',
     'card': '#fffdf8',
     'text': '#2b2116',
     'muted': '#6b5d47',
@@ -36,785 +49,694 @@ BRAND = {
     'indigo': '#1b1440',
 }
 
+SIGNS = [
+    ('Aries', 'Mesha'), ('Taurus', 'Vrishabha'), ('Gemini', 'Mithuna'),
+    ('Cancer', 'Karka'), ('Leo', 'Simha'), ('Virgo', 'Kanya'),
+    ('Libra', 'Tula'), ('Scorpio', 'Vrischika'), ('Sagittarius', 'Dhanu'),
+    ('Capricorn', 'Makara'), ('Aquarius', 'Kumbha'), ('Pisces', 'Meena'),
+]
 
-def fail(message: str) -> None:
-    print(f'ERROR: {message}', file=sys.stderr)
-    raise SystemExit(1)
+PLANET_ABBR = {
+    'sun': 'Su', 'moon': 'Mo', 'mars': 'Ma', 'mercury': 'Me', 'jupiter': 'Ju',
+    'venus': 'Ve', 'saturn': 'Sa', 'rahu': 'Ra', 'ketu': 'Ke',
+}
+
+# Terms coloured inline in prose, to mirror the reference report. Signs render in
+# green; jyotish vocabulary in saffron. This only *adds* colour to the AI-written
+# words — it never changes them.
+_GREEN_TERMS = [en for en, _ in SIGNS] + [hi for _, hi in SIGNS] + ['Lagna', 'Rasi', 'Navamsa']
+_SAFFRON_TERMS = [
+    'Mahadasha', 'Antardasha', 'dasha', 'nakshatra', 'bhagya', 'santaan', 'muhurat',
+    'griha pravesh', 'Shukla Paksha', 'Chaturmas', 'Kaal Sarp', 'Sade Sati', 'Manglik',
+    'Mangal', 'karaka', 'abhimantrit', 'vakri', 'upaay', 'Revati',
+]
+
+
+# --------------------------------------------------------------------------- #
+# Tolerant readers — inputs are always fully provided, so these never raise;
+# they simply coerce whatever value is present into display text.
+# --------------------------------------------------------------------------- #
+def text(value: Any) -> str:
+    if value is None:
+        return ''
+    if isinstance(value, bool):
+        return 'Yes' if value else 'No'
+    if isinstance(value, (int, float)):
+        return str(value)
+    return str(value).strip()
+
+
+def truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {'true', 'yes', 'present', '1'}
+    return bool(value)
+
+
+def obj(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def arr(value: Any) -> list[Any]:
+    return value if isinstance(value, list) else []
 
 
 def read_json(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding='utf-8'))
     except Exception as exc:  # pragma: no cover - defensive
-        fail(f'Unable to read JSON: {exc}')
-    if not isinstance(payload, dict):
-        fail('Top-level JSON must be an object.')
-    return payload
+        print(f'ERROR: Unable to read JSON: {exc}', file=sys.stderr)
+        raise SystemExit(1)
+    return payload if isinstance(payload, dict) else {}
 
 
-def as_object(value: Any, path: str) -> dict[str, Any]:
-    if not isinstance(value, dict):
-        fail(f'{path} must be an object.')
-    return value
+# --------------------------------------------------------------------------- #
+# Small formatting helpers
+# --------------------------------------------------------------------------- #
+def sign_index(name: str) -> int:
+    low = (name or '').lower()
+    for i, (en, hi) in enumerate(SIGNS):
+        if en.lower() in low or hi.lower() in low:
+            return i
+    return -1
 
 
-def as_list(value: Any, path: str) -> list[Any]:
-    if not isinstance(value, list):
-        fail(f'{path} must be an array.')
-    return value
+def sign_display(name: str) -> str:
+    """'Gemini' -> 'Gemini (Mithuna)'. If already qualified, leave as-is."""
+    name = text(name)
+    if not name or '(' in name:
+        return name
+    idx = sign_index(name)
+    if idx >= 0:
+        en, hi = SIGNS[idx]
+        return f'{en} ({hi})'
+    return name
 
 
-def as_string(value: Any, path: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        fail(f'{path} must be a non-empty string.')
-    return value.strip()
+def planet_abbr(name: str) -> str:
+    return PLANET_ABBR.get((name or '').strip().lower(), (name or '')[:2].title())
 
 
-def as_bool(value: Any, path: str) -> bool:
-    if not isinstance(value, bool):
-        fail(f'{path} must be a boolean.')
-    return value
+def highlight(raw: str) -> str:
+    """Escape prose and colour a small, curated set of jyotish terms."""
+    out = escape(text(raw))
+    try:
+        for terms, color, weight in (
+            (_SAFFRON_TERMS, BRAND['saffron'], '600'),
+            (_GREEN_TERMS, BRAND['green'], '600'),
+        ):
+            for term in sorted(terms, key=len, reverse=True):
+                pattern = re.compile(r'(?<![\w>])(' + re.escape(escape(term)) + r')(?![\w<])', re.IGNORECASE)
+                out = pattern.sub(
+                    lambda m: f'<span style="color:{color};font-weight:{weight}">{m.group(1)}</span>',
+                    out,
+                    count=1,
+                )
+    except Exception:
+        return escape(text(raw))
+    return out
 
 
-def scalar_text(value: Any, path: str) -> str:
-    if isinstance(value, str) and value.strip():
-        return value.strip()
-    if isinstance(value, (int, float)):
-        return str(value)
-    fail(f'{path} must be a string or number.')
+def paragraphs(raw: str) -> str:
+    blocks = [b.strip() for b in re.split(r'\n\s*\n', text(raw)) if b.strip()]
+    return ''.join(f'<p>{highlight(b)}</p>' for b in blocks) or '<p></p>'
 
 
-def parse_person(data: dict[str, Any]) -> dict[str, str]:
-    person = as_object(data.get('person'), 'person')
-    return {
-        'fullName': as_string(person.get('fullName'), 'person.fullName'),
-        'gender': as_string(person.get('gender'), 'person.gender'),
-        'dateOfBirth': as_string(person.get('dateOfBirth'), 'person.dateOfBirth'),
-        'timeOfBirth': as_string(person.get('timeOfBirth'), 'person.timeOfBirth'),
-        'placeOfBirth': as_string(person.get('placeOfBirth'), 'person.placeOfBirth'),
-        'timezone': as_string(person.get('timezone'), 'person.timezone'),
-    }
+# --------------------------------------------------------------------------- #
+# North-Indian square chart (fixed geometry)
+# --------------------------------------------------------------------------- #
+# Centroid of each of the 12 fixed houses in a 0..300 square (house positions are
+# fixed in the North-Indian style; the sign number rotates with the Lagna).
+_OFF = 8.0
+_D = 300.0
+_HOUSE_CENTROID = {
+    1: (150, 75), 2: (75, 25), 3: (25, 75), 4: (75, 150),
+    5: (25, 225), 6: (75, 275), 7: (150, 225), 8: (225, 275),
+    9: (275, 225), 10: (225, 150), 11: (275, 75), 12: (225, 25),
+}
 
 
-def parse_pandit(data: dict[str, Any]) -> dict[str, str]:
-    pandit = as_object(data.get('pandit'), 'pandit')
-    return {
-        'name': as_string(pandit.get('name'), 'pandit.name'),
-        'referenceNumber': as_string(pandit.get('referenceNumber'), 'pandit.referenceNumber'),
-        'customerEmail': as_string(pandit.get('customerEmail'), 'pandit.customerEmail'),
-    }
+def _pt(x: float, y: float) -> str:
+    return f'{x + _OFF:.1f},{y + _OFF:.1f}'
 
 
-def parse_planet(value: Any, path: str) -> dict[str, str]:
-    planet = as_object(value, path)
-    return {
-        'name': as_string(planet.get('name'), f'{path}.name'),
-        'sign': as_string(planet.get('sign'), f'{path}.sign'),
-        'degree': as_string(planet.get('degree'), f'{path}.degree'),
-        'nakshatra': as_string(planet.get('nakshatra'), f'{path}.nakshatra'),
-        'pada': scalar_text(planet.get('pada'), f'{path}.pada'),
-        'house': scalar_text(planet.get('house'), f'{path}.house'),
-    }
+def render_chart(lagna_sign: str, placements: dict[int, list[str]], center_label: str, subtitle: str) -> str:
+    li = sign_index(lagna_sign)
+    g = BRAND['gold']
+    maroon = BRAND['maroon']
+    saffron = BRAND['saffron']
+    md = BRAND['maroon_deep']
 
-
-def parse_navamsa(value: Any, path: str) -> dict[str, str]:
-    item = as_object(value, path)
-    return {
-        'name': as_string(item.get('name'), f'{path}.name'),
-        'sign': as_string(item.get('sign'), f'{path}.sign'),
-        'house': scalar_text(item.get('house'), f'{path}.house'),
-    }
-
-
-def parse_dasha(value: Any, path: str) -> dict[str, Any]:
-    item = as_object(value, path)
-    return {
-        'maha': as_string(item.get('maha'), f'{path}.maha'),
-        'start': as_string(item.get('start'), f'{path}.start'),
-        'end': as_string(item.get('end'), f'{path}.end'),
-        'active': as_bool(item.get('active'), f'{path}.active'),
-    }
-
-
-def parse_dosha(value: Any, path: str) -> dict[str, Any]:
-    item = as_object(value, path)
-    return {
-        'name': as_string(item.get('name'), f'{path}.name'),
-        'present': as_bool(item.get('present'), f'{path}.present'),
-        'note': as_string(item.get('note'), f'{path}.note'),
-    }
-
-
-def parse_interpretation(data: dict[str, Any]) -> dict[str, Any]:
-    interpretation = as_object(data.get('interpretation'), 'interpretation')
-    return {
-        'summary': as_string(interpretation.get('summary'), 'interpretation.summary'),
-        'personality': as_string(interpretation.get('personality'), 'interpretation.personality'),
-        'houseHighlights': [
-            {
-                'title': as_string(item.get('title'), f'interpretation.houseHighlights[{i}].title'),
-                'text': as_string(item.get('text'), f'interpretation.houseHighlights[{i}].text'),
-            }
-            for i, item in enumerate(as_list(interpretation.get('houseHighlights'), 'interpretation.houseHighlights'))
-        ],
-        'predictions': [
-            {
-                'period': as_string(item.get('period'), f'interpretation.predictions[{i}].period'),
-                'text': as_string(item.get('text'), f'interpretation.predictions[{i}].text'),
-            }
-            for i, item in enumerate(as_list(interpretation.get('predictions'), 'interpretation.predictions'))
-        ],
-        'concerns': [
-            {
-                'title': as_string(item.get('title'), f'interpretation.concerns[{i}].title'),
-                'text': as_string(item.get('text'), f'interpretation.concerns[{i}].text'),
-            }
-            for i, item in enumerate(as_list(interpretation.get('concerns'), 'interpretation.concerns'))
-        ],
-        'remedies': [
-            {
-                'title': as_string(item.get('title'), f'interpretation.remedies[{i}].title'),
-                'text': as_string(item.get('text'), f'interpretation.remedies[{i}].text'),
-            }
-            for i, item in enumerate(as_list(interpretation.get('remedies'), 'interpretation.remedies'))
-        ],
-        'answers': [
-            {
-                'question': as_string(item.get('question'), f'interpretation.answers[{i}].question'),
-                'answer': as_string(item.get('answer'), f'interpretation.answers[{i}].answer'),
-            }
-            for i, item in enumerate(as_list(interpretation.get('answers'), 'interpretation.answers'))
-        ],
-    }
-
-
-def parse_chart(data: dict[str, Any]) -> dict[str, Any]:
-    chart = as_object(data.get('chart'), 'chart')
-    return {
-        'ayanamsa': as_string(chart.get('ayanamsa'), 'chart.ayanamsa'),
-        'lagna': as_string(chart.get('lagna'), 'chart.lagna'),
-        'planets': [parse_planet(item, f'chart.planets[{i}]') for i, item in enumerate(as_list(chart.get('planets'), 'chart.planets'))],
-        'navamsa': [parse_navamsa(item, f'chart.navamsa[{i}]') for i, item in enumerate(as_list(chart.get('navamsa'), 'chart.navamsa'))],
-        'dasha': [parse_dasha(item, f'chart.dasha[{i}]') for i, item in enumerate(as_list(chart.get('dasha'), 'chart.dasha'))],
-        'doshas': [parse_dosha(item, f'chart.doshas[{i}]') for i, item in enumerate(as_list(chart.get('doshas'), 'chart.doshas'))],
-    }
-
-
-def wrap_text(text: str, max_chars: int = 15) -> list[str]:
-    words = text.split()
-    lines: list[str] = []
-    current = ''
-    for word in words:
-        candidate = word if not current else f'{current} {word}'
-        if len(candidate) <= max_chars:
-            current = candidate
-        else:
-            if current:
-                lines.append(current)
-            current = word
-    if current:
-        lines.append(current)
-    return lines or ['']
-
-
-def render_svg(title: str, lagna: str, items: list[dict[str, str]], chart_type: str) -> str:
-    house_map: dict[int, list[str]] = {i: [] for i in range(1, 13)}
-    for item in items:
-        match = re.search(r'\d+', str(item.get('house', '')))
-        if match:
-            house = int(match.group())
-            if 1 <= house <= 12:
-                house_map[house].append(item['name'])
-
-    house_positions = {
-        1: (210, 84),
-        2: (130, 120),
-        3: (290, 120),
-        4: (338, 196),
-        5: (338, 252),
-        6: (338, 308),
-        7: (210, 384),
-        8: (130, 348),
-        9: (82, 308),
-        10: (82, 252),
-        11: (82, 196),
-        12: (130, 308),
-    }
+    lines = [
+        # outer square
+        f'<rect x="{_OFF}" y="{_OFF}" width="{_D}" height="{_D}" fill="{BRAND["card"]}" '
+        f'stroke="{maroon}" stroke-width="2.4" />',
+        # diagonals
+        f'<line x1="{_pt(0,0).split(",")[0]}" y1="{_pt(0,0).split(",")[1]}" x2="{_pt(300,300).split(",")[0]}" y2="{_pt(300,300).split(",")[1]}" stroke="{g}" stroke-width="1.3" />',
+        f'<line x1="{_pt(300,0).split(",")[0]}" y1="{_pt(300,0).split(",")[1]}" x2="{_pt(0,300).split(",")[0]}" y2="{_pt(0,300).split(",")[1]}" stroke="{g}" stroke-width="1.3" />',
+        # central diamond (side midpoints)
+        f'<polygon points="{_pt(150,0)} {_pt(300,150)} {_pt(150,300)} {_pt(0,150)}" '
+        f'fill="none" stroke="{g}" stroke-width="1.3" />',
+    ]
 
     cells: list[str] = []
     for house in range(1, 13):
-        x, y = house_positions[house]
-        base_label = f'{house}' if house != 1 else f'1 · Lagna {lagna}'
-        text_lines = wrap_text(base_label)
-        text_lines.extend(wrap_text(' / '.join(house_map[house])))
-        spans = []
-        for index, line in enumerate(text_lines[:4]):
-            dy = 0 if index == 0 else 13
-            spans.append(f'<tspan x="{x}" dy="{dy}">{escape(line)}</tspan>')
-        cell_class = 'chart-cell chart-cell-lagna' if house == 1 else 'chart-cell'
+        cx, cy = _HOUSE_CENTROID[house]
+        cx += _OFF
+        cy += _OFF
+        rashi = ((li + house - 1) % 12) + 1 if li >= 0 else house
+        planets = placements.get(house, [])
+        # sign number (small, saffron) sits just above the planet cluster
+        n = len(planets)
+        num_y = cy - 8 - (6 if n else 0)
         cells.append(
-            f'<g class="{cell_class}"><rect x="{x - 46}" y="{y - 26}" rx="12" ry="12" width="92" height="52" />'
-            f'<text x="{x}" y="{y - 5}" text-anchor="middle">{"".join(spans)}</text></g>'
+            f'<text x="{cx:.1f}" y="{num_y:.1f}" text-anchor="middle" '
+            f'font-size="10.5" fill="{saffron}" font-weight="600">{rashi}</text>'
         )
+        if planets:
+            # wrap up to 3 abbreviations per line
+            rows = [planets[i:i + 3] for i in range(0, len(planets), 3)]
+            start = cy + 4
+            for ri, row in enumerate(rows):
+                cells.append(
+                    f'<text x="{cx:.1f}" y="{start + ri * 13:.1f}" text-anchor="middle" '
+                    f'font-size="11" fill="{md}" font-weight="700" '
+                    f'font-family="Marcellus, Georgia, serif">{escape(" ".join(row))}</text>'
+                )
 
-    center_label = 'D-1' if chart_type == 'd1' else 'D-9'
-    center_sub = 'Lagna chart' if chart_type == 'd1' else 'Navamsa chart'
-    return f'''
-    <svg class="chart-svg" viewBox="0 0 420 420" role="img" aria-label="{escape(title)}">
-      <defs>
-        <linearGradient id="chart-ring-{chart_type}" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="{BRAND['gold_soft']}" />
-          <stop offset="100%" stop-color="{BRAND['gold']}" />
-        </linearGradient>
-      </defs>
-      <rect x="14" y="14" width="392" height="392" rx="24" fill="{BRAND['card']}" stroke="{BRAND['border']}" stroke-width="2" />
-      <polygon points="210,28 392,210 210,392 28,210" fill="#fffaf0" stroke="url(#chart-ring-{chart_type})" stroke-width="3.5" />
-      <polygon points="210,84 346,210 210,336 74,210" fill="none" stroke="{BRAND['gold']}" stroke-width="2" opacity="0.7" />
-      <line x1="28" y1="210" x2="392" y2="210" stroke="{BRAND['gold']}" stroke-width="1.6" opacity="0.72" />
-      <line x1="210" y1="28" x2="210" y2="392" stroke="{BRAND['gold']}" stroke-width="1.6" opacity="0.72" />
-      <line x1="74" y1="74" x2="346" y2="346" stroke="{BRAND['border']}" stroke-width="1.4" opacity="0.95" />
-      <line x1="346" y1="74" x2="74" y2="346" stroke="{BRAND['border']}" stroke-width="1.4" opacity="0.95" />
-      <text class="chart-title" x="210" y="48" text-anchor="middle">{escape(title)}</text>
-      <text class="chart-lagna" x="210" y="66" text-anchor="middle">{escape(f'Lagna: {lagna}')}</text>
-      <circle cx="210" cy="210" r="26" fill="#fff5dc" stroke="{BRAND['marigold']}" stroke-width="2" />
-      <text class="chart-center-label" x="210" y="205" text-anchor="middle">{escape(center_label)}</text>
-      <text class="chart-center-sub" x="210" y="221" text-anchor="middle">{escape(center_sub)}</text>
-      {''.join(cells)}
-    </svg>
-    '''
+    return (
+        f'<svg viewBox="0 0 {_D + 2 * _OFF:.0f} {_D + 2 * _OFF:.0f}" class="kundli" '
+        f'role="img" aria-label="{escape(center_label)}">'
+        + ''.join(lines) + ''.join(cells) + '</svg>'
+    )
+
+
+def d1_placements(planets: list[dict[str, Any]]) -> dict[int, list[str]]:
+    houses: dict[int, list[str]] = {i: [] for i in range(1, 13)}
+    houses[1].append('La')
+    for p in planets:
+        m = re.search(r'\d+', text(p.get('house')))
+        if m:
+            h = int(m.group())
+            if 1 <= h <= 12:
+                houses[h].append(planet_abbr(text(p.get('name'))))
+    return houses
+
+
+def d9_placements(navamsa: list[dict[str, Any]], d9_lagna: str) -> dict[int, list[str]]:
+    houses: dict[int, list[str]] = {i: [] for i in range(1, 13)}
+    li = sign_index(d9_lagna)
+    houses[1].append('La')
+    for p in navamsa:
+        si = sign_index(text(p.get('sign')))
+        if li >= 0 and si >= 0:
+            h = ((si - li) % 12) + 1
+            houses[h].append(planet_abbr(text(p.get('name'))))
+    return houses
+
+
+# --------------------------------------------------------------------------- #
+# Section builders
+# --------------------------------------------------------------------------- #
+def footer_html(pandit_name: str) -> str:
+    return (
+        '<div class="foot-end">'
+        f'<div>Siddh Jyotish · Vedic Astrology &amp; Jyotish — {escape(CONTACT_EMAIL)} · '
+        f'WhatsApp {escape(WHATSAPP_NUMBER)} · {escape(SITE)}</div>'
+        f'<div>Prepared with care by {escape(pandit_name)}. Computed with a professional astronomical '
+        'ephemeris (sidereal zodiac, Lahiri ayanamsa, whole-sign houses).</div>'
+        '</div>'
+    )
 
 
 def render_report(data: dict[str, Any]) -> str:
-    person = parse_person(data)
-    pandit = parse_pandit(data)
-    chart = parse_chart(data)
-    interp = parse_interpretation(data)
+    person = obj(data.get('person'))
+    pandit = obj(data.get('pandit'))
+    chart = obj(data.get('chart'))
+    interp = obj(data.get('interpretation'))
 
-    planetary_rows = ''.join(
-        '<tr>'
-        f'<td>{escape(item["name"])}</td>'
-        f'<td>{escape(item["sign"])}</td>'
-        f'<td>{escape(item["degree"])}</td>'
-        f'<td>{escape(item["nakshatra"])}</td>'
-        f'<td>{escape(item["pada"])}</td>'
-        f'<td>{escape(item["house"])}</td>'
-        '</tr>'
-        for item in chart['planets']
-    )
+    name = text(person.get('fullName'))
+    gender = text(person.get('gender')).lower()
+    pandit_name = text(pandit.get('name'))
+    reference = text(pandit.get('referenceNumber'))
 
-    navamsa_rows = ''.join(
-        '<tr>'
-        f'<td>{escape(item["name"])}</td>'
-        f'<td>{escape(item["sign"])}</td>'
-        f'<td>{escape(item["house"])}</td>'
-        '</tr>'
-        for item in chart['navamsa']
-    )
+    if gender == 'male':
+        addr_name, child = f'Shri {name}', 'Beta'
+    elif gender == 'female':
+        addr_name, child = f'Smt. {name}', 'Beti'
+    else:
+        addr_name, child = name, 'Dear one'
 
-    dasha_rows = ''.join(
-        '<tr>'
-        f'<td>{escape(item["maha"])}</td>'
-        f'<td>{escape(item["start"])}</td>'
-        f'<td>{escape(item["end"])}</td>'
-        f'<td>{"Yes" if item["active"] else "No"}</td>'
-        '</tr>'
-        for item in chart['dasha']
-    )
+    lagna = text(chart.get('lagna'))
+    planets = arr(chart.get('planets'))
+    navamsa = arr(chart.get('navamsa'))
+    d9_lagna = text(chart.get('navamsaLagna'))
 
-    dosha_cards = ''.join(
-        f'<article class="mini-card {"present" if item["present"] else "absent"}"><h4>{escape(item["name"])}</h4><b>{"Present" if item["present"] else "Not present"}</b><p>{escape(item["note"])}</p></article>'
-        for item in chart['doshas']
-    )
+    foot = ''
+    footer = footer_html(pandit_name)
 
-    house_cards = ''.join(
-        f'<article class="panel"><h3>{escape(item["title"])}</h3><p>{escape(item["text"])}</p></article>'
-        for item in interp['houseHighlights']
-    )
-    prediction_cards = ''.join(
-        f'<article class="panel"><h3>{escape(item["period"])}</h3><p>{escape(item["text"])}</p></article>'
-        for item in interp['predictions']
-    )
-    concern_cards = ''.join(
-        f'<article class="panel"><h3>{escape(item["title"])}</h3><p>{escape(item["text"])}</p></article>'
-        for item in interp['concerns']
-    )
-    remedy_cards = ''.join(
-        f'<article class="panel remedy"><h3>{escape(item["title"])}</h3><p>{escape(item["text"])}</p></article>'
-        for item in interp['remedies']
-    )
-    answer_cards = ''.join(
-        f'<article class="qa"><h3>Q. {escape(item["question"])}</h3><p><strong>A.</strong> {escape(item["answer"])}</p></article>'
-        for item in interp['answers']
-    )
-
-    generated_on = datetime.now(timezone.utc).strftime('%d %b %Y')
-    title = f"{person['fullName']} — Janma Kundli Report"
-
-    html = Template(
-        r'''<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>$title</title>
-  <style>
-    @page { size: A4; margin: 18mm 16mm; }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
-    body {
-      background: $cream;
-      color: $text;
-      font-family: Mukta, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      font-size: 12.25px;
-      line-height: 1.55;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    h1, h2, h3, h4 {
-      margin: 0 0 0.45rem;
-      color: $maroon;
-      font-family: Marcellus, "Cormorant Garamond", Georgia, serif;
-      font-weight: 400;
-      line-height: 1.1;
-    }
-    h1 { font-size: 31px; }
-    h2 { font-size: 20px; }
-    h3 { font-size: 15px; }
-    h4 { font-size: 13px; }
-    p { margin: 0 0 0.72rem; }
-    .page { margin: 0; }
-    .page-break { break-before: page; page-break-before: always; }
-    .card {
-      background: $card;
-      border: 1px solid $border;
-      border-radius: 20px;
-      box-shadow: 0 8px 26px rgba(90, 49, 0, 0.05);
-      padding: 16px;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-    .hero-banner {
-      padding: 18px;
-      border-radius: 24px;
-      background: linear-gradient(145deg, #fff8eb, #fdf4de 64%, #f8ebc8);
-      border: 1px solid rgba(201, 162, 39, 0.42);
-      box-shadow: 0 14px 30px rgba(90, 49, 0, 0.08);
-    }
-    .diya { font-size: 26px; margin-bottom: 6px; }
-    .brand-line {
-      text-transform: uppercase;
-      letter-spacing: 1.8px;
-      font-size: 10px;
-      color: $saffron;
-      font-weight: 700;
-      margin-bottom: 8px;
-    }
-    .title-row {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: end;
-    }
-    .title-row > div:first-child { flex: 1 1 auto; min-width: 0; }
-    .title-row > div:last-child {
-      flex: 0 1 240px;
-      max-width: 240px;
-      min-width: 0;
-      text-align: right;
-    }
-    .prepared-by {
-      margin: 0;
-      white-space: nowrap;
-    }
-    .reference-label {
-      margin: 0;
-      text-align: right;
-    }
-    .cover-reference-token {
-      display: block;
-      font-size: 18px;
-      font-weight: 700;
-      color: $maroon_deep;
-      word-break: break-all;
-      overflow-wrap: anywhere;
-    }
-    .meta-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 14px;
-    }
-    .meta {
-      border: 1px solid $border;
-      background: rgba(255, 255, 255, 0.72);
-      border-radius: 14px;
-      padding: 10px 12px;
-    }
-    .meta label {
-      display: block;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      font-size: 9px;
-      color: $muted;
-      margin-bottom: 4px;
-      font-weight: 700;
-    }
-    .meta strong { color: $maroon_deep; }
-    .intro {
-      margin-top: 14px;
-      font-size: 13.3px;
-      max-width: 66ch;
-    }
-    .signature { margin-top: 12px; font-size: 11px; color: $muted; }
-    .section-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: end;
-      gap: 16px;
-      margin-bottom: 12px;
-    }
-    .section-head small { color: $muted; }
-    .chart-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      align-items: start;
-    }
-    .chart-grid > .chart-shell { flex: 1 1 320px; min-width: 0; }
-    .chart-shell { break-inside: avoid; page-break-inside: avoid; }
-    .chart-caption {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: baseline;
-      margin-bottom: 8px;
-      color: $muted;
-    }
-    .chart-caption b { color: $maroon; }
-    .chart-svg { width: 100%; height: auto; display: block; max-height: 235px; }
-    .chart-title { font-family: Marcellus, Georgia, serif; font-size: 16px; fill: $maroon; }
-    .chart-lagna, .chart-center-sub { font-family: Mukta, system-ui, sans-serif; fill: $muted; font-size: 10px; }
-    .chart-center-label { font-family: Mukta, system-ui, sans-serif; fill: $maroon_deep; font-size: 13px; font-weight: 700; }
-    .chart-cell rect { fill: #fffdf8; stroke: $border; stroke-width: 1.2; }
-    .chart-cell text { font-family: Mukta, system-ui, sans-serif; fill: $text; font-size: 9px; }
-    .chart-cell-lagna rect { fill: #fff3d2; stroke: $gold; stroke-width: 1.6; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 10px;
-      font-size: 11.2px;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-    th, td {
-      border: 1px solid $border;
-      padding: 7px 8px;
-      text-align: left;
-      vertical-align: top;
-    }
-    th {
-      background: #fff4d6;
-      color: $maroon_deep;
-      font-size: 10px;
-      letter-spacing: 0.7px;
-      text-transform: uppercase;
-    }
-    .grid-2 {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .grid-2 > * { flex: 1 1 320px; min-width: 0; }
-    .panel {
-      background: $card;
-      border: 1px solid $border;
-      border-radius: 18px;
-      padding: 14px 15px;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-    .panel h3 { color: $saffron; }
-    .remedy { border-left: 4px solid $green; }
-    .mini-card {
-      background: #fffdf8;
-      border: 1px solid $border;
-      border-radius: 16px;
-      padding: 12px 13px;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-    .mini-card.present { border-color: rgba(31, 122, 77, 0.42); background: #f4fff8; }
-    .mini-card.absent { border-color: rgba(122, 30, 30, 0.25); background: #fff8f5; }
-    .mini-card b { display: inline-block; color: $maroon_deep; margin-bottom: 6px; }
-    .qa { background: $card; border: 1px solid $border; border-radius: 16px; padding: 12px 13px; }
-    .qa h3 { color: $maroon_deep; }
-    .answer-list { display: grid; gap: 12px; }
-    .closing-box {
-      max-width: 520px;
-      margin: 0 auto;
-      text-align: center;
-    }
-    .reference {
-      display: block;
-      margin: 14px auto 18px;
-      padding: 12px 16px;
-      border-radius: 16px;
-      border: 1px dashed $gold;
-      background: #fff8e6;
-      font-size: 15px;
-      font-weight: 700;
-      color: $maroon_deep;
-      max-width: min(100%, 360px);
-      word-break: break-all;
-      overflow-wrap: anywhere;
-    }
-    .cta-row {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 18px;
-    }
-    .btn {
-      display: inline-block;
-      padding: 10px 16px;
-      border-radius: 999px;
-      text-decoration: none;
-      font-weight: 700;
-      border: 1px solid transparent;
-    }
-    .btn-primary { background: linear-gradient(180deg, $gold_soft, $gold); color: $indigo; }
-    .btn-secondary { background: $maroon; color: white; }
-    .footer-note { color: $muted; font-size: 11px; margin-top: 12px; }
-  </style>
-</head>
-<body>
-  <section class="page page-break">
-    <div class="hero-banner card">
+    # ---- Cover ---------------------------------------------------------- #
+    born_line = f"Born {text(person.get('dateOfBirth'))} · {text(person.get('timeOfBirth'))} · {text(person.get('placeOfBirth'))}"
+    cover = f'''
+    <section class="cover">
       <div class="diya">🪔</div>
-      <div class="brand-line">Siddh Jyotish · Janma Kundli Report</div>
-      <div class="title-row">
-        <div>
-          <h1>$full_name</h1>
-          <p class="subtle prepared-by">Prepared by $pandit_name</p>
-        </div>
-        <div>
-          <p class="subtle reference-label">Reference number</p>
-          <div class="cover-reference-token">$reference_number</div>
-        </div>
-      </div>
-      <p class="intro">Namaste. This is your personal Janma Kundli — your Vedic birth chart, studied and prepared for you with care. Within these pages you will find your planetary placements, the charts that shape your life, and guidance on the path ahead.</p>
-      <div class="meta-grid">
-        <div class="meta"><label>Name</label><strong>$full_name</strong></div>
-        <div class="meta"><label>Gender</label><strong>$gender</strong></div>
-        <div class="meta"><label>Date of birth</label><strong>$date_of_birth</strong></div>
-        <div class="meta"><label>Time of birth</label><strong>$time_of_birth</strong></div>
-        <div class="meta"><label>Place of birth</label><strong>$place_of_birth</strong></div>
-        <div class="meta"><label>Timezone</label><strong>$timezone</strong></div>
-      </div>
-      <div class="signature">Customer email: $customer_email · Generated $generated_on UTC</div>
-    </div>
-  </section>
+      <div class="cover-brand">Siddh Jyotish Presents</div>
+      <h1 class="cover-title">Janma Kundli</h1>
+      <div class="cover-rule"></div>
+      <div class="cover-sub">Vedic Birth-Chart Report &amp; Life Reading</div>
+      <div class="cover-name">{escape(addr_name)}</div>
+      <div class="cover-born">{escape(born_line)}</div>
+      <div class="cover-rule"></div>
+      <div class="cover-prep">— Reading personally prepared by —</div>
+      <div class="cover-pandit">{escape(pandit_name)}</div>
+    </section>'''
 
-  <section class="page page-break">
-    <div class="section-head">
-      <div>
-        <h2>D-1 Lagna Chart · D-9 Navamsa Chart</h2>
-        <small>Your birth chart in the traditional North-Indian style.</small>
+    # ---- Page 2: Namaste letter + birth details ------------------------ #
+    details_rows = [
+        ('Name', f"{name} ({text(person.get('gender'))})", 'Date', text(person.get('dateOfBirth'))),
+        ('Time', text(person.get('timeOfBirth')), 'Place',
+         f"{text(person.get('placeOfBirth'))} ({text(person.get('latitude'))}, {text(person.get('longitude'))})"),
+        ('Timezone used', f"{text(person.get('timezone'))} ({text(person.get('timezoneOffset'))})",
+         'Universal Time', text(person.get('universalTime'))),
+        ('Ayanamsa', text(chart.get('ayanamsa')), 'House system', 'Whole-sign (sidereal)'),
+    ]
+    details_html = ''.join(
+        f'<tr><th>{escape(a)}</th><td>{escape(b)}</td><th>{escape(c)}</th><td>{escape(d)}</td></tr>'
+        for a, b, c, d in details_rows
+    )
+    letter = f'''
+    <section class="page">
+      <h2 class="head">🪔 Namaste, {escape(addr_name)}</h2>
+      <p>{escape(child)}, with folded hands I welcome you. I am <b>{escape(pandit_name)}</b>, and it has been
+        my joy to sit quietly with your <span style="color:{BRAND['saffron']}">Janma Kundli</span> (birth chart)
+        and read what the grahas (planets) wrote in the sky at the moment you took your first breath. Please read
+        this as a letter from a well-wisher who has studied your stars closely — <i>hum aapke saath hain</i>,
+        we are with you on this journey.</p>
+      <p>Every placement below is computed precisely from a professional astronomical ephemeris for your exact
+        birth moment converted to Universal Time — nothing here is guessed. The interpretation that follows is my
+        own reading of those real placements.</p>
+      <div class="accent-card gold">
+        <h3>Your Birth Details</h3>
+        <table class="kv">{details_html}</table>
+        <p class="note">Note: the local birth time was converted to Universal Time using the
+          {escape(text(person.get('timezone')))} offset ({escape(text(person.get('timezoneOffset')))}) confirmed for the
+          birthplace on that date.</p>
       </div>
-      <small>Lagna sign: <strong>$lagna</strong> · Ayanamsa: $ayanamsa</small>
-    </div>
-    <div class="chart-grid">
-      <div class="chart-shell card">
-        <div class="chart-caption"><b>D-1 Lagna Chart</b><span>Your birth (Rashi) chart</span></div>
-        $d1_svg
-      </div>
-      <div class="chart-shell card">
-        <div class="chart-caption"><b>D-9 Navamsa Chart</b><span>The chart of destiny &amp; marriage</span></div>
-        $d9_svg
-      </div>
-    </div>
+      {foot}
+    </section>'''
 
-    <div class="card" style="margin-top:14px;">
-      <h3>Planetary positions</h3>
-      <table>
-        <thead>
-          <tr><th>Planet</th><th>Sign</th><th>Degree</th><th>Nakshatra</th><th>Pada</th><th>House</th></tr>
-        </thead>
-        <tbody>$planetary_rows</tbody>
+    # ---- Page 3: Two charts + legend ----------------------------------- #
+    d1_svg = render_chart(lagna, d1_placements(planets), 'D-1', 'Rasi')
+    d9_svg = render_chart(d9_lagna, d9_placements(navamsa, d9_lagna), 'D-9', 'Navamsa')
+    charts = f'''
+    <section class="page">
+      <h2 class="head">🪔 Your Two Sacred Charts</h2>
+      <p>Below are your <span style="color:{BRAND['saffron']}">Lagna Chart (D-1 / Rasi)</span> — the main birth
+        chart — and your <span style="color:{BRAND['saffron']}">Navamsa Chart (D-9)</span>, the chart of the soul,
+        marriage and inner strength that every astrologer reads beside the D-1. Both are drawn in the traditional
+        North-Indian style.</p>
+      <div class="chart-row">
+        <div class="chart-cell">{d1_svg}<div class="chart-cap">Lagna Chart (D-1 / Rasi)</div></div>
+        <div class="chart-cell">{d9_svg}<div class="chart-cap">Navamsa Chart (D-9)</div></div>
+      </div>
+      <div class="accent-card gold legend">
+        <p>In the North-Indian chart the house positions are fixed; the <b>number</b> printed in each house is the
+          sign occupying it (1=Aries, 2=Taurus … 12=Pisces). <b>La</b> marks your Lagna (ascendant). Planet
+          abbreviations: <b>Su</b>=Sun, <b>Mo</b>=Moon, <b>Ma</b>=Mars, <b>Me</b>=Mercury, <b>Ju</b>=Jupiter,
+          <b>Ve</b>=Venus, <b>Sa</b>=Saturn, <b>Ra</b>=Rahu, <b>Ke</b>=Ketu. Your Lagna is
+          <b>{escape(sign_display(lagna))}</b>.</p>
+      </div>
+      {foot}
+    </section>'''
+
+    # ---- Page 4: Graha table + Navamsa placements + signatures --------- #
+    lagna_row = (
+        '<tr class="lagna-row">'
+        '<td>Lagna (Ascendant)</td>'
+        f'<td>{escape(sign_display(lagna))}</td>'
+        f'<td>{escape(text(chart.get("lagnaDegree")))}</td>'
+        '<td>1</td>'
+        f'<td>{escape(text(chart.get("lagnaNakshatra")))}</td>'
+        f'<td>{escape(text(chart.get("lagnaPada")))}</td>'
+        f'<td>{escape(text(chart.get("lagnaNakLord")))}</td>'
+        '<td>—</td></tr>'
+    )
+    graha_rows = lagna_row + ''.join(
+        '<tr>'
+        f'<td>{escape(text(p.get("name")))}</td>'
+        f'<td>{escape(sign_display(text(p.get("sign"))))}</td>'
+        f'<td>{escape(text(p.get("degree")))}</td>'
+        f'<td>{escape(text(p.get("house")))}</td>'
+        f'<td>{escape(text(p.get("nakshatra")))}</td>'
+        f'<td>{escape(text(p.get("pada")))}</td>'
+        f'<td>{escape(text(p.get("nakLord")))}</td>'
+        f'<td>{escape(text(p.get("motion")))}</td>'
+        '</tr>'
+        for p in planets
+    )
+    nav_rows = (
+        f'<tr><td>D9 Lagna</td><td>{escape(sign_display(d9_lagna))}</td></tr>'
+        + ''.join(
+            f'<tr><td>{escape(text(p.get("name")))}</td><td>{escape(sign_display(text(p.get("sign"))))}</td></tr>'
+            for p in navamsa
+        )
+    )
+    sig_pills = ''.join(
+        f'<span class="pill">{escape(text(s))}</span>' for s in arr(chart.get('signatures'))
+    )
+    grahas = f'''
+    <section class="page">
+      <h2 class="head">🪔 Grahas at Your Birth</h2>
+      <p>These are the exact positions of the nine grahas and your <span style="color:{BRAND['saffron']}">Lagna</span>
+        (ascendant — the sign rising on the eastern horizon at your birth). Each planet's
+        <span style="color:{BRAND['saffron']}">nakshatra</span> (lunar mansion) and pada (quarter) are given, as an
+        astrologer requires.</p>
+      <table class="grid-table">
+        <thead><tr><th>Body</th><th>Sign (Rasi)</th><th>Degree</th><th>House</th><th>Nakshatra</th><th>Pada</th><th>Nak. Lord</th><th>Motion</th></tr></thead>
+        <tbody>{graha_rows}</tbody>
       </table>
-    </div>
+      <div class="two-col">
+        <div>
+          <h3 class="sub">Navamsa (D-9) Placements</h3>
+          <table class="kv2">{nav_rows}</table>
+        </div>
+        <div class="accent-card green sig-card">
+          <h3>Chart Signatures</h3>
+          <div class="pills">{sig_pills}</div>
+        </div>
+      </div>
+      {foot}
+    </section>'''
 
-    <div class="grid-2" style="margin-top:14px;">
-      <div class="card">
-        <h3>Dasha timeline</h3>
-        <table>
-          <thead><tr><th>Maha dasha</th><th>Start</th><th>End</th><th>Active</th></tr></thead>
-          <tbody>$dasha_rows</tbody>
-        </table>
-      </div>
-      <div class="card">
-        <h3>Doshas</h3>
-        <div class="grid-2">$dosha_cards</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="page">
-    <div class="section-head">
-      <div>
-        <h2>Your Reading · Nature &amp; the houses of your life</h2>
-        <small>What your chart reveals about you.</small>
-      </div>
-    </div>
-    <div class="grid-2">
-      <article class="panel" style="grid-column:1/-1;">
-        <h3>Summary</h3>
-        <p>$summary</p>
-      </article>
-      <article class="panel" style="grid-column:1/-1;">
-        <h3>Personality</h3>
-        <p>$personality</p>
-      </article>
-    </div>
-    <div style="margin-top:14px;">
-      <h3>House highlights</h3>
-      <div class="grid-2">$house_cards</div>
-    </div>
-  </section>
-
-  <section class="page">
-    <div class="section-head">
-      <div>
-        <h2>Your Reading · Predictions, concerns, remedies &amp; answers</h2>
-        <small>The road ahead and how to walk it with confidence.</small>
-      </div>
-    </div>
-    <div>
-      <h3>Predictions</h3>
-      <div class="grid-2">$prediction_cards</div>
-    </div>
-    <div style="margin-top:14px;">
-      <h3>Concerns</h3>
-      <div class="grid-2">$concern_cards</div>
-    </div>
-    <div style="margin-top:14px;">
-      <h3>Remedies</h3>
-      <div class="grid-2">$remedy_cards</div>
-    </div>
-    <div style="margin-top:14px;">
-      <h3>Answers</h3>
-      <div class="answer-list">$answer_cards</div>
-    </div>
-  </section>
-
-  <section class="page">
-    <div class="closing-box card">
-      <div class="diya">🪔</div>
-      <h2>Your key to ask me more</h2>
-      <div class="reference">$reference_number</div>
-      <p class="subtle">This reference number is your open door back to me — use it at siddhjyotish.com/returning whenever a new question arises, and I will study your chart again for you.</p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="https://siddhjyotish.com/returning">Ask follow-up questions</a>
-        <a class="btn btn-secondary" href="$whatsapp_url">WhatsApp support</a>
-      </div>
-      <p class="footer-note">Prepared for you with devotion at Siddh Jyotish. May the grace of the grahas light your path. 🙏</p>
-    </div>
-  </section>
-</body>
-</html>
-'''
-    ).substitute(
-        title=escape(title),
-        full_name=escape(person['fullName']),
-        pandit_name=escape(pandit['name']),
-        reference_number=escape(pandit['referenceNumber']),
-        customer_email=escape(pandit['customerEmail']),
-        generated_on=escape(generated_on),
-        gender=escape(person['gender']),
-        date_of_birth=escape(person['dateOfBirth']),
-        time_of_birth=escape(person['timeOfBirth']),
-        place_of_birth=escape(person['placeOfBirth']),
-        timezone=escape(person['timezone']),
-        lagna=escape(chart['lagna']),
-        ayanamsa=escape(chart['ayanamsa']),
-        d1_svg=render_svg('D-1 Lagna Chart', chart['lagna'], chart['planets'], 'd1'),
-        d9_svg=render_svg('D-9 Navamsa Chart', chart['lagna'], chart['navamsa'], 'd9'),
-        planetary_rows=planetary_rows,
-        dasha_rows=dasha_rows,
-        dosha_cards=dosha_cards,
-        summary=escape(interp['summary']),
-        personality=escape(interp['personality']),
-        house_cards=house_cards,
-        prediction_cards=prediction_cards,
-        concern_cards=concern_cards,
-        remedy_cards=remedy_cards,
-        answer_cards=answer_cards,
-        whatsapp_url=WHATSAPP_URL,
-        cream=BRAND['cream'],
-        text=BRAND['text'],
-        maroon=BRAND['maroon'],
-        maroon_deep=BRAND['maroon_deep'],
-        saffron=BRAND['saffron'],
-        marigold=BRAND['marigold'],
-        gold=BRAND['gold'],
-        gold_soft=BRAND['gold_soft'],
-        green=BRAND['green'],
-        card=BRAND['card'],
-        muted=BRAND['muted'],
-        border=BRAND['border'],
-        indigo=BRAND['indigo'],
+    # ---- Page 5: Vimshottari Dasha ------------------------------------- #
+    maha_rows = ''.join(
+        f'<tr class="{"active" if truthy(d.get("active")) else ""}">'
+        f'<td>{escape(text(d.get("maha")))} Mahadasha</td>'
+        f'<td>{escape(text(d.get("start")))}</td>'
+        f'<td>{escape(text(d.get("end")))}</td>'
+        f'<td>{escape(text(d.get("length")))}</td>'
+        '</tr>'
+        for d in arr(chart.get('dasha'))
     )
-    return html
+    antar_rows = ''.join(
+        f'<tr class="{"active" if truthy(a.get("active")) else ""}">'
+        f'<td>{escape(text(a.get("period")))}</td>'
+        f'<td>{escape(text(a.get("from")))}</td>'
+        f'<td>{escape(text(a.get("to")))}</td>'
+        '</tr>'
+        for a in arr(chart.get('antardasha'))
+    )
+    dasha = f'''
+    <section class="page">
+      <h2 class="head">🪔 Vimshottari Dasha — Your Planetary Timeline</h2>
+      <p>The <span style="color:{BRAND['saffron']}">Vimshottari Dasha</span> is the great 120-year cycle of
+        planetary periods (<span style="color:{BRAND['saffron']}">Mahadasha</span>) that governs the timing of life
+        events. The green row is running now.</p>
+      <div class="two-col">
+        <div>
+          <h3 class="sub">Mahadasha sequence</h3>
+          <table class="grid-table"><thead><tr><th>Mahadasha</th><th>From</th><th>To</th><th>Length</th></tr></thead>
+            <tbody>{maha_rows}</tbody></table>
+        </div>
+        <div>
+          <h3 class="sub">Antardashas in {escape(text(chart.get('antardashaTitle')))}</h3>
+          <table class="grid-table"><thead><tr><th>Period</th><th>From</th><th>To</th></tr></thead>
+            <tbody>{antar_rows}</tbody></table>
+        </div>
+      </div>
+      {foot}
+    </section>'''
+
+    # ---- Page 6: Who You Are + house highlights ------------------------ #
+    core = ''.join(f'<p>{highlight(text(c))}</p>' for c in arr(interp.get('coreNature')))
+    house_items = ''.join(
+        f'<li><b>{highlight(text(h.get("title")))}:</b> {highlight(text(h.get("text")))}</li>'
+        for h in arr(interp.get('houseHighlights'))
+    )
+    core_page = f'''
+    <section class="page">
+      <h2 class="head">🪔 Who You Are — Your Core Nature</h2>
+      {core}
+      <div class="accent-card cream">
+        <h3>House-by-House Highlights</h3>
+        <ul class="bullets">{house_items}</ul>
+      </div>
+      {foot}
+    </section>'''
+
+    # ---- Page 7+: Questions answered ----------------------------------- #
+    q_blocks = ''
+    accent_cycle = ['saffron', 'green', 'gold']
+    for i, a in enumerate(arr(interp.get('answers'))):
+        acc = accent_cycle[i % len(accent_cycle)]
+        q_blocks += (
+            f'<div class="q-head">{i + 1} · {escape(text(a.get("question")))}</div>'
+            f'<div class="q-card {acc}">{paragraphs(text(a.get("answer")))}</div>'
+        )
+    questions = f'''
+    <section class="page">
+      <h2 class="head">🪔 Your Questions — Answered</h2>
+      <p>{escape(child)}, I have looked carefully at the houses, their lords, the karakas (significators) and above
+        all the <span style="color:{BRAND['saffron']}">dasha</span> (timing) before replying. Remember, jyotish shows
+        the strong currents of time — your own effort and prayers steer the boat.</p>
+      {q_blocks}
+      {foot}
+    </section>'''
+
+    # ---- Page 9: Doshas, remedies, blessings --------------------------- #
+    dosha_items = ''.join(
+        f'<li><b>{highlight(text(dd.get("name")))}:</b> {highlight(text(dd.get("note")))}</li>'
+        for dd in arr(chart.get('doshas'))
+    )
+    remedy_items = ''.join(
+        f'<li><b>{highlight(text(r.get("title")))}</b> — {highlight(text(r.get("text")))}</li>'
+        for r in arr(interp.get('remedies'))
+    )
+    remedies_page = f'''
+    <section class="page">
+      <h2 class="head">🪔 Doshas, Remedies &amp; Blessings</h2>
+      <div class="accent-card maroon">
+        <h3>What I checked for you (and the good news)</h3>
+        <ul class="bullets">{dosha_items}</ul>
+      </div>
+      <div class="accent-card gold">
+        <h3>Upaay — Practical Remedies, Each for a Reason</h3>
+        <ul class="bullets">{remedy_items}</ul>
+      </div>
+      <div class="accent-card green">
+        <h3>🪔 With care, from your Pandit</h3>
+        <p>{escape(child)}, remedies and poojas give their full fruit only when they are genuine and properly
+          <span style="color:{BRAND['saffron']}">abhimantrit</span> (energised with mantra). For an authentic
+          energised gemstone or to arrange a pooja, please <b>WhatsApp me personally at {escape(WHATSAPP_NUMBER)}</b>
+          and I will guide you at every step.</p>
+      </div>
+      {foot}
+    </section>'''
+
+    # ---- Page 10: Reference + blessing --------------------------------- #
+    closing = f'''
+    <section class="page">
+      <div class="accent-card maroon ref-card">
+        <div class="ref-label">Your reference number:</div>
+        <div class="ref-token">{escape(reference)}</div>
+      </div>
+      <p>{highlight(text(interp.get('closingBlessing')))}</p>
+      <p>For any further questions, visit <b>{escape(RETURNING_URL)}</b>, keep your reference number safe, paste it in
+        the form and ask — I will personally look into your chart again. <i>Hum aapke saath hain.</i></p>
+      <div class="blessing">With blessings,</div>
+      <div class="sign-name">{escape(pandit_name)}</div>
+      <div class="sign-org">Siddh Jyotish</div>
+      {foot}
+    </section>'''
+
+    body = cover + letter + charts + grahas + dasha + core_page + questions + remedies_page + closing + footer
+    return _document(name, body)
 
 
+# --------------------------------------------------------------------------- #
+# Document shell + CSS (static; never customer-specific)
+# --------------------------------------------------------------------------- #
+def _document(name: str, body: str) -> str:
+    css = _CSS
+    for key, val in BRAND.items():
+        css = css.replace(f'@{key}@', val)
+    return (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8" />'
+        '<meta name="viewport" content="width=device-width, initial-scale=1" />'
+        f'<title>{escape(name)} — Janma Kundli Report</title>'
+        f'<style>{css}</style></head><body>{body}</body></html>'
+    )
+
+
+_CSS = r'''
+  @page { size: Letter; margin: 15mm 14mm 15mm; }
+  @page cover { margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: @page@;
+    color: @text@;
+    font-family: Mukta, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 11.6px;
+    line-height: 1.62;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1, h2, h3 { font-family: Marcellus, "Cormorant Garamond", Georgia, serif; font-weight: 400; margin: 0; color: @maroon@; }
+  p { margin: 0 0 10px; }
+  b { font-weight: 700; }
+  .page { break-before: page; page-break-before: always; }
+  .head {
+    font-size: 23px; color: @maroon@; padding-bottom: 8px; margin-bottom: 12px;
+    border-bottom: 2px solid @gold@;
+  }
+  .sub { font-size: 15px; color: @maroon@; margin: 4px 0 6px; }
+
+  /* Cover */
+  .cover {
+    page: cover; break-after: page; page-break-after: always;
+    height: 100vh; width: 100%;
+    background: radial-gradient(120% 90% at 50% 30%, #8a2222 0%, @maroon@ 45%, @maroon_deep@ 100%);
+    color: #f7e9cf; text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 40px;
+  }
+  .cover .diya { font-size: 40px; margin-bottom: 12px; }
+  .cover-brand { text-transform: uppercase; letter-spacing: 4px; font-size: 13px; color: #f0d9a6; margin-bottom: 14px; }
+  .cover-title { font-size: 52px; color: #fdeecb; letter-spacing: 1px; }
+  .cover-rule {
+    width: 190px; height: 0; margin: 22px 0;
+    border-top: 2px solid transparent;
+    border-image: linear-gradient(90deg, transparent, @gold_soft@, @gold@, @gold_soft@, transparent) 1;
+  }
+  .cover-sub { text-transform: uppercase; letter-spacing: 3px; font-size: 12px; color: #e7c98f; }
+  .cover-name { font-size: 34px; color: #fdeecb; font-family: Marcellus, Georgia, serif; margin-top: 22px; }
+  .cover-born { font-size: 12px; color: #e9cfa0; margin-top: 8px; }
+  .cover-prep { color: @saffron@; font-size: 13px; margin-top: 8px; }
+  .cover-pandit { font-family: Marcellus, Georgia, serif; font-size: 22px; color: #fdeecb; margin-top: 4px; }
+
+  /* Accent cards */
+  .accent-card {
+    background: @card@; border: 1px solid @border@; border-radius: 14px;
+    padding: 15px 18px; margin: 14px 0;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .accent-card h3 { font-size: 16px; color: @maroon@; margin-bottom: 8px; }
+  .accent-card.gold { border-left: 5px solid @gold@; }
+  .accent-card.green { border-left: 5px solid @green@; background: #f5fbf6; }
+  .accent-card.maroon { border-left: 5px solid @maroon@; }
+  .accent-card.cream { background: #fbeecb; border: 1px solid @border@; }
+  .accent-card.cream h3 { font-size: 15px; }
+  .note { color: @muted@; font-size: 10.4px; margin: 8px 0 0; }
+  .legend p { margin: 0; font-size: 10.6px; }
+
+  /* Birth-details key/value table */
+  table.kv { width: 100%; border-collapse: collapse; }
+  table.kv th, table.kv td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid #f0e6cd; font-size: 11px; }
+  table.kv th { color: @maroon_deep@; font-weight: 700; width: 15%; white-space: nowrap; }
+  table.kv td { width: 35%; }
+  table.kv tr:last-child th, table.kv tr:last-child td { border-bottom: none; }
+
+  /* Charts */
+  .chart-row { display: flex; gap: 20px; margin: 6px 0 4px; }
+  .chart-cell { flex: 1 1 0; text-align: center; }
+  svg.kundli { width: 100%; max-width: 320px; height: auto; display: block; margin: 0 auto; }
+  .chart-cap { font-family: Marcellus, Georgia, serif; font-size: 15px; color: @maroon@; margin-top: 8px; }
+
+  /* Data tables */
+  table.grid-table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 10.8px; break-inside: avoid; }
+  table.grid-table th { background: @maroon@; color: #fdeecb; text-align: left; padding: 7px 8px; font-weight: 700; font-size: 10px; letter-spacing: 0.3px; font-family: Mukta, sans-serif; }
+  table.grid-table td { padding: 6px 8px; border-bottom: 1px solid #f0e6cd; }
+  table.grid-table tbody tr:nth-child(even) { background: #fbf5e6; }
+  table.grid-table tr.lagna-row td { background: #fde7c9; font-weight: 700; }
+  table.grid-table tr.active td { background: #e8f5ec; color: @green@; font-weight: 700; }
+
+  table.kv2 { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.kv2 td { padding: 6px 8px; border-bottom: 1px solid #f0e6cd; }
+  table.kv2 td:first-child { font-weight: 700; color: @maroon_deep@; width: 45%; }
+  table.kv2 tr:nth-child(even) { background: #fbf5e6; }
+
+  .two-col { display: flex; gap: 18px; align-items: flex-start; margin-top: 8px; }
+  .two-col > div { flex: 1 1 0; min-width: 0; }
+  .sig-card { margin-top: 26px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 7px; }
+  .pill { background: #eaf6ee; color: @green@; border: 1px solid #cfe9d8; border-radius: 999px; padding: 5px 11px; font-size: 10.4px; font-weight: 600; }
+
+  /* Bullets */
+  ul.bullets { margin: 4px 0 0; padding-left: 18px; }
+  ul.bullets li { margin-bottom: 7px; }
+
+  /* Questions */
+  .q-head {
+    background: #fbeecb; border-radius: 10px; padding: 10px 14px; margin: 14px 0 0;
+    font-family: Marcellus, Georgia, serif; font-size: 16px; color: @maroon_deep@;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .q-card {
+    background: @card@; border: 1px solid @border@; border-radius: 12px; padding: 14px 16px; margin: 8px 0 4px;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .q-card.saffron { border-left: 5px solid @saffron@; }
+  .q-card.green { border-left: 5px solid @green@; }
+  .q-card.gold { border-left: 5px solid @gold@; }
+  .q-card p:last-child { margin-bottom: 0; }
+
+  /* Closing */
+  .ref-card { text-align: left; }
+  .ref-label { font-family: Marcellus, Georgia, serif; color: @maroon_deep@; font-size: 13px; margin-bottom: 6px; }
+  .ref-token { font-family: "Courier New", monospace; font-weight: 700; color: @maroon_deep@; word-break: break-all; font-size: 12px; }
+  .blessing { font-family: Marcellus, Georgia, serif; font-size: 16px; color: @maroon@; margin-top: 14px; }
+  .sign-name { font-family: Marcellus, Georgia, serif; font-size: 20px; color: @maroon@; font-weight: 700; }
+  .sign-org { color: @muted@; font-size: 11px; }
+
+  /* Footer */
+  .foot-end {
+    break-inside: avoid; page-break-inside: avoid;
+    margin-top: 26px; padding-top: 10px; text-align: center;
+    color: @muted@; font-size: 9.4px; line-height: 1.5;
+    border-top: 1px solid #eadfc4;
+  }
+'''
+
+
+# --------------------------------------------------------------------------- #
+# Chrome rendering + validation
+# --------------------------------------------------------------------------- #
 def find_chrome_binary() -> str:
     env_bin = os.environ.get('CHROME_BIN')
-    if env_bin:
-        path = Path(env_bin)
-        if path.exists():
-            return str(path)
+    if env_bin and Path(env_bin).exists():
+        return env_bin
 
     def newest_executable(root: Path) -> Path | None:
-        real_candidates: list[Path] = []
-        wrapper_candidates: list[Path] = []
+        real, wrapper = [], []
         for path in root.rglob('*'):
             if not path.is_file() or not os.access(path, os.X_OK):
                 continue
-            name = path.name.lower()
-            if name in {'chrome', 'chromium', 'chrome-headless-shell'}:
-                real_candidates.append(path)
-            elif 'chrome' in name or 'chromium' in name:
-                wrapper_candidates.append(path)
-        candidates = real_candidates or wrapper_candidates
-        if not candidates:
-            return None
-        return max(candidates, key=lambda item: item.stat().st_mtime)
+            n = path.name.lower()
+            if n in {'chrome', 'chromium', 'chrome-headless-shell'}:
+                real.append(path)
+            elif 'chrome' in n or 'chromium' in n:
+                wrapper.append(path)
+        candidates = real or wrapper
+        return max(candidates, key=lambda p: p.stat().st_mtime) if candidates else None
 
     for root in (Path('/opt/.devin/chrome'), Path('/opt/.devin/playwright_browsers')):
-        if not root.exists():
-            continue
-        candidate = newest_executable(root)
-        if candidate:
-            return str(candidate)
-
-    fail('Unable to find Chrome binary. Set CHROME_BIN or install a browser under /opt/.devin/chrome.')
-    raise AssertionError('unreachable')
+        if root.exists():
+            candidate = newest_executable(root)
+            if candidate:
+                return str(candidate)
+    print('ERROR: Unable to find Chrome binary. Set CHROME_BIN.', file=sys.stderr)
+    raise SystemExit(1)
 
 
 def run_chrome(chrome_bin: str, html_path: Path, pdf_path: Path) -> None:
     chrome_dir = Path('/tmp/chrome-pdf')
     chrome_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
-        chrome_bin,
-        '--headless=new',
-        '--disable-gpu',
-        '--no-sandbox',
-        '--disable-dev-shm-usage',
-        f'--user-data-dir={chrome_dir}',
-        '--no-pdf-header-footer',
-        f'--print-to-pdf={pdf_path}',
-        str(html_path),
+        chrome_bin, '--headless=new', '--disable-gpu', '--no-sandbox',
+        '--disable-dev-shm-usage', f'--user-data-dir={chrome_dir}',
+        '--no-pdf-header-footer', f'--print-to-pdf={pdf_path}', str(html_path),
     ]
     print('Rendering PDF with:', ' '.join(cmd))
     subprocess.run(cmd, check=True)
@@ -823,34 +745,33 @@ def run_chrome(chrome_bin: str, html_path: Path, pdf_path: Path) -> None:
 def validate_pdf(pdf_path: Path, data: dict[str, Any]) -> int:
     try:
         from pypdf import PdfReader
-    except Exception as exc:  # pragma: no cover - dependency issue
-        fail(f'pypdf is required for validation: {exc}')
+    except Exception as exc:  # pragma: no cover
+        print(f'ERROR: pypdf is required for validation: {exc}', file=sys.stderr)
+        raise SystemExit(1)
 
     if not pdf_path.exists() or pdf_path.stat().st_size <= 0:
-        fail('PDF was not created or is empty.')
+        print('ERROR: PDF was not created or is empty.', file=sys.stderr)
+        raise SystemExit(1)
 
     reader = PdfReader(str(pdf_path))
-    page_count = len(reader.pages)
+    pages = [(p.extract_text() or '').strip() for p in reader.pages]
+    page_count = len(pages)
     if page_count < MIN_PAGE_COUNT:
-        fail(f'PDF page count {page_count} is below the structural minimum of {MIN_PAGE_COUNT}.')
+        print(f'ERROR: PDF page count {page_count} is below the structural minimum {MIN_PAGE_COUNT}.', file=sys.stderr)
+        raise SystemExit(1)
 
-    extracted_pages: list[str] = []
-    blank_pages: list[int] = []
-    for index, page in enumerate(reader.pages, start=1):
-        text = (page.extract_text() or '').strip()
-        extracted_pages.append(text)
-        if not text:
-            blank_pages.append(index)
+    blank = [i + 1 for i, t in enumerate(pages) if not t]
+    if blank:
+        print(f'ERROR: Blank pages detected: {", ".join(map(str, blank))}.', file=sys.stderr)
+        raise SystemExit(1)
 
-    if blank_pages:
-        fail(f'Blank pages detected: {", ".join(map(str, blank_pages))}.')
-
-    all_text = '\n'.join(extracted_pages).lower()
-    lagna = str(as_object(data.get('chart'), 'chart').get('lagna', '')).lower()
-    required_markers = [lagna, 'planetary', 'd-1 lagna chart', 'd-9 navamsa chart', 'predictions', 'remedies', 'answers']
-    missing = [marker for marker in required_markers if marker and marker not in all_text]
+    all_text = '\n'.join(pages).lower()
+    lagna = text(obj(data.get('chart')).get('lagna')).lower()
+    markers = [lagna, 'janma kundli', 'lagna chart', 'navamsa', 'grahas', 'vimshottari', 'remedies', 'answered']
+    missing = [m for m in markers if m and m not in all_text]
     if missing:
-        fail('Missing validation markers: ' + ', '.join(missing))
+        print('ERROR: Missing validation markers: ' + ', '.join(missing), file=sys.stderr)
+        raise SystemExit(1)
 
     print(f'VALIDATION PASS: {page_count} pages, no blank pages, required markers found.')
     return page_count
@@ -858,11 +779,13 @@ def validate_pdf(pdf_path: Path, data: dict[str, Any]) -> int:
 
 def main() -> None:
     if len(sys.argv) != 2:
-        fail('Usage: python scripts/kundli/generate_report.py data.json')
+        print('Usage: python scripts/kundli/generate_report.py data.json', file=sys.stderr)
+        raise SystemExit(1)
 
     input_path = Path(sys.argv[1]).expanduser().resolve()
     if not input_path.exists():
-        fail(f'Input file not found: {input_path}')
+        print(f'ERROR: Input file not found: {input_path}', file=sys.stderr)
+        raise SystemExit(1)
 
     data = read_json(input_path)
     html = render_report(data)

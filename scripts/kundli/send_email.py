@@ -15,7 +15,8 @@ API_URL = 'https://api.resend.com/emails'
 DOMAINS_URL = 'https://api.resend.com/domains'
 USER_AGENT = 'Siddh-Jyotish-Mailer/1.0'
 DEFAULT_FROM = 'Siddh Jyotish <namaste@siddhjyotish.com>'
-DEFAULT_SUBJECT_TEMPLATE = 'Your Janam Patrika from {pandit} at Siddh Jyotish'
+DEFAULT_SUBJECT = 'Your Janma Kundli is Ready — Siddh Jyotish'
+WHATSAPP_NUMBER = '+91 7051300168'
 WHATSAPP_URL = 'https://wa.me/917051300168'
 RETURNING_URL = 'https://siddhjyotish.com/returning'
 VERIFIED_DOMAIN = 'siddhjyotish.com'
@@ -110,7 +111,7 @@ def parse_email_data(data: dict[str, Any], base_dir: Path) -> dict[str, Any]:
 
     return {
         'from': optional_string(data.get('from'), 'from') or DEFAULT_FROM,
-        'subject': optional_string(data.get('subject'), 'subject') or DEFAULT_SUBJECT_TEMPLATE.format(pandit=as_string(pandit.get('name'), 'pandit.name')),
+        'subject': optional_string(data.get('subject'), 'subject') or DEFAULT_SUBJECT,
         'to': as_string(pandit.get('customerEmail'), 'pandit.customerEmail'),
         'pdfPath': pdf_path,
         'person': {
@@ -121,209 +122,87 @@ def parse_email_data(data: dict[str, Any], base_dir: Path) -> dict[str, Any]:
             'name': as_string(pandit.get('name'), 'pandit.name'),
             'referenceNumber': as_string(pandit.get('referenceNumber'), 'pandit.referenceNumber'),
         },
-        'answers': parse_items(as_list(interpretation.get('answers'), 'interpretation.answers'), 'interpretation.answers', [('question', 'question'), ('answer', 'answer')]),
-        'concerns': parse_items(as_list(interpretation.get('concerns'), 'interpretation.concerns'), 'interpretation.concerns', [('title', 'title'), ('text', 'text')]),
-        'remedies': parse_items(as_list(interpretation.get('remedies'), 'interpretation.remedies'), 'interpretation.remedies', [('title', 'title'), ('text', 'text')]),
-        'doshas': [
-            {
-                'name': as_string(item.get('name'), f'chart.doshas[{index}].name'),
-                'present': bool(item.get('present')),
-                'note': as_string(item.get('note'), f'chart.doshas[{index}].note'),
-            }
-            for index, item in enumerate(as_list(chart.get('doshas'), 'chart.doshas'))
-        ],
+        'highlights': parse_items(as_list(interpretation.get('emailHighlights'), 'interpretation.emailHighlights'), 'interpretation.emailHighlights', [('label', 'label'), ('text', 'text')]),
+        'goodNews': as_string(interpretation.get('emailGoodNews'), 'interpretation.emailGoodNews'),
     }
 
 
-def greeting_for(person: dict[str, str]) -> str:
+def greeting_for(person: dict[str, str]) -> tuple[str, str]:
+    """Return (formal greeting line, affectionate address word)."""
     if person['gender'] == 'Male':
-        prefix = 'Shri'
-    elif person['gender'] == 'Female':
-        prefix = 'Smt.'
-    else:
-        prefix = ''
-    if prefix:
-        return f'Namaste {prefix} {person["fullName"]} ji,'
-    return f'Namaste {person["fullName"]} ji,'
+        return f'Namaste Shri {person["fullName"]} ji,', 'Beta'
+    if person['gender'] == 'Female':
+        return f'Namaste Smt. {person["fullName"]} ji,', 'Beti'
+    return f'Namaste {person["fullName"]} ji,', 'Dear one'
 
 
-def render_cards(items: list[dict[str, str]], title_key: str, text_key: str, class_name: str) -> str:
-    if not items:
-        return '<p class="empty-note">No items were shared in this section.</p>'
+def render_highlights(items: list[dict[str, str]]) -> str:
     return ''.join(
-        f'<article class="{class_name}"><h3>{escape(item[title_key])}</h3><p>{escape(item[text_key])}</p></article>'
-        for item in items
-    )
-
-
-def render_doshas(items: list[dict[str, Any]]) -> str:
-    if not items:
-        return '<p class="empty-note">No doshas were listed for this reading.</p>'
-    return ''.join(
-        f'<article class="dosha-card {"present" if item["present"] else "absent"}"><h3>{escape(item["name"])}</h3><b>{"Present" if item["present"] else "Not present"}</b><p>{escape(item["note"])}</p></article>'
+        f'<li style="margin-bottom:7px;"><b style="color:{BRAND["maroon_deep"]};">{escape(item["label"])}:</b> '
+        f'{escape(item["text"])}</li>'
         for item in items
     )
 
 
 def build_html(email: dict[str, Any]) -> str:
-    greeting = greeting_for(email['person'])
+    greeting, child = greeting_for(email['person'])
     reference = email['pandit']['referenceNumber']
+    pandit_name = email['pandit']['name']
+    highlights = render_highlights(email['highlights'])
     return f'''<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{escape(email['subject'])}</title>
-  <style>
-    body {{
-      margin: 0;
-      padding: 0;
-      background: {BRAND['cream']};
-      color: {BRAND['text']};
-      font-family: Mukta, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      line-height: 1.6;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }}
-    .wrap {{ max-width: 720px; margin: 0 auto; padding: 24px 16px 40px; }}
-    .card {{
-      background: {BRAND['card']};
-      border: 1px solid {BRAND['border']};
-      border-radius: 22px;
-      box-shadow: 0 12px 28px rgba(90, 49, 0, 0.07);
-      overflow: hidden;
-    }}
-    .hero {{
-      padding: 22px 22px 18px;
-      background: linear-gradient(145deg, #fff8eb, #fdf4de 64%, #f8ebc8);
-      border-bottom: 1px solid rgba(201, 162, 39, 0.35);
-    }}
-    .diya {{ font-size: 26px; margin-bottom: 6px; }}
-    .brand {{
-      text-transform: uppercase;
-      letter-spacing: 1.8px;
-      font-size: 10px;
-      color: {BRAND['saffron']};
-      font-weight: 700;
-      margin-bottom: 8px;
-    }}
-    h1, h2, h3 {{
-      margin: 0 0 0.45rem;
-      color: {BRAND['maroon']};
-      font-family: Marcellus, 'Cormorant Garamond', Georgia, serif;
-      font-weight: 400;
-      line-height: 1.15;
-    }}
-    h1 {{ font-size: 30px; }}
-    h2 {{ font-size: 20px; }}
-    h3 {{ font-size: 15px; }}
-    p {{ margin: 0 0 0.75rem; }}
-    .greeting {{ font-size: 15px; margin-top: 10px; }}
-    .intro {{ color: {BRAND['maroon_deep']}; }}
-    .reference-box {{
-      margin: 18px 0 16px;
-      padding: 14px 16px;
-      border: 1px dashed {BRAND['gold']};
-      border-radius: 18px;
-      background: #fff8e6;
-    }}
-    .reference-label {{
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      font-size: 9px;
-      color: {BRAND['muted']};
-      font-weight: 700;
-      margin-bottom: 6px;
-    }}
-    .reference-token {{
-      font-size: 16px;
-      font-weight: 700;
-      color: {BRAND['maroon_deep']};
-      word-break: break-all;
-      overflow-wrap: anywhere;
-    }}
-    .section {{ padding: 18px 22px 0; }}
-    .section h2 {{ margin-bottom: 10px; }}
-    .grid {{ display: grid; gap: 12px; }}
-    .grid.two {{ grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }}
-    .panel {{
-      background: #fffdf8;
-      border: 1px solid {BRAND['border']};
-      border-radius: 18px;
-      padding: 14px 15px;
-    }}
-    .panel h3 {{ color: {BRAND['saffron']}; }}
-    .dosha-card {{
-      background: #fffdf8;
-      border: 1px solid {BRAND['border']};
-      border-radius: 16px;
-      padding: 12px 13px;
-    }}
-    .dosha-card.present {{ border-color: rgba(31, 122, 77, 0.42); background: #f4fff8; }}
-    .dosha-card.absent {{ border-color: rgba(122, 30, 30, 0.25); background: #fff8f5; }}
-    .dosha-card b {{ display: inline-block; margin-bottom: 6px; color: {BRAND['maroon_deep']}; }}
-    .callout {{
-      margin: 18px 22px 0;
-      padding: 16px;
-      border-radius: 18px;
-      border: 1px solid rgba(201, 162, 39, 0.3);
-      background: linear-gradient(180deg, #fffaf0, #fff3d2);
-    }}
-    .cta {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }}
-    .btn {{
-      display: inline-block;
-      text-decoration: none;
-      border-radius: 999px;
-      padding: 10px 16px;
-      font-weight: 700;
-    }}
-    .btn.primary {{ background: linear-gradient(180deg, {BRAND['gold_soft']}, {BRAND['gold']}); color: {BRAND['indigo']}; }}
-    .btn.secondary {{ background: {BRAND['maroon']}; color: white; }}
-    .signature {{ margin-top: 14px; color: {BRAND['muted']}; }}
-    .pdf-line {{ margin-top: 10px; font-weight: 700; }}
-    .empty-note {{ color: {BRAND['muted']}; font-style: italic; margin: 0; }}
-  </style>
 </head>
-<body>
-  <div class="wrap">
-    <div class="card">
-      <div class="hero">
-        <div class="diya">🪔</div>
-        <div class="brand">Siddh Jyotish</div>
-        <h1>{escape(email['subject'])}</h1>
-        <p class="greeting">{escape(greeting)}</p>
-        <p class="intro">I have prepared your Janam Patrika and the guidance for your path ahead. Please find the reading below, written with care for you.</p>
-        <div class="reference-box">
-          <div class="reference-label">Your key to ask me more at <a href="{RETURNING_URL}">{RETURNING_URL}</a></div>
-          <div class="reference-token">{escape(reference)}</div>
-        </div>
-      </div>
+<body style="margin:0;padding:0;background:{BRAND['cream']};color:{BRAND['text']};font-family:Mukta,system-ui,-apple-system,'Segoe UI',Arial,sans-serif;line-height:1.6;-webkit-text-size-adjust:100%;">
+  <div style="max-width:640px;margin:0 auto;padding:26px 14px 40px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:{BRAND['card']};border:1px solid {BRAND['border']};border-radius:20px;overflow:hidden;box-shadow:0 12px 30px rgba(90,49,0,0.08);">
+      <tr>
+        <td style="background:linear-gradient(150deg,#8a2222,{BRAND['maroon']} 55%,{BRAND['maroon_deep']});padding:30px 28px;text-align:center;">
+          <div style="font-size:26px;line-height:1;margin-bottom:8px;">🪔</div>
+          <div style="text-transform:uppercase;letter-spacing:3px;font-size:11px;color:#f0d9a6;margin-bottom:8px;">Siddh Jyotish</div>
+          <div style="font-family:Marcellus,'Cormorant Garamond',Georgia,serif;font-size:27px;color:#fdeecb;">Your Janma Kundli is Ready</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:24px 28px 8px;">
+          <p style="margin:0 0 12px;color:{BRAND['maroon_deep']};font-size:14px;">{escape(greeting)}</p>
+          <p style="margin:0 0 14px;">{escape(child)}, with folded hands I send you blessings. I am <b>{escape(pandit_name)}</b>, and it has been my joy to personally study your <b>Janma Kundli</b> (Vedic birth chart) and prepare your complete life reading. Your full report is attached as a PDF keepsake — <b>Kundli_Report.pdf</b>.</p>
 
-      <div class="section">
-        <h2>Your direct answers</h2>
-        <div class="grid">{render_cards(email['answers'], 'question', 'answer', 'panel')}</div>
-      </div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:6px 0 18px;">
+            <tr><td style="background:{BRAND['maroon']};border-radius:14px;padding:14px 16px;">
+              <div style="text-transform:uppercase;letter-spacing:1px;font-size:10px;color:#f0d9a6;font-weight:700;margin-bottom:6px;">Your reference number (keep it safe)</div>
+              <div style="font-family:'Courier New',monospace;font-size:13px;font-weight:700;color:#ffffff;word-break:break-all;">{escape(reference)}</div>
+            </td></tr>
+          </table>
 
-      <div class="section">
-        <h2>Concerns &amp; doshas</h2>
-        <div class="grid two">{render_cards(email['concerns'], 'title', 'text', 'panel')}{render_doshas(email['doshas'])}</div>
-      </div>
+          <p style="margin:0 0 6px;font-weight:700;color:{BRAND['maroon']};">A few highlights from your chart:</p>
+          <ul style="margin:0 0 14px;padding-left:20px;">{highlights}</ul>
 
-      <div class="section">
-        <h2>Remedies</h2>
-        <div class="grid">{render_cards(email['remedies'], 'title', 'text', 'panel')}</div>
-      </div>
+          <p style="margin:0 0 16px;">{escape(email['goodNews'])}</p>
 
-      <div class="callout">
-        <p>When you are ready for more guidance, return with the same key and I will study your chart again for you.</p>
-        <div class="cta">
-          <a class="btn primary" href="{RETURNING_URL}">Ask follow-up questions</a>
-          <a class="btn secondary" href="{WHATSAPP_URL}">WhatsApp +91 7051300168</a>
-        </div>
-        <p class="pdf-line">Your full report is attached as a PDF.</p>
-        <p class="signature">With care,<br />{escape(email['pandit']['name'])}<br />Siddh Jyotish</p>
-      </div>
-    </div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:2px 0 16px;">
+            <tr><td style="background:#f5fbf6;border:1px solid #cfe9d8;border-left:5px solid {BRAND['green']};border-radius:14px;padding:14px 16px;">
+              <div style="font-family:Marcellus,Georgia,serif;font-size:15px;color:{BRAND['green']};margin-bottom:6px;">🪔 Personal guidance &amp; energised remedies</div>
+              <div style="color:{BRAND['maroon_deep']};font-size:13px;">For an authentic energised gemstone (Pukhraj / Opal) or to arrange a Griha Pravesh, Santaan Gopal or Mangal-shanti pooja, please WhatsApp me personally at <b>{escape(WHATSAPP_NUMBER)}</b> and I will guide you at every step.</div>
+            </td></tr>
+          </table>
+
+          <p style="margin:0 0 18px;">To ask a follow-up question later, visit <a href="{RETURNING_URL}" style="color:{BRAND['saffron']};font-weight:700;">{RETURNING_URL}</a>, paste your reference number above, and I will personally look into your chart again.</p>
+
+          <p style="margin:0;font-family:Marcellus,Georgia,serif;font-size:16px;color:{BRAND['maroon']};">With blessings,</p>
+          <p style="margin:2px 0 0;font-family:Marcellus,Georgia,serif;font-size:19px;font-weight:700;color:{BRAND['maroon']};">{escape(pandit_name)}</p>
+          <p style="margin:2px 0 6px;color:{BRAND['muted']};font-size:12px;">Siddh Jyotish</p>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:14px 28px 22px;border-top:1px solid #f0e6cd;text-align:center;color:{BRAND['muted']};font-size:10px;">
+          Siddh Jyotish · Vedic Astrology &amp; Jyotish · {escape(WHATSAPP_NUMBER)} · siddhjyotish.com
+        </td>
+      </tr>
+    </table>
   </div>
 </body>
 </html>
@@ -354,6 +233,11 @@ def request_json(url: str, api_key: str, method: str = 'GET', body: dict[str, An
 
 def ensure_verified_domain(api_key: str) -> None:
     status, body = request_json(DOMAINS_URL, api_key, 'GET')
+    if status in (401, 403):
+        # A send-only (restricted) Resend key cannot read the domains endpoint.
+        # That is expected in production, so skip the preflight rather than fail.
+        print(f'NOTE: skipping domain preflight (restricted key, HTTP {status}).', file=sys.stderr)
+        return
     if status != 200:
         fail(f'Domains preflight failed: HTTP {status}: {body.strip()}')
 
