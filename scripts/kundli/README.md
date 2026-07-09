@@ -57,26 +57,16 @@ The input JSON keeps deterministic chart data separate from AI-written prose.
 
 Use `send_email.py` to mail the finished Kundli PDF through Resend.
 
-### Email payload schema
-
-Provide a single JSON file with:
-
-- `to` — recipient email address
-- `from` — optional sender address, defaults to `Siddh Jyotish <namaste@siddhjyotish.com>`
-- `subject` — email subject line
-- `html` — HTML email body
-- `pdfPath` — path to `Kundli_Report.pdf`
-
 ### Usage
 
 ```bash
-python scripts/kundli/send_email.py email.json
+python scripts/kundli/send_email.py scripts/kundli/data.sample.json
 ```
 
 For a local dry run that validates the payload and preflight without sending:
 
 ```bash
-python scripts/kundli/send_email.py --dry-run email.json
+python scripts/kundli/send_email.py --dry-run scripts/kundli/data.sample.json
 ```
 
-The sender reads `RESEND_API_KEY` from the environment, checks that `siddhjyotish.com` is verified in Resend, and sends with a fixed `Siddh-Jyotish-Mailer/1.0` user agent so Cloudflare does not block the request.
+The sender reads the same `data.json` used for the report. It derives the recipient from `pandit.customerEmail`, uses `Kundli_Report.pdf` next to the data file, and sends with a fixed `Siddh-Jyotish-Mailer/1.0` user agent so Cloudflare does not block the request.
