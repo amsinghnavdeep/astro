@@ -1,80 +1,132 @@
 {
   "person": {
-    "fullName": "Navdeep Singh",
+    "fullName": "Nav",
     "gender": "Male",
-    "dateOfBirth": "14 Feb 1992",
-    "timeOfBirth": "6:45 AM",
-    "placeOfBirth": "Jalandhar, Punjab, India",
-    "timezone": "Asia/Kolkata"
+    "dateOfBirth": "1 July 1995",
+    "timeOfBirth": "10:40 AM",
+    "placeOfBirth": "Mississauga",
+    "latitude": "43.59\u00b0N",
+    "longitude": "79.64\u00b0W",
+    "timezone": "Asia/Kolkata",
+    "timezoneOffset": "+5:30",
+    "universalTime": "05:10 UT"
   },
   "pandit": {
-    "name": "Pandit Raghav Sharma",
-    "referenceNumber": "SJ-NS-2048",
-    "customerEmail": "navdeep@example.com"
+    "name": "Acharya Girish Chaturvedi",
+    "referenceNumber": "v1.yWsAkR_1pc3K8EDE.IR6wwkw9vZSKi7V7Nk9V8RtBPwiJrb9NNDsJS54x7M7EsGxtBWdkrSSQEHugSsiM",
+    "customerEmail": "seeker@example.com"
   },
   "chart": {
-    "ayanamsa": "23°51′29″ (Lahiri)",
-    "lagna": "Virgo",
+    "ayanamsa": "Lahiri 23\u00b047'39\"",
+    "lagna": "Pisces",
+    "lagnaDegree": "18\u00b027'55\"",
+    "lagnaNakshatra": "Revati",
+    "lagnaPada": "1",
+    "lagnaNakLord": "Mercury",
+    "navamsaLagna": "Sagittarius",
+    "antardashaTitle": "current Shukra (Venus) Mahadasha",
     "planets": [
-      { "name": "Sun", "sign": "Aquarius", "degree": "12°41′", "nakshatra": "Shatabhisha", "pada": 2, "house": 6 },
-      { "name": "Moon", "sign": "Cancer", "degree": "04°18′", "nakshatra": "Pushya", "pada": 1, "house": 11 },
-      { "name": "Mars", "sign": "Scorpio", "degree": "19°03′", "nakshatra": "Jyeshtha", "pada": 4, "house": 3 },
-      { "name": "Mercury", "sign": "Capricorn", "degree": "28°12′", "nakshatra": "Dhanishta", "pada": 2, "house": 5 },
-      { "name": "Jupiter", "sign": "Leo", "degree": "09°55′", "nakshatra": "Magha", "pada": 3, "house": 12 },
-      { "name": "Venus", "sign": "Pisces", "degree": "17°26′", "nakshatra": "Uttara Bhadrapada", "pada": 1, "house": 7 },
-      { "name": "Saturn", "sign": "Gemini", "degree": "21°08′", "nakshatra": "Punarvasu", "pada": 4, "house": 10 },
-      { "name": "Rahu", "sign": "Taurus", "degree": "02°44′", "nakshatra": "Krittika", "pada": 2, "house": 8 },
-      { "name": "Ketu", "sign": "Scorpio", "degree": "02°44′", "nakshatra": "Anuradha", "pada": 2, "house": 2 }
+      { "name": "Sun", "sign": "Gemini", "degree": "15\u00b007'51\"", "nakshatra": "Ardra", "pada": "3", "house": "4", "nakLord": "Rahu", "motion": "Direct" },
+      { "name": "Moon", "sign": "Cancer", "degree": "20\u00b030'06\"", "nakshatra": "Ashlesha", "pada": "2", "house": "5", "nakLord": "Mercury", "motion": "Direct" },
+      { "name": "Mars", "sign": "Leo", "degree": "24\u00b041'17\"", "nakshatra": "Purva Phalguni", "pada": "4", "house": "6", "nakLord": "Venus", "motion": "Direct" },
+      { "name": "Mercury", "sign": "Taurus", "degree": "23\u00b023'07\"", "nakshatra": "Mrigashira", "pada": "1", "house": "3", "nakLord": "Mars", "motion": "Direct" },
+      { "name": "Jupiter", "sign": "Scorpio", "degree": "13\u00b017'30\"", "nakshatra": "Anuradha", "pada": "3", "house": "9", "nakLord": "Saturn", "motion": "Retrograde" },
+      { "name": "Venus", "sign": "Gemini", "degree": "1\u00b014'18\"", "nakshatra": "Mrigashira", "pada": "3", "house": "4", "nakLord": "Mars", "motion": "Direct" },
+      { "name": "Saturn", "sign": "Pisces", "degree": "0\u00b056'00\"", "nakshatra": "Purva Bhadrapada", "pada": "4", "house": "1", "nakLord": "Jupiter", "motion": "Direct" },
+      { "name": "Rahu", "sign": "Libra", "degree": "8\u00b022'28\"", "nakshatra": "Swati", "pada": "1", "house": "8", "nakLord": "Rahu", "motion": "Retrograde" },
+      { "name": "Ketu", "sign": "Aries", "degree": "8\u00b022'28\"", "nakshatra": "Ashwini", "pada": "3", "house": "2", "nakLord": "Ketu", "motion": "Retrograde" }
     ],
     "navamsa": [
-      { "name": "Sun", "sign": "Capricorn", "house": 5 },
-      { "name": "Moon", "sign": "Taurus", "house": 9 },
-      { "name": "Mars", "sign": "Cancer", "house": 11 },
-      { "name": "Mercury", "sign": "Sagittarius", "house": 4 },
-      { "name": "Jupiter", "sign": "Virgo", "house": 2 },
-      { "name": "Venus", "sign": "Pisces", "house": 7 },
-      { "name": "Saturn", "sign": "Aries", "house": 12 },
-      { "name": "Rahu", "sign": "Gemini", "house": 10 },
-      { "name": "Ketu", "sign": "Sagittarius", "house": 4 }
+      { "name": "Sun", "sign": "Aquarius" },
+      { "name": "Moon", "sign": "Capricorn" },
+      { "name": "Mars", "sign": "Scorpio" },
+      { "name": "Mercury", "sign": "Leo" },
+      { "name": "Jupiter", "sign": "Libra" },
+      { "name": "Venus", "sign": "Libra" },
+      { "name": "Saturn", "sign": "Cancer" },
+      { "name": "Rahu", "sign": "Sagittarius" },
+      { "name": "Ketu", "sign": "Gemini" }
     ],
     "dasha": [
-      { "maha": "Jupiter", "start": "2022-08-14", "end": "2038-08-14", "active": true },
-      { "maha": "Saturn", "start": "2038-08-14", "end": "2057-08-14", "active": false },
-      { "maha": "Mercury", "start": "2057-08-14", "end": "2074-08-14", "active": false },
-      { "maha": "Ketu", "start": "2074-08-14", "end": "2081-08-14", "active": false }
+      { "maha": "Mercury", "start": "1995-07-01", "end": "2007-08-10", "length": "12.11 yrs", "active": false },
+      { "maha": "Ketu", "start": "2007-08-10", "end": "2014-08-10", "length": "7 yrs", "active": false },
+      { "maha": "Venus", "start": "2014-08-10", "end": "2034-08-10", "length": "20 yrs", "active": true },
+      { "maha": "Sun", "start": "2034-08-10", "end": "2040-08-09", "length": "6 yrs", "active": false },
+      { "maha": "Moon", "start": "2040-08-09", "end": "2050-08-10", "length": "10 yrs", "active": false },
+      { "maha": "Mars", "start": "2050-08-10", "end": "2057-08-09", "length": "7 yrs", "active": false },
+      { "maha": "Rahu", "start": "2057-08-09", "end": "2075-08-10", "length": "18 yrs", "active": false },
+      { "maha": "Jupiter", "start": "2075-08-10", "end": "2091-08-10", "length": "16 yrs", "active": false },
+      { "maha": "Saturn", "start": "2091-08-10", "end": "2110-08-10", "length": "19 yrs", "active": false }
+    ],
+    "antardasha": [
+      { "period": "Venus \u2013 Venus", "from": "2014-08-10", "to": "2017-12-09", "active": false },
+      { "period": "Venus \u2013 Sun", "from": "2017-12-09", "to": "2018-12-10", "active": false },
+      { "period": "Venus \u2013 Moon", "from": "2018-12-10", "to": "2020-08-09", "active": false },
+      { "period": "Venus \u2013 Mars", "from": "2020-08-09", "to": "2021-10-09", "active": false },
+      { "period": "Venus \u2013 Rahu", "from": "2021-10-09", "to": "2024-10-09", "active": false },
+      { "period": "Venus \u2013 Jupiter", "from": "2024-10-09", "to": "2027-06-10", "active": true },
+      { "period": "Venus \u2013 Saturn", "from": "2027-06-10", "to": "2030-08-10", "active": false },
+      { "period": "Venus \u2013 Mercury", "from": "2030-08-10", "to": "2033-06-10", "active": false },
+      { "period": "Venus \u2013 Ketu", "from": "2033-06-10", "to": "2034-08-10", "active": false }
     ],
     "doshas": [
-      { "name": "Manglik", "present": true, "note": "Mars in the 3rd house can create a sharp, direct emotional style." },
-      { "name": "Kaal Sarp", "present": false, "note": "The nodal axis is present but does not form a full Kaal Sarp pattern here." },
-      { "name": "Pitra", "present": true, "note": "The chart suggests ancestral responsibility and duty-oriented choices." }
+      { "name": "Mangal (Kuja) Dosha", "present": true, "note": "Mars sits in your 6th house \u2014 not a Manglik house from the Lagna. There is only a mild Mangal influence measured from the Moon. This is easily pacified and should not worry you for marriage; a simple Mangal-shanti before the wedding is enough." },
+      { "name": "Kaal Sarp Yoga", "present": false, "note": "Not present in full \u2014 Jupiter and Saturn fall outside the Rahu\u2013Ketu axis, so the yoga does not form here." },
+      { "name": "Sade Sati", "present": false, "note": "You are not in Sade Sati at present \u2014 Saturn is transiting the 9th from your natal Moon, not over it. These are peaceful years for the mind." }
+    ],
+    "signatures": [
+      "Meena (Pisces) Lagna",
+      "Chandra in own Karka rasi, 5th",
+      "Guru (lagna lord) in 9th",
+      "Mild Mangal (from Chandra)",
+      "No Kaal Sarp (partial only)",
+      "Not in Sade Sati now"
     ]
   },
   "interpretation": {
-    "summary": "Navdeep's chart shows a thoughtful communicator with steady ambition, strong practical instincts, and a genuine need to align work with purpose. The chart rewards patient consistency more than fast leaps.",
-    "personality": "You come across as composed, observant, and quietly persuasive. There is a strong blend of analytical thinking and emotional warmth, which makes you effective in both problem-solving and people-facing roles.",
+    "coreNature": [
+      "Beta, your Lagna is Meena (Pisces) rising in Revati nakshatra \u2014 the gentlest, most compassionate of all rising signs, ruled by Guru (Jupiter), the great teacher. This gives you a soft, wise, devotional heart, imagination, and a natural pull toward faith and helping others. Revati Lagna souls are often the quiet guides that others lean upon.",
+      "What makes your chart special is that Guru, your Lagna lord, sits in the 9th house of Vrischika (Scorpio) \u2014 the house of bhagya (fortune, dharma, father, higher learning). This is a blessed placement: your destiny is protected by grace, and you rise through honesty, faith and the blessings of elders and gurus. Guru is retrograde (vakri), which turns his wisdom inward \u2014 you learn deeply from experience and mature into a source of counsel for your family.",
+      "Shani (Saturn) sits in your Lagna itself, in Meena. This gives you seriousness, patience, endurance and an old-soul maturity beyond your years \u2014 but it also tends to make the big milestones of life (marriage, property, settling down) arrive after a period of patient effort rather than very early. This is not a flaw; it is Shani teaching you to build things that last.",
+      "Chandra (Moon) is beautifully placed in her own sign Karka (Cancer) in the 5th house of santaan (children), creativity and love. A strong, dignified Moon in the 5th is one of the finest indications for emotional depth, a loving nature, and \u2014 importantly for your questions \u2014 healthy prospects of progeny."
+    ],
     "houseHighlights": [
-      { "title": "1st House", "text": "The ascendant emphasizes health awareness, self-discipline, and a clear personal style." },
-      { "title": "4th House", "text": "Home and inner stability matter deeply; peaceful surroundings help you think and perform better." },
-      { "title": "7th House", "text": "Partnerships bring growth when expectations are clearly communicated and boundaries are respected." },
-      { "title": "10th House", "text": "Career development improves through patience, skill-building, and visible responsibility." }
-    ],
-    "predictions": [
-      { "period": "Near term", "text": "The current dasha supports steady professional recognition if you keep refining your expertise and maintain a reliable routine." },
-      { "period": "Mid term", "text": "Travel, training, or a role that broadens your network is likely to become more important than pure status chasing." },
-      { "period": "Longer term", "text": "Relationships deepen when your goals become more defined and you give equal weight to career and emotional clarity." }
-    ],
-    "concerns": [
-      { "title": "Overthinking", "text": "A strong mental loop can delay action; decisions improve when you time-box analysis." },
-      { "title": "Pressure tolerance", "text": "You can carry a lot on your shoulders, but burnout becomes more likely if rest is treated as optional." }
-    ],
-    "remedies": [
-      { "title": "Structured routine", "text": "Keep wake/sleep times stable and protect a few quiet minutes before work." },
-      { "title": "Simple devotional practice", "text": "A regular prayer, mantra, or diya practice brings emotional grounding." }
+      { "title": "2nd (wealth, family, speech) \u2013 Ketu in Mesha", "text": "a spiritual detachment toward money; you earn but are not greedy. Watch measured speech." },
+      { "title": "3rd (courage, communication) \u2013 Mercury in Vrishabha", "text": "a steady, practical mind and good communication and skills; you can build through effort and networks." },
+      { "title": "4th (home, mother, property, comforts) \u2013 Sun & Venus in Mithuna", "text": "a strong desire for a beautiful home and vehicles; property and domestic comfort are important life themes (directly relevant to your house-buying question)." },
+      { "title": "5th (children, romance, intellect) \u2013 Moon in own Karka", "text": "excellent for love, creativity and children." },
+      { "title": "6th (effort, health, competition) \u2013 Mars in Simha", "text": "a fighter's energy that helps you overcome enemies and obstacles; good for discipline, though guard against stress." },
+      { "title": "8th (transformation) \u2013 Rahu in Tula", "text": "sudden turns and deep interests; be careful in speculation and shortcuts." },
+      { "title": "9th (fortune, dharma) \u2013 Jupiter (lagna lord)", "text": "your greatest strength \u2014 fortune, faith and the protection of gurus and elders." }
     ],
     "answers": [
-      { "question": "When will I get married?", "answer": "Commitment becomes easier when the relationship feels purposeful and the timing supports emotional steadiness; the chart favors quality over speed." },
-      { "question": "When will I get a good job?", "answer": "Career progress comes through consistent skill growth and a reputation for dependability, especially during periods where responsibility increases." },
-      { "question": "When will we have a child?", "answer": "The chart supports family growth when partnership and home life feel secure, so the focus should remain on stability and timing rather than force." }
-    ]
+      {
+        "question": "When will I get married?",
+        "answer": "Marriage is read from the 7th house (Kanya / Virgo), its lord Budh (Mercury), and the great karaka of marriage, Shukra (Venus). Here is the beautiful part: you are running the Shukra (Venus) Mahadasha (2014\u20132034) \u2014 the very period that most naturally ripens marriage, and Venus in your chart sits in the 4th house of home and domestic happiness.\n\nRight now you are in Venus\u2013Jupiter (Oct 2024 \u2013 Jun 2027). Jupiter is your Lagna lord and a supreme benefic \u2014 a Venus\u2013Guru sub-period is one of the classic marriage-making windows in Vedic astrology. Because Shani sits in your Lagna (which gently delays but strengthens), the most likely window is from the latter half of 2025 through 2027, with a strong secondary window as you enter Venus\u2013Saturn (mid-2027 onwards) when Saturn finally \"settles\" what he has been maturing. In short, marriage is near and well-supported \u2014 most probably between late 2025 and 2027. A serious, lasting match (Saturn's signature) is indicated rather than a hasty one."
+      },
+      {
+        "question": "When will we have a child?",
+        "answer": "Children are read from the 5th house (Karka / Cancer), its lord Chandra (Moon), and the karaka of progeny, Guru (Jupiter). Your chart is genuinely blessed here: the Moon sits in her own sign in the 5th house itself \u2014 a textbook indication of healthy santaan (progeny) \u2014 and Jupiter, the giver of children, is strong in the 9th aspecting your fortune.\n\nSince childbirth naturally follows marriage, the timing flows from the same dasha. After marriage in the 2025\u20132027 window, the Venus\u2013Saturn period (mid-2027 to 2030) and the Jupiter sub-periods within it are most promising for the first child \u2014 most likely around 2028\u20132029. With the Moon so well placed, I foresee joy in this area of life; do the Santaan Gopal remedies below when you begin planning, and the blessing will come."
+      },
+      {
+        "question": "Should I buy a house this year?",
+        "answer": "Property and home are the domain of the 4th house (Mithuna / Gemini), where you have both Surya (Sun) and Shukra (Venus). Venus in the 4th, and Venus being your running Mahadasha lord, is a supportive signature for acquiring property, comforts and vehicles during this very period. So the underlying current is favourable.\n\nMy guidance, beta: yes, this year is auspicious to move toward buying a home \u2014 but do it with a proper muhurat (auspicious timing) for the registry and griha pravesh (house-warming). Prefer a Thursday or Friday in a Shukla Paksha (waxing moon), and avoid finalising when Mercury or Venus are retrograde or during the Chaturmas shraddha fortnight. Since Shani is in your Lagna, do not over-stretch your loan \u2014 buy within comfortable means and it will bless you for years. If you wish, WhatsApp me your shortlisted dates and I will personally pick the strongest muhurat for you."
+      }
+    ],
+    "remedies": [
+      { "title": "Yellow Sapphire (Pukhraj)", "text": "to strengthen Guru, your Lagna lord and giver of children and wisdom. Set in gold, worn on the index finger of the right hand, first on a Thursday morning after energising with the Guru mantra. This is your primary, life-supporting gemstone." },
+      { "title": "Opal or White Sapphire", "text": "to support Shukra (Venus), your marriage karaka and Mahadasha lord, aiding marriage, harmony and property. Set in silver or white gold, worn on the middle/ring finger, first on a Friday. (Please have it checked for suitability before wearing.)" },
+      { "title": "Mantra for marriage & wisdom", "text": "chant \u201cOm Gram Greem Graum Sah Gurave Namah\u201d 108 times on Thursdays, and \u201cOm Draam Dreem Draum Sah Shukraya Namah\u201d on Fridays." },
+      { "title": "For children (when planning)", "text": "recite the Santaan Gopal mantra and offer worship to Lord Krishna; feed and bless young children." },
+      { "title": "For Shani in Lagna", "text": "light a mustard-oil lamp and read the Hanuman Chalisa on Saturdays; donate black sesame or mustard oil \u2014 this softens delays and steadies your path." },
+      { "title": "Mild Mangal", "text": "worship Hanuman ji on Tuesdays and offer red masoor daal (lentils) before the wedding." }
+    ],
+    "closingBlessing": "May Guru's grace and Ma Lakshmi's blessings be upon you, beta. A good marriage, healthy children and a happy home are all written kindly in your stars \u2014 walk toward them with faith and honest effort.",
+    "emailHighlights": [
+      { "label": "Marriage", "text": "You are running the auspicious Shukra (Venus) Mahadasha. A strong, lasting match is most likely between late 2025 and 2027." },
+      { "label": "Children", "text": "Your Moon sits gloriously in her own sign in the 5th house of progeny \u2014 a genuine blessing. The first child is most promising around 2028\u20132029." },
+      { "label": "Buying a home this year", "text": "With Venus in your 4th house and its Mahadasha active, the current period is favourable \u2014 proceed with a proper muhurat and within comfortable means." }
+    ],
+    "emailGoodNews": "Good news too: you are not in Sade Sati at present, there is no full Kaal Sarp yoga, and only a mild Mangal influence that is easily pacified. The remedies (gemstones, mantras and poojas), each chosen for a specific placement, are explained in your report."
   }
 }

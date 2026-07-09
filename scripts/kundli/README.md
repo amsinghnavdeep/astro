@@ -1,72 +1,69 @@
-# Kundli PDF generator
+# Kundli PDF generator + email sender
 
-Run the report generator with a single JSON payload:
+The report layout is a **fixed template**. Every heading, the cover, the North-Indian
+square chart diagrams, the tables, and all static copy live in `generate_report.py`
+and `send_email.py` and are identical for every customer. The AI/backend only ever
+**fills the values** inside `data.json` — it must **never add, remove, or rename keys**,
+and it must not touch the design. The same `data.json` drives both the PDF and the email.
 
 ```bash
-python scripts/kundli/generate_report.py scripts/kundli/data.sample.json
+python scripts/kundli/generate_report.py scripts/kundli/data.sample.json   # writes Kundli_Report.pdf + report.html
+python scripts/kundli/send_email.py       scripts/kundli/data.sample.json   # emails the PDF via Resend
+python scripts/kundli/send_email.py --dry-run scripts/kundli/data.sample.json   # preview payload, no send
 ```
 
-It writes:
+Both output files are written next to the input JSON.
 
-- `Kundli_Report.pdf`
-- `report.html`
+## Fixed JSON schema (fill values only)
 
-Both files are generated in the same directory as the input JSON.
-
-## JSON schema
-
-The input JSON keeps deterministic chart data separate from AI-written prose.
+`data.sample.json` is the canonical, complete example. Provide **every** key below with an
+accurate value. Numbers, signs, degrees, nakshatras, dates, houses, etc. must be **accurate**
+(taken from the computed chart) — the template renders exactly what you supply.
 
 ### `person`
-- `fullName`
-- `gender` (`Male` | `Female` | `Other`)
-- `dateOfBirth`
-- `timeOfBirth`
-- `placeOfBirth`
-- `timezone`
+`fullName`, `gender` (`Male` | `Female` | `Other`), `dateOfBirth`, `timeOfBirth`,
+`placeOfBirth`, `latitude`, `longitude`, `timezone`, `timezoneOffset`, `universalTime`
 
 ### `pandit`
-- `name`
-- `referenceNumber`
-- `customerEmail`
+`name`, `referenceNumber`, `customerEmail`
 
 ### `chart`
-- `ayanamsa`
-- `lagna`
-- `planets[]`: `{ name, sign, degree, nakshatra, pada, house }`
-- `navamsa[]`: `{ name, sign, house }`
-- `dasha[]`: `{ maha, start, end, active }`
-- `doshas[]`: `{ name, present, note }`
+- `ayanamsa`, `lagna`, `lagnaDegree`, `lagnaNakshatra`, `lagnaPada`, `lagnaNakLord`
+- `navamsaLagna` — the D-9 ascendant sign
+- `antardashaTitle` — short label for the active mahadasha, e.g. `current Shukra (Venus) Mahadasha`
+- `planets[]` (all nine grahas): `{ name, sign, degree, nakshatra, pada, house, nakLord, motion }`
+- `navamsa[]` (all nine grahas): `{ name, sign }` — the D-9 sign of each graha
+- `dasha[]` (full Vimshottari sequence): `{ maha, start, end, length, active }`
+- `antardasha[]` (sub-periods of the active mahadasha): `{ period, from, to, active }`
+- `doshas[]`: `{ name, present (bool), note }`
+- `signatures[]`: short chart-signature phrases (strings) shown as pills
 
-### `interpretation`
-- `summary`
-- `personality`
+### `interpretation` (AI-written prose)
+- `coreNature[]` — paragraphs on the person's core nature (array of strings)
 - `houseHighlights[]`: `{ title, text }`
-- `predictions[]`: `{ period, text }`
-- `concerns[]`: `{ title, text }`
+- `answers[]`: `{ question, answer }` — **always exactly 3** questions/answers; `answer` may
+  contain multiple paragraphs separated by a blank line
 - `remedies[]`: `{ title, text }`
-- `answers[]`: `{ question, answer }`
+- `closingBlessing` — one closing blessing paragraph (string)
+- `emailHighlights[]`: `{ label, text }` — the 3 bullets shown in the email
+- `emailGoodNews` — the reassuring "good news" paragraph in the email (string)
 
-## Notes
+Notes:
+- Sign values may be given as English (`Gemini`) — the template appends the Sanskrit name
+  (`Gemini (Mithuna)`) automatically. Supplying `Gemini (Mithuna)` is also fine.
+- `sign`/planet names drive the chart diagrams; keep them spelled normally.
 
-- The PDF output is customer-facing. Keep the on-page copy warm and devotional, and do not expose JSON, template, or validation mechanics in the rendered report.
-- PDF rendering uses headless Chrome from `CHROME_BIN`, with fallbacks under `/opt/.devin/chrome` and `/opt/.devin/playwright_browsers`.
-- Validation uses `pypdf` and fails if the PDF is empty, missing required markers, or contains blank pages.
+## Rendering / validation
+- PDF rendering uses headless Chrome from `CHROME_BIN`, falling back to `/opt/.devin/chrome`
+  and `/opt/.devin/playwright_browsers`.
+- Validation (`pypdf`) fails only if the PDF is empty, below the structural page minimum,
+  has blank pages, or is missing required section markers. It prints `VALIDATION PASS` on success.
+- The rendered report is customer-facing: never expose JSON, template, or validation mechanics,
+  and do not name the ephemeris engine (describe it as "a professional astronomical ephemeris").
 
 ## Email sender
-
-Use `send_email.py` to mail the finished Kundli PDF through Resend.
-
-### Usage
-
-```bash
-python scripts/kundli/send_email.py scripts/kundli/data.sample.json
-```
-
-For a local dry run that validates the payload and preflight without sending:
-
-```bash
-python scripts/kundli/send_email.py --dry-run scripts/kundli/data.sample.json
-```
-
-The sender reads the same `data.json` used for the report. It derives the recipient from `pandit.customerEmail`, uses `Kundli_Report.pdf` next to the data file, and sends with a fixed `Siddh-Jyotish-Mailer/1.0` user agent so Cloudflare does not block the request.
+`send_email.py` mails the finished `Kundli_Report.pdf` through Resend, reading the same
+`data.json`. Recipient comes from `pandit.customerEmail`; the email body is built from the
+`interpretation.emailHighlights`, `interpretation.emailGoodNews`, `pandit`, and `person` values.
+It requires `RESEND_API_KEY`. Send-only (restricted) keys are supported — the domain preflight
+is skipped gracefully when the key cannot read the domains endpoint.
