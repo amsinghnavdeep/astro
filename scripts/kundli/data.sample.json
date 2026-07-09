@@ -1,0 +1,80 @@
+{
+  "person": {
+    "fullName": "Navdeep Singh",
+    "gender": "Male",
+    "dateOfBirth": "14 Feb 1992",
+    "timeOfBirth": "6:45 AM",
+    "placeOfBirth": "Jalandhar, Punjab, India",
+    "timezone": "Asia/Kolkata"
+  },
+  "pandit": {
+    "name": "Pandit Raghav Sharma",
+    "referenceNumber": "SJ-NS-2048",
+    "customerEmail": "navdeep@example.com"
+  },
+  "chart": {
+    "ayanamsa": "23°51′29″ (Lahiri)",
+    "lagna": "Virgo",
+    "planets": [
+      { "name": "Sun", "sign": "Aquarius", "degree": "12°41′", "nakshatra": "Shatabhisha", "pada": 2, "house": 6 },
+      { "name": "Moon", "sign": "Cancer", "degree": "04°18′", "nakshatra": "Pushya", "pada": 1, "house": 11 },
+      { "name": "Mars", "sign": "Scorpio", "degree": "19°03′", "nakshatra": "Jyeshtha", "pada": 4, "house": 3 },
+      { "name": "Mercury", "sign": "Capricorn", "degree": "28°12′", "nakshatra": "Dhanishta", "pada": 2, "house": 5 },
+      { "name": "Jupiter", "sign": "Leo", "degree": "09°55′", "nakshatra": "Magha", "pada": 3, "house": 12 },
+      { "name": "Venus", "sign": "Pisces", "degree": "17°26′", "nakshatra": "Uttara Bhadrapada", "pada": 1, "house": 7 },
+      { "name": "Saturn", "sign": "Gemini", "degree": "21°08′", "nakshatra": "Punarvasu", "pada": 4, "house": 10 },
+      { "name": "Rahu", "sign": "Taurus", "degree": "02°44′", "nakshatra": "Krittika", "pada": 2, "house": 8 },
+      { "name": "Ketu", "sign": "Scorpio", "degree": "02°44′", "nakshatra": "Anuradha", "pada": 2, "house": 2 }
+    ],
+    "navamsa": [
+      { "name": "Sun", "sign": "Capricorn", "house": 5 },
+      { "name": "Moon", "sign": "Taurus", "house": 9 },
+      { "name": "Mars", "sign": "Cancer", "house": 11 },
+      { "name": "Mercury", "sign": "Sagittarius", "house": 4 },
+      { "name": "Jupiter", "sign": "Virgo", "house": 2 },
+      { "name": "Venus", "sign": "Pisces", "house": 7 },
+      { "name": "Saturn", "sign": "Aries", "house": 12 },
+      { "name": "Rahu", "sign": "Gemini", "house": 10 },
+      { "name": "Ketu", "sign": "Sagittarius", "house": 4 }
+    ],
+    "dasha": [
+      { "maha": "Jupiter", "start": "2022-08-14", "end": "2038-08-14", "active": true },
+      { "maha": "Saturn", "start": "2038-08-14", "end": "2057-08-14", "active": false },
+      { "maha": "Mercury", "start": "2057-08-14", "end": "2074-08-14", "active": false },
+      { "maha": "Ketu", "start": "2074-08-14", "end": "2081-08-14", "active": false }
+    ],
+    "doshas": [
+      { "name": "Manglik", "present": true, "note": "Mars in the 3rd house can create a sharp, direct emotional style." },
+      { "name": "Kaal Sarp", "present": false, "note": "The nodal axis is present but does not form a full Kaal Sarp pattern here." },
+      { "name": "Pitra", "present": true, "note": "The chart suggests ancestral responsibility and duty-oriented choices." }
+    ]
+  },
+  "interpretation": {
+    "summary": "Navdeep's chart shows a thoughtful communicator with steady ambition, strong practical instincts, and a genuine need to align work with purpose. The chart rewards patient consistency more than fast leaps.",
+    "personality": "You come across as composed, observant, and quietly persuasive. There is a strong blend of analytical thinking and emotional warmth, which makes you effective in both problem-solving and people-facing roles.",
+    "houseHighlights": [
+      { "title": "1st House", "text": "The ascendant emphasizes health awareness, self-discipline, and a clear personal style." },
+      { "title": "4th House", "text": "Home and inner stability matter deeply; peaceful surroundings help you think and perform better." },
+      { "title": "7th House", "text": "Partnerships bring growth when expectations are clearly communicated and boundaries are respected." },
+      { "title": "10th House", "text": "Career development improves through patience, skill-building, and visible responsibility." }
+    ],
+    "predictions": [
+      { "period": "Near term", "text": "The current dasha supports steady professional recognition if you keep refining your expertise and maintain a reliable routine." },
+      { "period": "Mid term", "text": "Travel, training, or a role that broadens your network is likely to become more important than pure status chasing." },
+      { "period": "Longer term", "text": "Relationships deepen when your goals become more defined and you give equal weight to career and emotional clarity." }
+    ],
+    "concerns": [
+      { "title": "Overthinking", "text": "A strong mental loop can delay action; decisions improve when you time-box analysis." },
+      { "title": "Pressure tolerance", "text": "You can carry a lot on your shoulders, but burnout becomes more likely if rest is treated as optional." }
+    ],
+    "remedies": [
+      { "title": "Structured routine", "text": "Keep wake/sleep times stable and protect a few quiet minutes before work." },
+      { "title": "Simple devotional practice", "text": "A regular prayer, mantra, or diya practice brings emotional grounding." }
+    ],
+    "answers": [
+      { "question": "When will I get married?", "answer": "Commitment becomes easier when the relationship feels purposeful and the timing supports emotional steadiness; the chart favors quality over speed." },
+      { "question": "When will I get a good job?", "answer": "Career progress comes through consistent skill growth and a reputation for dependability, especially during periods where responsibility increases." },
+      { "question": "When will we have a child?", "answer": "The chart supports family growth when partnership and home life feel secure, so the focus should remain on stability and timing rather than force." }
+    ]
+  }
+}

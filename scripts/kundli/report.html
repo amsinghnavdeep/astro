@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Navdeep Singh — Janma Kundli Report</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: #fbf4e6;
+      color: #2b2116;
+      font-family: Mukta, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 12.25px;
+      line-height: 1.55;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    h1, h2, h3, h4 {
+      margin: 0 0 0.45rem;
+      color: #7a1e1e;
+      font-family: Marcellus, "Cormorant Garamond", Georgia, serif;
+      font-weight: 400;
+      line-height: 1.1;
+    }
+    h1 { font-size: 31px; }
+    h2 { font-size: 20px; }
+    h3 { font-size: 15px; }
+    h4 { font-size: 13px; }
+    p { margin: 0 0 0.72rem; }
+    .page { margin: 0; }
+    .page-break { break-before: page; page-break-before: always; }
+    .card {
+      background: #fffdf8;
+      border: 1px solid #ecdcb8;
+      border-radius: 20px;
+      box-shadow: 0 8px 26px rgba(90, 49, 0, 0.05);
+      padding: 16px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .hero-banner {
+      padding: 18px;
+      border-radius: 24px;
+      background: linear-gradient(145deg, #fff8eb, #fdf4de 64%, #f8ebc8);
+      border: 1px solid rgba(201, 162, 39, 0.42);
+      box-shadow: 0 14px 30px rgba(90, 49, 0, 0.08);
+    }
+    .diya { font-size: 26px; margin-bottom: 6px; }
+    .brand-line {
+      text-transform: uppercase;
+      letter-spacing: 1.8px;
+      font-size: 10px;
+      color: #e0812f;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+    }
+    .title-row > div:first-child { flex: 1 1 auto; min-width: 0; }
+    .title-row > div:last-child { flex: 0 0 auto; }
+    .meta-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .meta {
+      border: 1px solid #ecdcb8;
+      background: rgba(255, 255, 255, 0.72);
+      border-radius: 14px;
+      padding: 10px 12px;
+    }
+    .meta label {
+      display: block;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 9px;
+      color: #6b5d47;
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+    .meta strong { color: #5c1414; }
+    .intro {
+      margin-top: 14px;
+      font-size: 13.3px;
+      max-width: 66ch;
+    }
+    .signature { margin-top: 12px; font-size: 11px; color: #6b5d47; }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .section-head small { color: #6b5d47; }
+    .chart-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      align-items: start;
+    }
+    .chart-grid > .chart-shell { flex: 1 1 320px; min-width: 0; }
+    .chart-shell { break-inside: avoid; page-break-inside: avoid; }
+    .chart-caption {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: baseline;
+      margin-bottom: 8px;
+      color: #6b5d47;
+    }
+    .chart-caption b { color: #7a1e1e; }
+    .chart-svg { width: 100%; height: auto; display: block; max-height: 235px; }
+    .chart-title { font-family: Marcellus, Georgia, serif; font-size: 16px; fill: #7a1e1e; }
+    .chart-lagna, .chart-center-sub { font-family: Mukta, system-ui, sans-serif; fill: #6b5d47; font-size: 10px; }
+    .chart-center-label { font-family: Mukta, system-ui, sans-serif; fill: #5c1414; font-size: 13px; font-weight: 700; }
+    .chart-cell rect { fill: #fffdf8; stroke: #ecdcb8; stroke-width: 1.2; }
+    .chart-cell text { font-family: Mukta, system-ui, sans-serif; fill: #2b2116; font-size: 9px; }
+    .chart-cell-lagna rect { fill: #fff3d2; stroke: #c9a227; stroke-width: 1.6; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 11.2px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #ecdcb8;
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #fff4d6;
+      color: #5c1414;
+      font-size: 10px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+    }
+    .grid-2 {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .grid-2 > * { flex: 1 1 320px; min-width: 0; }
+    .panel {
+      background: #fffdf8;
+      border: 1px solid #ecdcb8;
+      border-radius: 18px;
+      padding: 14px 15px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .panel h3 { color: #e0812f; }
+    .remedy { border-left: 4px solid #1f7a4d; }
+    .mini-card {
+      background: #fffdf8;
+      border: 1px solid #ecdcb8;
+      border-radius: 16px;
+      padding: 12px 13px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .mini-card.present { border-color: rgba(31, 122, 77, 0.42); background: #f4fff8; }
+    .mini-card.absent { border-color: rgba(122, 30, 30, 0.25); background: #fff8f5; }
+    .mini-card b { display: inline-block; color: #5c1414; margin-bottom: 6px; }
+    .qa { background: #fffdf8; border: 1px solid #ecdcb8; border-radius: 16px; padding: 12px 13px; }
+    .qa h3 { color: #5c1414; }
+    .answer-list { display: grid; gap: 12px; }
+    .closing-box {
+      max-width: 520px;
+      margin: 0 auto;
+      text-align: center;
+    }
+    .reference {
+      margin: 14px auto 18px;
+      display: inline-block;
+      padding: 12px 16px;
+      border-radius: 16px;
+      border: 1px dashed #c9a227;
+      background: #fff8e6;
+      font-size: 15px;
+      font-weight: 700;
+      color: #5c1414;
+    }
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 16px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }
+    .btn-primary { background: linear-gradient(180deg, #e6c766, #c9a227); color: #1b1440; }
+    .btn-secondary { background: #7a1e1e; color: white; }
+    .footer-note { color: #6b5d47; font-size: 11px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <section class="page page-break">
+    <div class="hero-banner card">
+      <div class="diya">🪔</div>
+      <div class="brand-line">Siddh Jyotish · Janma Kundli Report</div>
+      <div class="title-row">
+        <div>
+          <h1>Navdeep Singh</h1>
+          <p class="subtle">Prepared by Pandit Raghav Sharma</p>
+        </div>
+        <div>
+          <p class="subtle" style="text-align:right;margin:0;">Reference number</p>
+          <div style="text-align:right;font-size:18px;font-weight:700;color:#5c1414;">SJ-NS-2048</div>
+        </div>
+      </div>
+      <p class="intro">Namaste. This is your personal Janma Kundli — your Vedic birth chart, studied and prepared for you with care. Within these pages you will find your planetary placements, the charts that shape your life, and guidance on the path ahead.</p>
+      <div class="meta-grid">
+        <div class="meta"><label>Name</label><strong>Navdeep Singh</strong></div>
+        <div class="meta"><label>Gender</label><strong>Male</strong></div>
+        <div class="meta"><label>Date of birth</label><strong>14 Feb 1992</strong></div>
+        <div class="meta"><label>Time of birth</label><strong>6:45 AM</strong></div>
+        <div class="meta"><label>Place of birth</label><strong>Jalandhar, Punjab, India</strong></div>
+        <div class="meta"><label>Timezone</label><strong>Asia/Kolkata</strong></div>
+      </div>
+      <div class="signature">Customer email: navdeep@example.com · Generated 09 Jul 2026 UTC</div>
+    </div>
+  </section>
+
+  <section class="page page-break">
+    <div class="section-head">
+      <div>
+        <h2>D-1 Lagna Chart · D-9 Navamsa Chart</h2>
+        <small>Your birth chart in the traditional North-Indian style.</small>
+      </div>
+      <small>Lagna sign: <strong>Virgo</strong> · Ayanamsa: 23°51′29″ (Lahiri)</small>
+    </div>
+    <div class="chart-grid">
+      <div class="chart-shell card">
+        <div class="chart-caption"><b>D-1 Lagna Chart</b><span>Your birth (Rashi) chart</span></div>
+        
+    <svg class="chart-svg" viewBox="0 0 420 420" role="img" aria-label="D-1 Lagna Chart">
+      <defs>
+        <linearGradient id="chart-ring-d1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#e6c766" />
+          <stop offset="100%" stop-color="#c9a227" />
+        </linearGradient>
+      </defs>
+      <rect x="14" y="14" width="392" height="392" rx="24" fill="#fffdf8" stroke="#ecdcb8" stroke-width="2" />
+      <polygon points="210,28 392,210 210,392 28,210" fill="#fffaf0" stroke="url(#chart-ring-d1)" stroke-width="3.5" />
+      <polygon points="210,84 346,210 210,336 74,210" fill="none" stroke="#c9a227" stroke-width="2" opacity="0.7" />
+      <line x1="28" y1="210" x2="392" y2="210" stroke="#c9a227" stroke-width="1.6" opacity="0.72" />
+      <line x1="210" y1="28" x2="210" y2="392" stroke="#c9a227" stroke-width="1.6" opacity="0.72" />
+      <line x1="74" y1="74" x2="346" y2="346" stroke="#ecdcb8" stroke-width="1.4" opacity="0.95" />
+      <line x1="346" y1="74" x2="74" y2="346" stroke="#ecdcb8" stroke-width="1.4" opacity="0.95" />
+      <text class="chart-title" x="210" y="48" text-anchor="middle">D-1 Lagna Chart</text>
+      <text class="chart-lagna" x="210" y="66" text-anchor="middle">Lagna: Virgo</text>
+      <circle cx="210" cy="210" r="26" fill="#fff5dc" stroke="#f3a838" stroke-width="2" />
+      <text class="chart-center-label" x="210" y="205" text-anchor="middle">D-1</text>
+      <text class="chart-center-sub" x="210" y="221" text-anchor="middle">Lagna chart</text>
+      <g class="chart-cell chart-cell-lagna"><rect x="164" y="58" rx="12" ry="12" width="92" height="52" /><text x="210" y="79" text-anchor="middle"><tspan x="210" dy="0">1 · Lagna Virgo</tspan><tspan x="210" dy="13"></tspan></text></g><g class="chart-cell"><rect x="84" y="94" rx="12" ry="12" width="92" height="52" /><text x="130" y="115" text-anchor="middle"><tspan x="130" dy="0">2</tspan><tspan x="130" dy="13">Ketu</tspan></text></g><g class="chart-cell"><rect x="244" y="94" rx="12" ry="12" width="92" height="52" /><text x="290" y="115" text-anchor="middle"><tspan x="290" dy="0">3</tspan><tspan x="290" dy="13">Mars</tspan></text></g><g class="chart-cell"><rect x="292" y="170" rx="12" ry="12" width="92" height="52" /><text x="338" y="191" text-anchor="middle"><tspan x="338" dy="0">4</tspan><tspan x="338" dy="13"></tspan></text></g><g class="chart-cell"><rect x="292" y="226" rx="12" ry="12" width="92" height="52" /><text x="338" y="247" text-anchor="middle"><tspan x="338" dy="0">5</tspan><tspan x="338" dy="13">Mercury</tspan></text></g><g class="chart-cell"><rect x="292" y="282" rx="12" ry="12" width="92" height="52" /><text x="338" y="303" text-anchor="middle"><tspan x="338" dy="0">6</tspan><tspan x="338" dy="13">Sun</tspan></text></g><g class="chart-cell"><rect x="164" y="358" rx="12" ry="12" width="92" height="52" /><text x="210" y="379" text-anchor="middle"><tspan x="210" dy="0">7</tspan><tspan x="210" dy="13">Venus</tspan></text></g><g class="chart-cell"><rect x="84" y="322" rx="12" ry="12" width="92" height="52" /><text x="130" y="343" text-anchor="middle"><tspan x="130" dy="0">8</tspan><tspan x="130" dy="13">Rahu</tspan></text></g><g class="chart-cell"><rect x="36" y="282" rx="12" ry="12" width="92" height="52" /><text x="82" y="303" text-anchor="middle"><tspan x="82" dy="0">9</tspan><tspan x="82" dy="13"></tspan></text></g><g class="chart-cell"><rect x="36" y="226" rx="12" ry="12" width="92" height="52" /><text x="82" y="247" text-anchor="middle"><tspan x="82" dy="0">10</tspan><tspan x="82" dy="13">Saturn</tspan></text></g><g class="chart-cell"><rect x="36" y="170" rx="12" ry="12" width="92" height="52" /><text x="82" y="191" text-anchor="middle"><tspan x="82" dy="0">11</tspan><tspan x="82" dy="13">Moon</tspan></text></g><g class="chart-cell"><rect x="84" y="282" rx="12" ry="12" width="92" height="52" /><text x="130" y="303" text-anchor="middle"><tspan x="130" dy="0">12</tspan><tspan x="130" dy="13">Jupiter</tspan></text></g>
+    </svg>
+    
+      </div>
+      <div class="chart-shell card">
+        <div class="chart-caption"><b>D-9 Navamsa Chart</b><span>The chart of destiny &amp; marriage</span></div>
+        
+    <svg class="chart-svg" viewBox="0 0 420 420" role="img" aria-label="D-9 Navamsa Chart">
+      <defs>
+        <linearGradient id="chart-ring-d9" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#e6c766" />
+          <stop offset="100%" stop-color="#c9a227" />
+        </linearGradient>
+      </defs>
+      <rect x="14" y="14" width="392" height="392" rx="24" fill="#fffdf8" stroke="#ecdcb8" stroke-width="2" />
+      <polygon points="210,28 392,210 210,392 28,210" fill="#fffaf0" stroke="url(#chart-ring-d9)" stroke-width="3.5" />
+      <polygon points="210,84 346,210 210,336 74,210" fill="none" stroke="#c9a227" stroke-width="2" opacity="0.7" />
+      <line x1="28" y1="210" x2="392" y2="210" stroke="#c9a227" stroke-width="1.6" opacity="0.72" />
+      <line x1="210" y1="28" x2="210" y2="392" stroke="#c9a227" stroke-width="1.6" opacity="0.72" />
+      <line x1="74" y1="74" x2="346" y2="346" stroke="#ecdcb8" stroke-width="1.4" opacity="0.95" />
+      <line x1="346" y1="74" x2="74" y2="346" stroke="#ecdcb8" stroke-width="1.4" opacity="0.95" />
+      <text class="chart-title" x="210" y="48" text-anchor="middle">D-9 Navamsa Chart</text>
+      <text class="chart-lagna" x="210" y="66" text-anchor="middle">Lagna: Virgo</text>
+      <circle cx="210" cy="210" r="26" fill="#fff5dc" stroke="#f3a838" stroke-width="2" />
+      <text class="chart-center-label" x="210" y="205" text-anchor="middle">D-9</text>
+      <text class="chart-center-sub" x="210" y="221" text-anchor="middle">Navamsa chart</text>
+      <g class="chart-cell chart-cell-lagna"><rect x="164" y="58" rx="12" ry="12" width="92" height="52" /><text x="210" y="79" text-anchor="middle"><tspan x="210" dy="0">1 · Lagna Virgo</tspan><tspan x="210" dy="13"></tspan></text></g><g class="chart-cell"><rect x="84" y="94" rx="12" ry="12" width="92" height="52" /><text x="130" y="115" text-anchor="middle"><tspan x="130" dy="0">2</tspan><tspan x="130" dy="13">Jupiter</tspan></text></g><g class="chart-cell"><rect x="244" y="94" rx="12" ry="12" width="92" height="52" /><text x="290" y="115" text-anchor="middle"><tspan x="290" dy="0">3</tspan><tspan x="290" dy="13"></tspan></text></g><g class="chart-cell"><rect x="292" y="170" rx="12" ry="12" width="92" height="52" /><text x="338" y="191" text-anchor="middle"><tspan x="338" dy="0">4</tspan><tspan x="338" dy="13">Mercury / Ketu</tspan></text></g><g class="chart-cell"><rect x="292" y="226" rx="12" ry="12" width="92" height="52" /><text x="338" y="247" text-anchor="middle"><tspan x="338" dy="0">5</tspan><tspan x="338" dy="13">Sun</tspan></text></g><g class="chart-cell"><rect x="292" y="282" rx="12" ry="12" width="92" height="52" /><text x="338" y="303" text-anchor="middle"><tspan x="338" dy="0">6</tspan><tspan x="338" dy="13"></tspan></text></g><g class="chart-cell"><rect x="164" y="358" rx="12" ry="12" width="92" height="52" /><text x="210" y="379" text-anchor="middle"><tspan x="210" dy="0">7</tspan><tspan x="210" dy="13">Venus</tspan></text></g><g class="chart-cell"><rect x="84" y="322" rx="12" ry="12" width="92" height="52" /><text x="130" y="343" text-anchor="middle"><tspan x="130" dy="0">8</tspan><tspan x="130" dy="13"></tspan></text></g><g class="chart-cell"><rect x="36" y="282" rx="12" ry="12" width="92" height="52" /><text x="82" y="303" text-anchor="middle"><tspan x="82" dy="0">9</tspan><tspan x="82" dy="13">Moon</tspan></text></g><g class="chart-cell"><rect x="36" y="226" rx="12" ry="12" width="92" height="52" /><text x="82" y="247" text-anchor="middle"><tspan x="82" dy="0">10</tspan><tspan x="82" dy="13">Rahu</tspan></text></g><g class="chart-cell"><rect x="36" y="170" rx="12" ry="12" width="92" height="52" /><text x="82" y="191" text-anchor="middle"><tspan x="82" dy="0">11</tspan><tspan x="82" dy="13">Mars</tspan></text></g><g class="chart-cell"><rect x="84" y="282" rx="12" ry="12" width="92" height="52" /><text x="130" y="303" text-anchor="middle"><tspan x="130" dy="0">12</tspan><tspan x="130" dy="13">Saturn</tspan></text></g>
+    </svg>
+    
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px;">
+      <h3>Planetary positions</h3>
+      <table>
+        <thead>
+          <tr><th>Planet</th><th>Sign</th><th>Degree</th><th>Nakshatra</th><th>Pada</th><th>House</th></tr>
+        </thead>
+        <tbody><tr><td>Sun</td><td>Aquarius</td><td>12°41′</td><td>Shatabhisha</td><td>2</td><td>6</td></tr><tr><td>Moon</td><td>Cancer</td><td>04°18′</td><td>Pushya</td><td>1</td><td>11</td></tr><tr><td>Mars</td><td>Scorpio</td><td>19°03′</td><td>Jyeshtha</td><td>4</td><td>3</td></tr><tr><td>Mercury</td><td>Capricorn</td><td>28°12′</td><td>Dhanishta</td><td>2</td><td>5</td></tr><tr><td>Jupiter</td><td>Leo</td><td>09°55′</td><td>Magha</td><td>3</td><td>12</td></tr><tr><td>Venus</td><td>Pisces</td><td>17°26′</td><td>Uttara Bhadrapada</td><td>1</td><td>7</td></tr><tr><td>Saturn</td><td>Gemini</td><td>21°08′</td><td>Punarvasu</td><td>4</td><td>10</td></tr><tr><td>Rahu</td><td>Taurus</td><td>02°44′</td><td>Krittika</td><td>2</td><td>8</td></tr><tr><td>Ketu</td><td>Scorpio</td><td>02°44′</td><td>Anuradha</td><td>2</td><td>2</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="grid-2" style="margin-top:14px;">
+      <div class="card">
+        <h3>Dasha timeline</h3>
+        <table>
+          <thead><tr><th>Maha dasha</th><th>Start</th><th>End</th><th>Active</th></tr></thead>
+          <tbody><tr><td>Jupiter</td><td>2022-08-14</td><td>2038-08-14</td><td>Yes</td></tr><tr><td>Saturn</td><td>2038-08-14</td><td>2057-08-14</td><td>No</td></tr><tr><td>Mercury</td><td>2057-08-14</td><td>2074-08-14</td><td>No</td></tr><tr><td>Ketu</td><td>2074-08-14</td><td>2081-08-14</td><td>No</td></tr></tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>Doshas</h3>
+        <div class="grid-2"><article class="mini-card present"><h4>Manglik</h4><b>Present</b><p>Mars in the 3rd house can create a sharp, direct emotional style.</p></article><article class="mini-card absent"><h4>Kaal Sarp</h4><b>Not present</b><p>The nodal axis is present but does not form a full Kaal Sarp pattern here.</p></article><article class="mini-card present"><h4>Pitra</h4><b>Present</b><p>The chart suggests ancestral responsibility and duty-oriented choices.</p></article></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page">
+    <div class="section-head">
+      <div>
+        <h2>Your Reading · Nature &amp; the houses of your life</h2>
+        <small>What your chart reveals about you.</small>
+      </div>
+    </div>
+    <div class="grid-2">
+      <article class="panel" style="grid-column:1/-1;">
+        <h3>Summary</h3>
+        <p>Navdeep&#x27;s chart shows a thoughtful communicator with steady ambition, strong practical instincts, and a genuine need to align work with purpose. The chart rewards patient consistency more than fast leaps.</p>
+      </article>
+      <article class="panel" style="grid-column:1/-1;">
+        <h3>Personality</h3>
+        <p>You come across as composed, observant, and quietly persuasive. There is a strong blend of analytical thinking and emotional warmth, which makes you effective in both problem-solving and people-facing roles.</p>
+      </article>
+    </div>
+    <div style="margin-top:14px;">
+      <h3>House highlights</h3>
+      <div class="grid-2"><article class="panel"><h3>1st House</h3><p>The ascendant emphasizes health awareness, self-discipline, and a clear personal style.</p></article><article class="panel"><h3>4th House</h3><p>Home and inner stability matter deeply; peaceful surroundings help you think and perform better.</p></article><article class="panel"><h3>7th House</h3><p>Partnerships bring growth when expectations are clearly communicated and boundaries are respected.</p></article><article class="panel"><h3>10th House</h3><p>Career development improves through patience, skill-building, and visible responsibility.</p></article></div>
+    </div>
+  </section>
+
+  <section class="page">
+    <div class="section-head">
+      <div>
+        <h2>Your Reading · Predictions, concerns, remedies &amp; answers</h2>
+        <small>The road ahead and how to walk it with confidence.</small>
+      </div>
+    </div>
+    <div>
+      <h3>Predictions</h3>
+      <div class="grid-2"><article class="panel"><h3>Near term</h3><p>The current dasha supports steady professional recognition if you keep refining your expertise and maintain a reliable routine.</p></article><article class="panel"><h3>Mid term</h3><p>Travel, training, or a role that broadens your network is likely to become more important than pure status chasing.</p></article><article class="panel"><h3>Longer term</h3><p>Relationships deepen when your goals become more defined and you give equal weight to career and emotional clarity.</p></article></div>
+    </div>
+    <div style="margin-top:14px;">
+      <h3>Concerns</h3>
+      <div class="grid-2"><article class="panel"><h3>Overthinking</h3><p>A strong mental loop can delay action; decisions improve when you time-box analysis.</p></article><article class="panel"><h3>Pressure tolerance</h3><p>You can carry a lot on your shoulders, but burnout becomes more likely if rest is treated as optional.</p></article></div>
+    </div>
+    <div style="margin-top:14px;">
+      <h3>Remedies</h3>
+      <div class="grid-2"><article class="panel remedy"><h3>Structured routine</h3><p>Keep wake/sleep times stable and protect a few quiet minutes before work.</p></article><article class="panel remedy"><h3>Simple devotional practice</h3><p>A regular prayer, mantra, or diya practice brings emotional grounding.</p></article></div>
+    </div>
+    <div style="margin-top:14px;">
+      <h3>Answers</h3>
+      <div class="answer-list"><article class="qa"><h3>Q. When will I get married?</h3><p><strong>A.</strong> Commitment becomes easier when the relationship feels purposeful and the timing supports emotional steadiness; the chart favors quality over speed.</p></article><article class="qa"><h3>Q. When will I get a good job?</h3><p><strong>A.</strong> Career progress comes through consistent skill growth and a reputation for dependability, especially during periods where responsibility increases.</p></article><article class="qa"><h3>Q. When will we have a child?</h3><p><strong>A.</strong> The chart supports family growth when partnership and home life feel secure, so the focus should remain on stability and timing rather than force.</p></article></div>
+    </div>
+  </section>
+
+  <section class="page">
+    <div class="closing-box card">
+      <div class="diya">🪔</div>
+      <h2>Your key to ask me more</h2>
+      <div class="reference">SJ-NS-2048</div>
+      <p class="subtle">This reference number is your open door back to me — use it at siddhjyotish.com/returning whenever a new question arises, and I will study your chart again for you.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://siddhjyotish.com/returning">Ask follow-up questions</a>
+        <a class="btn btn-secondary" href="https://wa.me/917051300168">WhatsApp support</a>
+      </div>
+      <p class="footer-note">Prepared for you with devotion at Siddh Jyotish. May the grace of the grahas light your path. 🙏</p>
+    </div>
+  </section>
+</body>
+</html>
