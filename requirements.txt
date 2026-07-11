@@ -1,0 +1,25 @@
+# Core pipeline deps (CPU-friendly, versions validated together).
+# Install torch/torchvision/torchaudio separately via setup.sh (CPU or CUDA wheel).
+numpy==1.26.4
+scipy<1.13
+opencv-python==4.9.0.80
+numba>=0.58
+tqdm
+
+# Voiceover: built-in neural voices (edge-tts) OR clone your own voice (XTTS-v2).
+edge-tts>=7.0.0
+coqui-tts==0.27.5
+transformers==4.57.1   # 5.x removes symbols coqui-tts needs; pin to 4.57
+num2words
+
+# librosa 0.11 is required by coqui-tts; Wav2Lip is patched for it in setup.sh.
+librosa>=0.11
+
+# Avatar generator (text prompt -> photorealistic image, Stable Diffusion).
+diffusers==0.31.0
+accelerate
+
+# Face enhancement (optional) + person cutout for backgrounds.
+gfpgan==1.3.8
+rembg==2.0.59
+onnxruntime==1.18.1

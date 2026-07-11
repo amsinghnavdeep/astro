@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+out/
+models/
+third_party/
+reel_*/
+*.mp4
+*.webm
+gfpgan/
+.sadtalker-venv/
+.venv/
