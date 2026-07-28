@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
 import { detectCountry } from '../lib/geo';
 import { getCurrencyPricing } from '../lib/pricing';
 import { formatMoney } from '../lib/money';
@@ -52,7 +53,7 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
       </div>
 
       <div class="guarantee-box">
-        <div class="ico">🛡️</div>
+        <div class="ico"><Icon name="shield" size={32} /></div>
         <div>
           <h3>100% Money-Back Guarantee</h3>
           <p>
@@ -121,7 +122,7 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
     border-radius: 16px;
     padding: 1.5rem;
   }
-  .guarantee-box .ico { font-size: 2rem; flex-shrink: 0; }
+  .guarantee-box .ico { color: var(--gold); flex-shrink: 0; }
   .guarantee-box h3 { margin-top: 0; }
   .guarantee-box p { color: var(--muted); margin-bottom: 0; }
 
