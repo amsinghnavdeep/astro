@@ -2,7 +2,14 @@
 import Base from '../layouts/Base.astro';
 
 export const prerender = false;
-if (Astro.locals.user) return Astro.redirect('/account');
+function sanitizeNext(value: string | null): string {
+  return value && value.startsWith('/') && !value.startsWith('//') && !value.includes(':')
+    ? value
+    : '/account';
+}
+
+const next = sanitizeNext(Astro.url.searchParams.get('next'));
+if (Astro.locals.user) return Astro.redirect(next);
 ---
 
 <Base title="Login | Siddh Jyotish" description="Sign in to view your Siddh Jyotish report history." noindex>
@@ -24,7 +31,7 @@ if (Astro.locals.user) return Astro.redirect('/account');
           <p id="form-error" class="form-error" role="alert" aria-live="polite"></p>
           <button class="btn btn-block" type="submit">Login</button>
         </form>
-        <p class="auth-switch">New here? <a href="/register">Create an account</a></p>
+        <p class="auth-switch">New here? <a href={`/register?next=${encodeURIComponent(next)}`}>Create an account</a></p>
       </div>
     </section>
   </div>
@@ -45,7 +52,7 @@ if (Astro.locals.user) return Astro.redirect('/account');
   .auth-switch { text-align: center; margin: 1.25rem 0 0; color: var(--muted); }
 </style>
 
-<script>
+<script define:vars={{ next }}>
   const form = document.getElementById('login-form') as HTMLFormElement;
   const error = document.getElementById('form-error') as HTMLParagraphElement;
   form.addEventListener('submit', async (event) => {
@@ -61,6 +68,6 @@ if (Astro.locals.user) return Astro.redirect('/account');
       error.textContent = data.error || 'Unable to sign in.';
       return;
     }
-    window.location.href = '/account';
+    window.location.href = next;
   });
 </script>

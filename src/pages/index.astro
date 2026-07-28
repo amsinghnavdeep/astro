@@ -6,6 +6,9 @@ import { formatMoney } from '../lib/money';
 
 export const prerender = false;
 
+const isAuthed = !!Astro.locals.user;
+const userEmail = Astro.locals.user?.email ?? '';
+const authRedirect = `/register?next=/${encodeURIComponent('#order')}`;
 const country = detectCountry(Astro.request, Astro.locals.runtime);
 const { currency, pricing } = await getCurrencyPricing(Astro.locals.runtime?.env?.SIDDH_KV, country);
 const kundliNow = formatMoney(pricing.kundliCents, currency);
@@ -28,7 +31,7 @@ const faqItems = [
   {
     question: 'Do I need an account?',
     answer:
-      'No. We keep no account and store no personal data on our side — your reading is private. Your reference number is your key to follow-ups.',
+      'Yes. A free account is required to place an order, keeps your reports together, and lets you return for follow-up questions.',
   },
   {
     question: 'What is the money-back guarantee?',
@@ -250,6 +253,16 @@ const homeStructuredData = {
         <p>Secure checkout via Stripe. Your report is emailed to you once ready.</p>
       </div>
       <div class="card card-accent narrow">
+        {!isAuthed && (
+          <div class="account-required" role="note" aria-live="polite">
+            <span class="eyebrow">A private account is required</span>
+            <p>Create a free account or sign in before placing your order. Your account keeps your reports together and lets you return to this form.</p>
+            <div class="account-actions">
+              <a class="btn" href={authRedirect}>Create account</a>
+              <a class="btn btn-outline" href={`/login?next=/${encodeURIComponent('#order')}`}>Log in</a>
+            </div>
+          </div>
+        )}
         <form id="kundli-form" novalidate>
           <div class="field">
             <label for="fullName">Full name</label>
@@ -374,7 +387,7 @@ const homeStructuredData = {
 
           <div class="field">
             <label for="email">Email</label>
-            <input type="email" id="email" name="email" required autocomplete="email" />
+            <input type="email" id="email" name="email" value={userEmail} required autocomplete="email" />
             <p class="field-error" id="email-error" aria-live="polite"></p>
           </div>
 
@@ -849,9 +862,18 @@ const homeStructuredData = {
   }
   .btn-ghost-dark:hover { background: rgba(255,255,255,0.1); text-decoration: none; }
   .final-cta-reassure { font-size: 0.88rem; color: #a99fd6 !important; margin-top: 0.5rem !important; }
+  .account-required {
+    border: 1px solid rgba(201, 162, 39, 0.45);
+    border-radius: 14px;
+    background: rgba(255, 250, 235, 0.8);
+    padding: 1rem 1.1rem;
+    margin-bottom: 1.25rem;
+  }
+  .account-required p { margin: 0.35rem 0 0; }
+  .account-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.85rem; }
 </style>
 
-<script>
+<script define:vars={{ isAuthed, authRedirect }}>
   const MIN_BIRTH_DATE = '1900-01-01';
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -1241,6 +1263,11 @@ const homeStructuredData = {
     event.preventDefault();
     hidePlaceSuggestions();
 
+    if (!isAuthed) {
+      window.location.href = authRedirect;
+      return;
+    }
+
     const isValid = validateAllFields();
     if (!isValid) return;
 
@@ -1267,6 +1294,11 @@ const homeStructuredData = {
       });
 
       const data = await res.json().catch(() => ({}));
+
+      if (res.status === 401 && data?.error === 'account_required') {
+        window.location.href = authRedirect;
+        return;
+      }
 
       if (res.status === 200 && data && typeof data.url === 'string') {
         window.location.href = data.url;
