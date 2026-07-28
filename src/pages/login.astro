@@ -19,7 +19,7 @@ if (Astro.locals.user) return Astro.redirect(next);
         <span class="eyebrow">Welcome back</span>
         <h1>Sign in to your account</h1>
         <p class="lead">View your reports and keep your Kundli history in one place.</p>
-        <form id="login-form" action="/api/auth/login" method="post">
+        <form id="login-form" data-next={next} action="/api/auth/login" method="post">
           <div class="field">
             <label for="email">Email</label>
             <input id="email" name="email" type="email" autocomplete="email" required />
@@ -52,8 +52,9 @@ if (Astro.locals.user) return Astro.redirect(next);
   .auth-switch { text-align: center; margin: 1.25rem 0 0; color: var(--muted); }
 </style>
 
-<script define:vars={{ next }}>
+<script>
   const form = document.getElementById('login-form') as HTMLFormElement;
+  const next = form.dataset.next || '/account';
   const error = document.getElementById('form-error') as HTMLParagraphElement;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();

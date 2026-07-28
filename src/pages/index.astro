@@ -263,7 +263,7 @@ const homeStructuredData = {
             </div>
           </div>
         )}
-        <form id="kundli-form" novalidate>
+        <form id="kundli-form" data-authed={isAuthed ? 'true' : 'false'} data-auth-redirect={authRedirect} novalidate>
           <div class="field">
             <label for="fullName">Full name</label>
             <input type="text" id="fullName" name="fullName" required autocomplete="name" />
@@ -873,7 +873,7 @@ const homeStructuredData = {
   .account-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.85rem; }
 </style>
 
-<script define:vars={{ isAuthed, authRedirect }}>
+<script>
   const MIN_BIRTH_DATE = '1900-01-01';
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -883,6 +883,8 @@ const homeStructuredData = {
   };
 
   const form = document.getElementById('kundli-form') as HTMLFormElement;
+  const isAuthed = form.dataset.authed === 'true';
+  const authRedirect = form.dataset.authRedirect ?? '/register';
   const btn = document.getElementById('submit-btn') as HTMLButtonElement;
   const serverErrorEl = document.getElementById('error') as HTMLDivElement;
   const fullNameInput = document.getElementById('fullName') as HTMLInputElement;
