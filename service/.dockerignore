@@ -1,0 +1,13 @@
+.git
+.gitignore
+.dev.vars
+.env
+.env.*
+node_modules
+dist
+__pycache__
+*.pyc
+service/tests
+service/kundli/tests
+scripts/kundli/Kundli_Report.pdf
+scripts/kundli/page-*.png
