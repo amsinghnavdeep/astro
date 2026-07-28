@@ -11,6 +11,7 @@
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
+import type { D1Database } from '@cloudflare/workers-types';
 import { stripe, cryptoProvider } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
 import {
@@ -22,7 +23,13 @@ import { encodeReference, decodeReference } from '../../../lib/reference';
 import { recordOrder, type OrderRecord } from '../../../lib/orders';
 import { deleteLead } from '../../../lib/leads';
 import { computeChart, chartToPromptText } from '../../../lib/kundli/chart';
-import { upsertOrder, type OrderRecord as AccountOrderRecord } from '../../../lib/auth';
+import {
+  findOrderById,
+  upsertOrder,
+  type OrderRecord as AccountOrderRecord,
+} from '../../../lib/auth';
+import { geocodeBirthplace } from '../../../lib/kundli/geocode';
+import { generateReport, type GeneratePayload } from '../../../lib/reportService';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   // Signature verification needs the RAW body — never call request.json() first.
@@ -110,60 +117,133 @@ export const POST: APIRoute = async ({ request, locals }) => {
       const questions = JSON.parse(m.questions || '[]') as string[];
       const pandit = m.pandit || 'our senior astrologer';
 
-      // Pre-compute the chart in the Worker so the Devin session only has to
-      // interpret it (big ACU saving). If anything fails (geocoding, parsing),
-      // fall back gracefully: the playbook computes the chart itself.
-      let precomputedChart: string | undefined;
-      try {
-        if (m.timezone && m.dateOfBirth && m.timeOfBirth && m.placeOfBirth) {
-          const chart = await computeChart({
-            dateOfBirth: m.dateOfBirth,
-            timeOfBirth: m.timeOfBirth,
-            placeOfBirth: m.placeOfBirth,
-            timezone: m.timezone,
-          });
-          precomputedChart = chartToPromptText(chart);
+      const runDevinFulfillment = async (): Promise<void> => {
+        // Pre-compute the chart in the Worker so the Devin session only has to
+        // interpret it (big ACU saving). If anything fails (geocoding, parsing),
+        // fall back gracefully: the playbook computes the chart itself.
+        let precomputedChart: string | undefined;
+        try {
+          if (m.timezone && m.dateOfBirth && m.timeOfBirth && m.placeOfBirth) {
+            const chart = await computeChart({
+              dateOfBirth: m.dateOfBirth,
+              timeOfBirth: m.timeOfBirth,
+              placeOfBirth: m.placeOfBirth,
+              timezone: m.timezone,
+            });
+            precomputedChart = chartToPromptText(chart);
+          }
+        } catch (err) {
+          console.error('Chart pre-computation failed; playbook will compute it:', err);
         }
-      } catch (err) {
-        console.error('Chart pre-computation failed; playbook will compute it:', err);
-      }
 
-      const devinSession = await createKundliSession({
-        fullName: m.fullName,
-        gender: (m.gender as 'Male' | 'Female' | 'Other') || 'Other',
-        dateOfBirth: m.dateOfBirth,
-        timeOfBirth: m.timeOfBirth,
-        placeOfBirth: m.placeOfBirth,
-        timezone: m.timezone || undefined,
-        email: m.email,
-        questions,
-        pandit,
-        precomputedChart,
-      });
-      console.info('Created Devin Kundli session:', devinSession.session_id);
-      const reference = encodeReference(devinSession.session_id);
-      const delivery = instructKundliDelivery(devinSession.session_id, {
-        reference,
-        pandit,
-        email: m.email,
-        fullName: m.fullName,
-      })
-        .then(() => {
-          console.info('Kundli delivery instruction accepted:', devinSession.session_id);
-        })
-        .catch((err) => {
-          console.error('Kundli delivery instruction error:', err);
+        const devinSession = await createKundliSession({
+          fullName: m.fullName,
+          gender: (m.gender as 'Male' | 'Female' | 'Other') || 'Other',
+          dateOfBirth: m.dateOfBirth,
+          timeOfBirth: m.timeOfBirth,
+          placeOfBirth: m.placeOfBirth,
+          timezone: m.timezone || undefined,
+          email: m.email,
+          questions,
+          pandit,
+          precomputedChart,
         });
+        console.info('Created Devin Kundli session:', devinSession.session_id);
+        const reference = encodeReference(devinSession.session_id);
+        const delivery = instructKundliDelivery(devinSession.session_id, {
+          reference,
+          pandit,
+          email: m.email,
+          fullName: m.fullName,
+        })
+          .then(() => {
+            console.info('Kundli delivery instruction accepted:', devinSession.session_id);
+          })
+          .catch((err) => {
+            console.error('Kundli delivery instruction error:', err);
+          });
 
-      // No backend email here (Stripe needs a fast 200). We hand the session the
-      // reference + delivery instruction; the `!kundli` playbook then sends the
-      // customer EXACTLY ONE email — framed as from their Pandit — with the PDF
-      // attached and the reference number included. No polling needed.
-      const waitUntil = (locals.runtime as { ctx?: { waitUntil(promise: Promise<unknown>): void } }).ctx?.waitUntil;
-      if (waitUntil) {
-        waitUntil(delivery);
+        // No backend email here (Stripe needs a fast 200). We hand the session the
+        // reference + delivery instruction; the `!kundli` playbook then sends the
+        // customer EXACTLY ONE email — framed as from their Pandit — with the PDF
+        // attached and the reference number included. No polling needed.
+        const waitUntil = (locals.runtime as { ctx?: { waitUntil(promise: Promise<unknown>): void } }).ctx?.waitUntil;
+        if (waitUntil) {
+          waitUntil(delivery);
+        } else {
+          await delivery;
+        }
+      };
+
+      if (env.reportService.useDevinFulfillment) {
+        await runDevinFulfillment();
       } else {
-        await delivery;
+        const geo = await geocodeBirthplace(m.placeOfBirth || '');
+        if (!geo) {
+          console.error('Report service geocoding failed; falling back to Devin.');
+          await runDevinFulfillment();
+        } else {
+          const reference = encodeReference(session.id);
+          const payload: GeneratePayload = {
+            orderId: session.id,
+            serviceType: m.serviceType || 'kundli',
+            person: {
+              fullName: m.fullName || 'Seeker',
+              gender: m.gender || 'Other',
+              dateOfBirth: m.dateOfBirth || '',
+              timeOfBirth: m.timeOfBirth || '',
+              placeOfBirth: m.placeOfBirth || '',
+              latitude: geo.latitude,
+              longitude: geo.longitude,
+              timezone: m.timezone || '',
+              ...(m.timezoneOffset ? { timezoneOffset: m.timezoneOffset } : {}),
+            },
+            partner: null,
+            questions,
+            extras: {},
+            pandit: {
+              name: pandit,
+              referenceNumber: reference,
+              customerEmail: order.email,
+            },
+            dryRun: false,
+          };
+
+          const serviceWork = generateReport(payload)
+            .then(async (result) => {
+              if (result.ok) {
+                try {
+                  const db = locals.runtime.env.SIDDH_DB;
+                  // TODO(phase-8b): service should return PDF bytes; store to SIDDH_PDF and set pdf_key.
+                  await setAccountOrderStatus(db, session.id, 'delivered');
+                } catch (err) {
+                  console.error('Delivered order status update failed:', err);
+                }
+              } else if (result.status !== 409) {
+                try {
+                  const db = locals.runtime.env.SIDDH_DB;
+                  await setAccountOrderStatus(db, session.id, 'failed');
+                } catch (err) {
+                  console.error('Failed order status update failed:', err);
+                }
+              }
+            })
+            .catch(async (err) => {
+              console.error('Report service fulfillment failed:', err);
+              try {
+                const db = locals.runtime.env.SIDDH_DB;
+                await setAccountOrderStatus(db, session.id, 'failed');
+              } catch (statusErr) {
+                console.error('Failed order status update failed:', statusErr);
+              }
+            });
+          const waitUntil = (locals.runtime as { ctx?: { waitUntil(promise: Promise<unknown>): void } }).ctx?.waitUntil;
+          if (waitUntil) {
+            waitUntil(serviceWork);
+          } else {
+            await serviceWork;
+          }
+        }
       }
     } else if (m.kind === 'followup') {
       const sessionId = decodeReference(m.reference);
@@ -175,11 +255,28 @@ export const POST: APIRoute = async ({ request, locals }) => {
     // forever by Stripe, so we log and still return 200. If you want Stripe to
     // retry a transient failure, return 500 instead.
     console.error('Webhook fulfillment error:', err);
+    if (m.kind === 'kundli') {
+      try {
+        await setAccountOrderStatus(locals.runtime.env.SIDDH_DB, session.id, 'failed');
+      } catch (statusErr) {
+        console.error('Failed order status update failed:', statusErr);
+      }
+    }
     return json({ received: true }, 200);
   }
 
   return json({ received: true }, 200);
 };
+
+async function setAccountOrderStatus(
+  db: D1Database | undefined,
+  orderId: string,
+  status: AccountOrderRecord['status'],
+): Promise<void> {
+  if (!db) return;
+  const existing = await findOrderById(db, orderId);
+  if (existing) await upsertOrder(db, { ...existing, status });
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {

@@ -54,6 +54,14 @@ export const env = {
     followupPlaybook: optional('DEVIN_FOLLOWUP_PLAYBOOK'),
   },
 
+  reportService: {
+    url: optional('KUNDLI_SERVICE_URL'),
+    get token() {
+      return required('KUNDLI_SERVICE_TOKEN');
+    },
+    useDevinFulfillment: optional('USE_DEVIN_FULFILLMENT') === 'true',
+  },
+
   get referenceSecret() {
     return required('REFERENCE_SECRET');
   },
