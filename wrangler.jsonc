@@ -22,6 +22,23 @@
       "preview_id": "b885071c8bf3421cada98cef8e4cf5ac"
     }
   ],
+  // Create with `wrangler d1 create siddh-jyotish`, then paste the returned
+  // database id here. Local `wrangler dev` auto-uses a local SQLite database.
+  "d1_databases": [
+    {
+      "binding": "SIDDH_DB",
+      "database_name": "siddh-jyotish",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Create with `wrangler r2 bucket create siddh-jyotish-reports`.
+  "r2_buckets": [
+    {
+      "binding": "SIDDH_PDF",
+      "bucket_name": "siddh-jyotish-reports"
+    }
+  ],
   "workers_dev": true,
   "routes": [
     { "pattern": "siddhjyotish.com", "custom_domain": true },

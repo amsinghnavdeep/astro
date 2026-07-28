@@ -83,6 +83,9 @@ const siteStructuredData = {
         <a href="/#about">About</a>
         <a href="/contact">Contact</a>
         <a href="/#faq">FAQ</a>
+        <a href={Astro.locals.user ? '/account' : '/login'}>
+          {Astro.locals.user ? 'My Account' : 'Login'}
+        </a>
         <a class="nav-cta" href="/#order">Get started</a>
       </nav>
     </header>
