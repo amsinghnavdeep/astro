@@ -22,6 +22,7 @@ import { encodeReference, decodeReference } from '../../../lib/reference';
 import { recordOrder, type OrderRecord } from '../../../lib/orders';
 import { deleteLead } from '../../../lib/leads';
 import { computeChart, chartToPromptText } from '../../../lib/kundli/chart';
+import { upsertOrder, type OrderRecord as AccountOrderRecord } from '../../../lib/auth';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   // Signature verification needs the RAW body — never call request.json() first.
@@ -73,6 +74,29 @@ export const POST: APIRoute = async ({ request, locals }) => {
     await recordOrder(locals.runtime.env.SIDDH_KV, order);
   } catch (err) {
     console.error('Order persistence error:', err);
+  }
+
+  try {
+    const db = locals.runtime.env.SIDDH_DB;
+    if (db) {
+      const accountOrder: AccountOrderRecord = {
+        id: order.id,
+        user_id: m.userId || null,
+        email: order.email,
+        kind: order.kind,
+        service_type: order.kind,
+        full_name: order.fullName ?? null,
+        amount_total: order.amountTotal,
+        currency: order.currency,
+        status: 'paid',
+        pdf_key: null,
+        reference_number: m.reference || null,
+        created_at: order.createdAt,
+      };
+      await upsertOrder(db, accountOrder);
+    }
+  } catch (err) {
+    console.error('Account order persistence error:', err);
   }
 
   try {

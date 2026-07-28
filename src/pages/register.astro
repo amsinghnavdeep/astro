@@ -1,0 +1,72 @@
+---
+import Base from '../layouts/Base.astro';
+
+export const prerender = false;
+if (Astro.locals.user) return Astro.redirect('/account');
+---
+
+<Base title="Create an Account | Siddh Jyotish" description="Create a private Siddh Jyotish account to keep your report history." noindex>
+  <div class="wrap">
+    <section class="block auth-section">
+      <div class="card narrow auth-card">
+        <span class="eyebrow">Your private space</span>
+        <h1>Create your account</h1>
+        <p class="lead">Keep your Siddh Jyotish reports together. You can still check out as a guest anytime.</p>
+        <form id="register-form" action="/api/auth/register" method="post">
+          <div class="field">
+            <label for="fullName">Full name <span class="optional">(optional)</span></label>
+            <input id="fullName" name="fullName" type="text" autocomplete="name" />
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="email" required />
+          </div>
+          <div class="field">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" minlength="8" autocomplete="new-password" required />
+            <small class="helper">At least 8 characters.</small>
+          </div>
+          <p id="form-error" class="form-error" role="alert" aria-live="polite"></p>
+          <button class="btn btn-block" type="submit">Create account</button>
+        </form>
+        <p class="auth-switch">Already have an account? <a href="/login">Login</a></p>
+      </div>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .auth-section { padding: clamp(2.5rem, 8vw, 5rem) 0; }
+  .auth-card { padding: clamp(1.5rem, 5vw, 2.5rem); }
+  .auth-card h1 { margin-top: 0.5rem; }
+  .lead { color: var(--muted); }
+  .field { margin: 1rem 0; }
+  .field label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
+  .field input {
+    width: 100%; border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.75rem; font: inherit; background: #fff;
+  }
+  .optional { color: var(--muted); font-weight: 400; }
+  .form-error { color: var(--error); min-height: 1.5rem; }
+  .auth-switch { text-align: center; margin: 1.25rem 0 0; color: var(--muted); }
+</style>
+
+<script>
+  const form = document.getElementById('register-form') as HTMLFormElement;
+  const error = document.getElementById('form-error') as HTMLParagraphElement;
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    error.textContent = '';
+    const response = await fetch(form.action, {
+      method: 'POST',
+      body: JSON.stringify(Object.fromEntries(new FormData(form))),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      error.textContent = data.error || 'Unable to create account.';
+      return;
+    }
+    window.location.href = '/account';
+  });
+</script>

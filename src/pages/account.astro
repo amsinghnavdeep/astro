@@ -1,0 +1,92 @@
+---
+import Base from '../layouts/Base.astro';
+import { listOrdersByUserId, type OrderRecord } from '../lib/auth';
+
+export const prerender = false;
+if (!Astro.locals.user) return Astro.redirect('/login');
+
+const db = Astro.locals.runtime.env.SIDDH_DB;
+let orders: OrderRecord[] = [];
+if (db) {
+  try {
+    orders = await listOrdersByUserId(db, Astro.locals.user.id);
+  } catch {
+    orders = [];
+  }
+}
+---
+
+<Base title="My Account | Siddh Jyotish" description="View your Siddh Jyotish report history." noindex>
+  <div class="wrap">
+    <section class="block account-section">
+      <div class="account-heading">
+        <div>
+          <span class="eyebrow">Your private space</span>
+          <h1>My Account</h1>
+          <p>Welcome{Astro.locals.user.fullName ? `, ${Astro.locals.user.fullName}` : ''}. Your report history is below.</p>
+          <p class="account-email">{Astro.locals.user.email}</p>
+        </div>
+        <button id="logout" class="btn btn-outline" type="button">Logout</button>
+      </div>
+
+      <div class="account-card">
+        <h2>My Reports</h2>
+        {orders.length > 0 ? (
+          <div class="report-list">
+            {orders.map((order) => (
+              <article class="report-row">
+                <div>
+                  <h3>{order.service_type || order.kind}</h3>
+                  <p>{new Date(order.created_at).toLocaleDateString()} · {order.status}</p>
+                </div>
+                {order.pdf_key ? <a class="btn btn-small" href={`/api/reports/${encodeURIComponent(order.id)}`}>Download PDF</a> : <span class="not-ready">Preparing</span>}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p class="empty">Your reports will appear here after a completed purchase.</p>
+        )}
+      </div>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .account-section { padding: clamp(2.5rem, 7vw, 4.5rem) 0; }
+  .account-heading {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 1.5rem; margin-bottom: 2rem;
+  }
+  .account-heading h1 { margin-top: 0.5rem; }
+  .account-email, .empty { color: var(--muted); }
+  .account-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: clamp(1.2rem, 4vw, 2rem);
+  }
+  .account-card h2 { margin-top: 0; }
+  .report-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 1rem; padding: 1rem 0; border-top: 1px solid var(--border);
+  }
+  .report-row h3 { margin: 0; text-transform: capitalize; }
+  .report-row p { color: var(--muted); margin: 0.25rem 0 0; text-transform: capitalize; }
+  .not-ready { color: var(--muted); font-size: 0.9rem; }
+  .btn-small { padding: 0.4rem 0.8rem; font-size: 0.9rem; white-space: nowrap; }
+  .btn-outline {
+    background: transparent; color: var(--maroon); border: 2px solid var(--maroon);
+    box-shadow: none;
+  }
+  .btn-outline:hover { background: var(--maroon); color: #fff; text-decoration: none; }
+  @media (max-width: 560px) {
+    .account-heading, .report-row { flex-direction: column; }
+    .account-heading .btn { align-self: flex-start; }
+  }
+</style>
+
+<script>
+  const logout = document.getElementById('logout') as HTMLButtonElement;
+  logout.addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  });
+</script>

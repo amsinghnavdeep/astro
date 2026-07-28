@@ -68,6 +68,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     ],
     metadata: {
       kind: 'followup',
+      ...(locals.user ? { userId: locals.user.id } : {}),
       email,
       reference: reference.slice(0, 480),
       questionCount: String(count),

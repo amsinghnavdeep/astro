@@ -53,6 +53,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     ],
     metadata: {
       kind: 'kundli',
+      ...(locals.user ? { userId: locals.user.id } : {}),
       fullName: d.fullName,
       gender: d.gender,
       dateOfBirth: d.dateOfBirth,
