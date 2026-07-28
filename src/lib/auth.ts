@@ -31,7 +31,7 @@ export interface OrderRecord {
 
 const SESSION_COOKIE = 'sj_session';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
-const PBKDF2_ITERATIONS = 150_000;
+const PBKDF2_ITERATIONS = 100_000;
 const RATE_LIMIT = 10;
 const RATE_WINDOW_SECONDS = 15 * 60;
 
