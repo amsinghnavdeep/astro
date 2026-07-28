@@ -17,6 +17,9 @@ import { decodeReference } from '../../../lib/reference';
 import { recordLead, type LeadRecord } from '../../../lib/leads';
 
 export const POST: APIRoute = async ({ request, locals }) => {
+  if (!locals.user) return json({ error: 'account_required' }, 401);
+  const userId = locals.user.id;
+
   let payload: unknown;
   try {
     payload = await request.json();
@@ -68,7 +71,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     ],
     metadata: {
       kind: 'followup',
-      ...(locals.user ? { userId: locals.user.id } : {}),
+      userId,
       email,
       reference: reference.slice(0, 480),
       questionCount: String(count),
