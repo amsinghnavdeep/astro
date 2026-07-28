@@ -15,8 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 LOGGER = logging.getLogger(__name__)
 GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
-DEFAULT_MODEL = 'gemini-2.5-flash'
-FALLBACK_MODEL = 'gemini-2.0-flash'
+DEFAULT_MODEL = 'gemini-flash-latest'
+FALLBACK_MODEL = 'gemini-flash-lite-latest'
 DEFAULT_TIMEOUT = 90.0
 MAX_BACKOFF_CYCLES = 3
 

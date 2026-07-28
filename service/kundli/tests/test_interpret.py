@@ -7,6 +7,8 @@ import httpx
 import pytest
 
 from service.kundli.interpret import (
+    DEFAULT_MODEL,
+    FALLBACK_MODEL,
     GeminiClient,
     InterpretationValidationError,
     interpret,
@@ -74,7 +76,7 @@ def test_model_not_found_uses_fallback_model(monkeypatch: pytest.MonkeyPatch) ->
     client = GeminiClient(keys=['model-key'])
     client._generate('prompt')
 
-    assert models == ['gemini-2.5-flash', 'gemini-2.0-flash']
+    assert models == [DEFAULT_MODEL, FALLBACK_MODEL]
 
 
 def test_all_keys_rate_limited_then_backoff_cycle_succeeds(monkeypatch: pytest.MonkeyPatch) -> None:
