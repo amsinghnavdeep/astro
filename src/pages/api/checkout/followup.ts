@@ -100,6 +100,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const lead: LeadRecord = {
       id: session.id,
       kind: 'followup',
+      userId,
       email,
       reference,
       questions,
