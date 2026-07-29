@@ -83,12 +83,8 @@ const siteStructuredData = {
       <nav id="mobile-nav" class="nav-links" aria-label="Primary navigation">
         <a href="/#how">How it works</a>
         <a href="/#about">About</a>
-        <a href="/contact">Contact</a>
         <a href="/#faq">FAQ</a>
-        <a href={Astro.locals.user ? '/account' : '/login'}>
-          <Icon name="user" size={16} />
-          {Astro.locals.user ? 'My Account' : 'Login'}
-        </a>
+        <a href={Astro.locals.user ? '/account' : '/login'}>Login</a>
         <a class="nav-cta" href={Astro.locals.user ? '/#order' : `/register?next=${encodeURIComponent('/#order')}`}>Get started</a>
       </nav>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Menu">
@@ -152,21 +148,21 @@ const siteStructuredData = {
 
     <style is:global>
       :root {
-        --saffron: #e0812f;
-        --marigold: #f3a838;
+        --saffron: #f2695c;
+        --marigold: #f5c15c;
         --green: #1f7a4d;
         --green-2: #2e9e63;
-        --maroon: #7a1e1e;
-        --maroon-deep: #5c1414;
-        --gold: #c9a227;
-        --gold-soft: #e6c766;
-        --indigo: #1b1440;
-        --indigo-2: #2a1f5c;
-        --cream: #fbf4e6;
-        --card: #fffdf8;
-        --text: #2b2116;
-        --muted: #6b5d47;
-        --border: #ecdcb8;
+        --maroon: #221a4e;
+        --maroon-deep: #221a4e;
+        --gold: #f5c15c;
+        --gold-soft: #f5c15c;
+        --indigo: #221a4e;
+        --indigo-2: #43227e;
+        --cream: #f6f5f8;
+        --card: #fff;
+        --text: #27233c;
+        --muted: #66627a;
+        --border: #e8e5ee;
         --error: #a12020;
         --serif: 'Fraunces', Georgia, serif;
         --serif-2: 'Cormorant Garamond', Georgia, serif;
@@ -179,7 +175,7 @@ const siteStructuredData = {
 
       body {
         background:
-          radial-gradient(1200px 400px at 50% -120px, #fff7e6 0%, transparent 70%),
+          radial-gradient(1200px 400px at 50% -120px, #fff 0%, transparent 70%),
           var(--cream);
         color: var(--text);
         font-family: var(--sans);
@@ -210,11 +206,11 @@ const siteStructuredData = {
         top: 0;
         z-index: 30;
         display: flex; align-items: center; justify-content: space-between;
-        width: 100%; max-width: 1040px; margin: 0 auto; padding: 1rem 1.25rem;
-        background: rgba(251, 244, 230, 0.8);
+        width: 100%; max-width: 1280px; margin: 0 auto; padding: 1.15rem 2.25rem;
+        background: rgba(246, 245, 248, 0.9);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
-        border-bottom: 1px solid rgba(236, 220, 184, 0.7);
+        border-bottom: 1px solid rgba(232, 229, 238, 0.8);
       }
       .brand { display: flex; align-items: center; gap: 0.6rem; color: var(--maroon); }
       .brand:hover { text-decoration: none; }
@@ -222,24 +218,24 @@ const siteStructuredData = {
       .brand-mark img { display: block; }
       .brand-text { font-family: var(--serif); font-size: 1.4rem; letter-spacing: 0.5px; }
       .brand-text em { color: var(--saffron); font-style: normal; }
-      .nav-links { display: flex; align-items: center; gap: 1.4rem; font-weight: 500; }
+      .nav-links { display: flex; align-items: center; gap: 2rem; font-weight: 500; font-size: 0.88rem; }
       .nav-links a { color: var(--muted); }
       .nav-links a:not(.nav-cta) { display: inline-flex; align-items: center; gap: 0.35rem; }
       .nav-cta {
         display: inline-flex; align-items: center; justify-content: center;
-        min-height: 40px; padding: 0 1rem; border-radius: 12px;
-        background: linear-gradient(120deg, var(--saffron), var(--gold)); color: var(--indigo) !important;
+        min-height: 42px; padding: 0 1.25rem; border-radius: 999px;
+        background: linear-gradient(110deg, #6f48c7, #26b9aa); color: #fff !important;
         font-size: 0.9rem; font-weight: 600; letter-spacing: 0.01em;
       }
       .nav-cta:hover { filter: brightness(1.05); text-decoration: none; }
       .nav-toggle { display: none; }
       .nav-toggle-close { display: none; }
       @media (max-width: 760px) {
-        .site-nav { position: sticky; }
+        .site-nav { position: sticky; padding: 0.85rem 1.25rem; }
         .nav-toggle {
           display: inline-flex; align-items: center; justify-content: center;
-          width: 44px; height: 44px; padding: 0; border: 1px solid var(--border);
-          border-radius: 12px; background: var(--card); color: var(--indigo); cursor: pointer;
+          width: 40px; height: 40px; padding: 0; border: 0;
+          border-radius: 10px; background: transparent; color: var(--indigo); cursor: pointer;
         }
         .nav-links {
           display: none; position: absolute; top: calc(100% + 0.4rem); left: 1rem; right: 1rem;

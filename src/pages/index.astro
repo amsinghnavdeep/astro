@@ -97,15 +97,12 @@ const homeStructuredData = {
       </div>
       <div class="hero-copy">
         <span class="eyebrow">Prepared by respected Vedic astrologers</span>
-        <h1>Your Janma Kundli, read by hand — not by an app.</h1>
+        <h1>Your Janma Kundli,<br class="hero-break" /> read by hand —<br class="hero-break" /> not by an app.</h1>
         <p class="lead">
-          A genuine Vedic birth chart, cast from your exact birth details and interpreted personally by a real pandit.
+          A genuine Vedic birth chart, cast from your exact birth details and interpreted personally by a real pandit from 5000 year old lineage.
         </p>
-        <div class="price-tag">
-          <s class="was">{kundliWas}</s> <b>{kundliNow}</b><span>complete Kundli + 3 questions, by email</span>
-        </div>
         <div class="hero-cta">
-          <a class="btn hero-primary-cta" href={orderCta}>Start my reading <Icon name="arrow-right" size={18} /></a>
+          <a class="btn hero-primary-cta" href={orderCta}>Start my reading <Icon name="arrow-right" size={22} /></a>
         </div>
         <div class="hero-trust" aria-label="Service assurances">
           <span><Icon name="shield" size={18} />100% money-back</span>
@@ -383,7 +380,7 @@ const homeStructuredData = {
             <p class="field-error" id="q3-error" aria-live="polite"></p>
           </div>
 
-          <button type="submit" id="submit-btn" class="btn btn-block"><s class="was-btn">{kundliWas}</s> Pay {kundliNow} &amp; Get Kundli Report and Answers</button>
+          <button type="submit" id="submit-btn" class="btn btn-block">Pay {kundliNow} &amp; Get Kundli Report and Answers</button>
           <div id="error" class="error" hidden></div>
           <p class="helper center secure-helper" style="margin-top:1rem"><Icon name="lock" size={16} /> Secure Stripe checkout · 100% money-back guarantee</p>
         </form>
@@ -469,26 +466,54 @@ const homeStructuredData = {
 
 <style>
   /* Hero split */
-  .hero-split { padding-bottom: clamp(2.2rem, 5vw, 4rem); }
+  .hero-split {
+    width: 100%;
+    min-height: 650px;
+    margin-top: 2rem;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+    align-items: stretch;
+    overflow: hidden;
+    border-radius: 28px;
+    background: linear-gradient(130deg, #21194c 0%, #302064 48%, #4b2684 100%);
+    box-shadow: 0 22px 55px rgba(34, 26, 78, 0.2);
+  }
   .wrap-wide {
     max-width: 1240px;
   }
   .hero-copy { position: relative; z-index: 1; }
-  .hero-media { display: none; }
-  .hero .lead { color: #ecdfff; font-size: clamp(1.05rem, 2.4vw, 1.3rem); max-width: 40ch; }
-  .hero .price-tag { margin-bottom: 1.2rem; }
+  .hero-media {
+    display: block;
+    order: 2;
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .hero-media::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(34, 26, 78, 0.22), transparent 35%);
+    pointer-events: none;
+  }
+  .hero-media img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: 67% center;
+  }
+  .hero .lead { color: #c8c3e3; font-size: 1rem; line-height: 1.65; max-width: 42ch; }
   .eyebrow {
     display: inline-block; font-family: var(--sans); font-weight: 600;
     letter-spacing: 2px; text-transform: uppercase; font-size: 0.8rem;
-    color: var(--gold-soft); margin-bottom: 1rem;
+    color: #37d0c6; margin-bottom: 1.35rem; position: relative;
   }
-  .price-tag {
-    display: inline-flex; align-items: baseline; gap: 0.5rem; margin: 0.5rem 0 1.5rem;
+  .hero .eyebrow::after {
+    content: ''; display: block; width: 42px; height: 2px; margin-top: 0.65rem;
+    background: #37d0c6; border-radius: 2px;
   }
-  .price-tag b { font-family: var(--serif); font-size: 2rem; color: #fff; }
-  .price-tag span { color: #d9ccff; font-size: 0.95rem; }
-  .was { color: #b9a6e6; text-decoration: line-through; font-size: 1.25rem; opacity: 0.75; }
-  .was-btn { color: inherit; opacity: 0.7; text-decoration: line-through; margin-right: 0.35rem; font-weight: 600; }
 
   .field { margin-bottom: 1rem; }
   .field:last-child { margin-bottom: 0; }
@@ -655,50 +680,87 @@ const homeStructuredData = {
   }
   .account-required p { margin: 0.35rem 0 0; }
   .account-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.85rem; }
-  .hero-split {
-    width: 100vw;
-    margin-left: calc(50% - 50vw);
-    min-height: clamp(520px, 60vh, 640px);
-    display: flex;
-    align-items: center;
-    border-radius: 0;
-    padding: clamp(3.5rem, 8vw, 6rem) max(1.25rem, calc((100vw - 1040px) / 2));
-    background:
-      linear-gradient(90deg, rgba(20,14,50,0.92) 0%, rgba(20,14,50,0.75) 38%, rgba(20,14,50,0.15) 62%, rgba(20,14,50,0) 100%),
-      url('/hero-astrologer.png') center/cover,
-      linear-gradient(160deg, var(--indigo) 0%, var(--indigo-2) 55%, #3a2a72 100%);
+  .hero-split .hero-copy {
+    order: 1;
+    min-width: 0;
+    align-self: center;
+    padding: 3.8rem 3.6rem;
   }
-  .hero-split::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, rgba(20,14,50,0.18), transparent 68%);
-    pointer-events: none;
+  .hero-split h1 { font-size: clamp(3.5rem, 4.4vw, 3.75rem); max-width: none; line-height: 1.02; }
+  .hero-primary-cta {
+    width: 100%;
+    min-height: 72px;
+    justify-content: center;
+    gap: 4rem;
+    padding: 0 1.5rem 0 2rem;
+    border-radius: 16px;
+    background: linear-gradient(105deg, #f5c15c, #f2695c);
+    color: #241a4d;
+    font-family: var(--serif);
+    font-size: 1.62rem;
   }
-  .hero-split .hero-copy { max-width: 52%; z-index: 2; }
-  .hero-split h1 { font-size: clamp(2.4rem, 4.6vw, 3.4rem); max-width: 12ch; }
-  .hero-split .lead { max-width: 48ch; }
-  .hero-primary-cta { background: linear-gradient(120deg, #f7d56d, #e0812f); color: var(--indigo); }
-  .hero-trust { display: flex; flex-wrap: wrap; gap: 0.85rem 1.25rem; margin-top: 1.35rem; }
-  .hero-trust span, .secure-helper { display: inline-flex; align-items: center; gap: 0.38rem; }
-  .hero-trust span { color: #f7efe0; font-size: 0.86rem; }
-  .hero-followup { color: #d9ccff; font-size: 0.9rem; margin-top: 1.25rem; }
-  .hero-followup a { color: var(--gold-soft); font-weight: 700; }
+  .hero-trust {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    margin-top: 1.35rem;
+    border: 1px solid rgba(177, 169, 221, 0.32);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .hero-trust span, .secure-helper { display: flex; align-items: center; gap: 0.4rem; }
+  .hero-trust span {
+    min-width: 0;
+    padding: 0.7rem 0.65rem;
+    color: #fff;
+    font-size: 0.7rem;
+    line-height: 1.25;
+  }
+  .hero-trust span + span { border-left: 1px solid rgba(255, 255, 255, 0.15); }
+  .hero-trust svg { flex: 0 0 auto; color: #37d0c6; }
+  .hero-followup { color: #aaa5ca; font-size: 0.78rem; margin-top: 1.15rem; }
+  .hero-followup a { color: #37d0c6; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
   @media (max-width: 820px) {
     .hero-split {
       display: block;
       min-height: 0;
-      padding: 0;
-      background: linear-gradient(160deg, var(--indigo) 0%, var(--indigo-2) 100%);
+      margin-top: 0.9rem;
+      border-radius: 22px;
+      background: linear-gradient(160deg, #21194c 0%, #43227e 100%);
     }
-    .hero-split::after { display: none; }
-    .hero-media { display: block; height: clamp(240px, 42vh, 340px); overflow: hidden; }
-    .hero-media img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 72% 26%; }
-    .hero-split .hero-copy { max-width: 100%; padding: 2.5rem 1.25rem 3rem; }
-    .hero-split h1 { max-width: 16ch; }
-    .hero-primary-cta { width: 100%; }
-    .hero-trust { gap: 0.7rem 1rem; }
-    .hero-trust span { flex: 1 1 42%; }
+    .hero-media { height: 275px; }
+    .hero-media img { object-position: 68% 30%; }
+    .hero-media::after { background: linear-gradient(0deg, rgba(34, 26, 78, 0.2), transparent 45%); }
+    .hero-split .hero-copy { padding: 2.3rem 1.25rem 2.5rem; text-align: center; }
+    .hero-split h1 {
+      max-width: none;
+      margin-left: auto;
+      margin-right: auto;
+      font-size: clamp(1.95rem, 8vw, 2rem);
+      letter-spacing: -0.03em;
+    }
+    .hero .lead { max-width: 34ch; margin-left: auto; margin-right: auto; }
+    .hero .eyebrow::after { margin-left: auto; margin-right: auto; }
+    .hero .eyebrow {
+      display: block;
+      text-align: center;
+      white-space: nowrap;
+      font-size: 0.62rem;
+      letter-spacing: 1px;
+    }
+    .hero-primary-cta {
+      width: 100%;
+      min-height: 62px;
+      padding-left: 1.25rem;
+      padding-right: 1.1rem;
+      gap: 2rem;
+      font-size: 1.3rem;
+      text-align: left;
+    }
+    .hero-trust { display: block; text-align: left; }
+    .hero-trust span { min-height: 48px; padding: 0.7rem 0.9rem; font-size: 0.78rem; }
+    .hero-trust span + span { border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.15); }
+    .hero-followup { text-align: center; }
   }
 </style>
 
