@@ -19,7 +19,7 @@ if (Astro.locals.user) return Astro.redirect(next);
         <span class="eyebrow">Your private space</span>
         <h1>Create your account</h1>
         <p class="lead">Create a free account to place orders and keep your Siddh Jyotish reports together.</p>
-        <form id="register-form" action="/api/auth/register" method="post">
+        <form id="register-form" data-next={next} action="/api/auth/register" method="post">
           <div class="field">
             <label for="fullName">Full name <span class="optional">(optional)</span></label>
             <input id="fullName" name="fullName" type="text" autocomplete="name" />
@@ -44,7 +44,7 @@ if (Astro.locals.user) return Astro.redirect(next);
 
 <style>
   .auth-section { padding: clamp(2.5rem, 8vw, 5rem) 0; }
-  .auth-card { padding: clamp(1.5rem, 5vw, 2.5rem); }
+  .auth-card { max-width: 420px; margin: 0 auto; padding: clamp(1.5rem, 5vw, 2.5rem); }
   .auth-card h1 { margin-top: 0.5rem; }
   .lead { color: var(--muted); }
   .field { margin: 1rem 0; }
@@ -58,8 +58,9 @@ if (Astro.locals.user) return Astro.redirect(next);
   .auth-switch { text-align: center; margin: 1.25rem 0 0; color: var(--muted); }
 </style>
 
-<script define:vars={{ next }}>
+<script>
   const form = document.getElementById('register-form') as HTMLFormElement;
+  const next = form.dataset.next || '/account';
   const error = document.getElementById('form-error') as HTMLParagraphElement;
   form.addEventListener('submit', async (event) => {
     event.preventDefault();

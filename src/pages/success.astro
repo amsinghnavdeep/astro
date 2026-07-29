@@ -1,18 +1,19 @@
 ---
 import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
 ---
 
 <Base title="Payment received | Siddh Jyotish" description="Your payment was received. Your Janma Kundli report is now being prepared and will be emailed shortly." noindex>
   <div class="wrap">
     <section class="block">
       <div class="card narrow success-hero">
-        <div class="divider-om">🕉️</div>
-        <h1>Payment received 🎉</h1>
+        <div class="divider-om"><Icon name="check" size={34} /></div>
+        <h1>Payment received</h1>
         <p id="status" class="lead">Confirming your payment…</p>
 
         <div id="pandit-box" hidden>
           <div class="pandit-card">
-            <div class="pandit-avatar" aria-hidden="true">🧑‍🦳</div>
+            <div class="pandit-avatar" aria-hidden="true"><Icon name="om" size={28} /></div>
             <div>
               <p style="margin:0"><strong id="pandit-name">Our senior astrologer</strong> is now personally studying your Janma Kundli.</p>
               <p class="helper" style="margin:0.3rem 0 0">You'll receive your complete report by email shortly — please keep an eye on your inbox.</p>
@@ -21,7 +22,7 @@ import Base from '../layouts/Base.astro';
         </div>
 
         <p class="helper">You can safely close this page — everything arrives by email.</p>
-        <p class="helper spam-note">📩 Not in your inbox? Please check your <strong>Spam</strong> or <strong>Promotions</strong> folder — and mark us as “Not spam” so future messages land in your inbox.</p>
+        <p class="helper spam-note"><Icon name="mail" size={16} /> Not in your inbox? Please check your <strong>Spam</strong> or <strong>Promotions</strong> folder — and mark us as “Not spam” so future messages land in your inbox.</p>
         <p style="margin-top:1rem"><a href="/">← Back home</a></p>
       </div>
     </section>
@@ -64,7 +65,7 @@ import Base from '../layouts/Base.astro';
           const pandit = (data.pandit && String(data.pandit)) || 'Our senior astrologer';
           panditName.textContent = pandit;
           panditBox.hidden = false;
-          statusEl.textContent = 'Thank you — your reading has begun. 🙏';
+          statusEl.textContent = 'Thank you — your reading has begun.';
         }
         return;
       }

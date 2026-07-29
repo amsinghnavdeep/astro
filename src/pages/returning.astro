@@ -1,5 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
 import { detectCountry } from '../lib/geo';
 import { getCurrencyPricing } from '../lib/pricing';
 import { formatMoney } from '../lib/money';
@@ -52,7 +53,7 @@ const tiers = {
             </div>
           </div>
         )}
-        <form id="followup-form" novalidate>
+        <form id="followup-form" data-authed={isAuthed ? 'true' : 'false'} data-auth-redirect={authRedirect} novalidate>
           <div class="field">
             <label for="reference">Reference number</label>
             <textarea id="reference" name="reference" placeholder="Paste your encrypted reference number" required></textarea>
@@ -83,7 +84,7 @@ const tiers = {
 
           <button type="submit" id="submit-btn" class="btn btn-block">Pay <span id="btn-price">{tiers[1].now}</span> &amp; Get Answers</button>
           <div id="error" class="error" hidden></div>
-          <p class="helper center" style="margin-top:1rem">🔒 Secure Stripe checkout · Answers delivered by email</p>
+          <p class="helper center secure-helper" style="margin-top:1rem"><Icon name="lock" size={16} /> Secure Stripe checkout · Answers delivered by email</p>
         </form>
       </div>
 
@@ -134,9 +135,21 @@ const tiers = {
   }
   .account-required p { margin: 0.35rem 0 0; }
   .account-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.85rem; }
+  .secure-helper { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .returning-section {
+    position: relative;
+    overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(27,20,64,0.96), rgba(42,31,92,0.88)),
+      url('/astro-bg.png') center/cover no-repeat;
+  }
+  .returning-section::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 85% 0%, rgba(201,162,39,0.2), transparent 35%); }
+  .returning-section .section-head h2,
+  .returning-section .section-head p { color: #fff; }
+  .returning-section .section-head .eyebrow { color: var(--gold-soft); }
 </style>
 
-<script define:vars={{ isAuthed, authRedirect }}>
+<script>
   const TIERS: Record<number, { now: string; was: string }> = (() => {
     const el = document.getElementById('pricing-data');
     try {
@@ -154,6 +167,8 @@ const tiers = {
   };
 
   const form = document.getElementById('followup-form') as HTMLFormElement;
+  const isAuthed = form.dataset.authed === 'true';
+  const authRedirect = form.dataset.authRedirect ?? '/register';
   const btn = document.getElementById('submit-btn') as HTMLButtonElement;
   const errorEl = document.getElementById('error') as HTMLDivElement;
   const questionsEl = document.getElementById('questions') as HTMLDivElement;
