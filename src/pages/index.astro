@@ -101,9 +101,6 @@ const homeStructuredData = {
         <p class="lead">
           A genuine Vedic birth chart, cast from your exact birth details and interpreted personally by a real pandit.
         </p>
-        <div class="price-tag">
-          <s class="was">{kundliWas}</s> <b>{kundliNow}</b><span>complete Kundli + 3 questions, by email</span>
-        </div>
         <div class="hero-cta">
           <a class="btn hero-primary-cta" href={orderCta}>Start my reading <Icon name="arrow-right" size={22} /></a>
         </div>
@@ -383,7 +380,7 @@ const homeStructuredData = {
             <p class="field-error" id="q3-error" aria-live="polite"></p>
           </div>
 
-          <button type="submit" id="submit-btn" class="btn btn-block"><s class="was-btn">{kundliWas}</s> Pay {kundliNow} &amp; Get Kundli Report and Answers</button>
+          <button type="submit" id="submit-btn" class="btn btn-block">Pay {kundliNow} &amp; Get Kundli Report and Answers</button>
           <div id="error" class="error" hidden></div>
           <p class="helper center secure-helper" style="margin-top:1rem"><Icon name="lock" size={16} /> Secure Stripe checkout · 100% money-back guarantee</p>
         </form>
@@ -508,7 +505,6 @@ const homeStructuredData = {
     object-position: 67% center;
   }
   .hero .lead { color: #c8c3e3; font-size: 1rem; line-height: 1.65; max-width: 42ch; }
-  .hero .price-tag { margin: 1.1rem 0 1.35rem; }
   .eyebrow {
     display: inline-block; font-family: var(--sans); font-weight: 600;
     letter-spacing: 2px; text-transform: uppercase; font-size: 0.8rem;
@@ -518,13 +514,6 @@ const homeStructuredData = {
     content: ''; display: block; width: 42px; height: 2px; margin-top: 0.65rem;
     background: #37d0c6; border-radius: 2px;
   }
-  .price-tag {
-    display: inline-flex; align-items: baseline; gap: 0.55rem; margin: 0.5rem 0 1.5rem;
-  }
-  .price-tag b { font-family: var(--serif); font-size: clamp(2.7rem, 4vw, 3rem); line-height: 1; color: #fff; }
-  .price-tag span { color: #aaa5ca; font-size: 0.78rem; }
-  .was { color: #aaa5ca; text-decoration: line-through; font-size: 1.1rem; opacity: 0.75; }
-  .was-btn { color: inherit; opacity: 0.7; text-decoration: line-through; margin-right: 0.35rem; font-weight: 600; }
 
   .field { margin-bottom: 1rem; }
   .field:last-child { margin-bottom: 0; }
@@ -759,8 +748,6 @@ const homeStructuredData = {
       font-size: 0.62rem;
       letter-spacing: 1px;
     }
-    .price-tag { justify-content: center; flex-wrap: wrap; }
-    .price-tag span { flex-basis: 100%; }
     .hero-primary-cta {
       width: 100%;
       min-height: 62px;
