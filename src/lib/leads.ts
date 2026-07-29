@@ -3,6 +3,7 @@ import type { KVNamespace } from '@cloudflare/workers-types';
 export interface LeadRecord {
   id: string;
   kind: 'kundli' | 'followup';
+  userId?: string;
   email: string;
   fullName?: string;
   gender?: 'Male' | 'Female' | 'Other';
@@ -68,6 +69,13 @@ function parseLead(value: string | null): LeadRecord | null {
     if (
       parsed.fullName !== undefined &&
       typeof parsed.fullName !== 'string'
+    ) {
+      return null;
+    }
+
+    if (
+      parsed.userId !== undefined &&
+      typeof parsed.userId !== 'string'
     ) {
       return null;
     }

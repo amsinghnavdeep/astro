@@ -90,6 +90,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     const lead: LeadRecord = {
       id: session.id,
       kind: 'kundli',
+      userId,
       email: d.email,
       fullName: d.fullName,
       gender: d.gender,

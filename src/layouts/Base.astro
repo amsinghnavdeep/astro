@@ -66,7 +66,7 @@ const siteStructuredData = {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Marcellus&family=Cormorant+Garamond:wght@500;600;700&family=Mukta:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <script type="application/ld+json" set:html={JSON.stringify(siteStructuredData)}></script>
@@ -80,16 +80,21 @@ const siteStructuredData = {
         </span>
         <span class="brand-text">Siddh<em>Jyotish</em></span>
       </a>
-      <nav class="nav-links">
+      <nav id="mobile-nav" class="nav-links" aria-label="Primary navigation">
         <a href="/#how">How it works</a>
         <a href="/#about">About</a>
         <a href="/contact">Contact</a>
         <a href="/#faq">FAQ</a>
         <a href={Astro.locals.user ? '/account' : '/login'}>
+          <Icon name="user" size={16} />
           {Astro.locals.user ? 'My Account' : 'Login'}
         </a>
-        <a class="nav-cta" href="/#order">Get started</a>
+        <a class="nav-cta" href={Astro.locals.user ? '/#order' : `/register?next=${encodeURIComponent('/#order')}`}>Get started</a>
       </nav>
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Menu">
+        <span class="nav-toggle-menu"><Icon name="menu" size={22} /></span>
+        <span class="nav-toggle-close"><Icon name="x" size={22} /></span>
+      </button>
     </header>
 
     <main>
@@ -113,6 +118,38 @@ const siteStructuredData = {
       </div>
     </footer>
 
+    <script>
+      const navToggle = document.querySelector<HTMLButtonElement>('.nav-toggle');
+      const mobileNav = document.getElementById('mobile-nav');
+
+      function closeMobileNav() {
+        if (!navToggle || !mobileNav) return;
+        navToggle.setAttribute('aria-expanded', 'false');
+        mobileNav.classList.remove('open');
+      }
+
+      navToggle?.addEventListener('click', () => {
+        if (!mobileNav) return;
+        const expanded = navToggle.getAttribute('aria-expanded') === 'true';
+        navToggle.setAttribute('aria-expanded', String(!expanded));
+        mobileNav.classList.toggle('open', !expanded);
+      });
+
+      mobileNav?.querySelectorAll('a').forEach((link) => {
+        link.addEventListener('click', closeMobileNav);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeMobileNav();
+      });
+
+      document.addEventListener('click', (event) => {
+        if (!navToggle || !mobileNav || !mobileNav.classList.contains('open')) return;
+        const target = event.target as Node;
+        if (!navToggle.contains(target) && !mobileNav.contains(target)) closeMobileNav();
+      });
+    </script>
+
     <style is:global>
       :root {
         --saffron: #e0812f;
@@ -131,9 +168,9 @@ const siteStructuredData = {
         --muted: #6b5d47;
         --border: #ecdcb8;
         --error: #a12020;
-        --serif: 'Marcellus', Georgia, serif;
+        --serif: 'Fraunces', Georgia, serif;
         --serif-2: 'Cormorant Garamond', Georgia, serif;
-        --sans: 'Mukta', 'Segoe UI', system-ui, sans-serif;
+        --sans: 'Inter', system-ui, sans-serif;
       }
 
       * { box-sizing: border-box; }
@@ -147,15 +184,16 @@ const siteStructuredData = {
         color: var(--text);
         font-family: var(--sans);
         line-height: 1.65;
+        font-optical-sizing: auto;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
       }
 
-      h1, h2, h3 { font-family: var(--serif); font-weight: 400; line-height: 1.15; }
-      h1 { font-size: clamp(2rem, 6vw, 3.4rem); margin: 0 0 1rem; color: var(--maroon); }
-      h2 { font-size: clamp(1.5rem, 4vw, 2.2rem); margin: 0 0 1rem; color: var(--maroon); }
-      h3 { font-size: 1.25rem; margin: 0 0 0.5rem; color: var(--maroon-deep); }
+      h1, h2, h3 { font-family: var(--serif); font-weight: 500; line-height: 1.15; }
+      h1 { font-size: clamp(2.1rem, 4.5vw, 3.3rem); line-height: 1.1; letter-spacing: -0.015em; margin: 0 0 1rem; color: var(--maroon); }
+      h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); margin: 0 0 1rem; color: var(--maroon); }
+      h3 { font-size: 1.2rem; margin: 0 0 0.5rem; color: var(--maroon-deep); }
       p { margin: 0 0 1rem; }
       a { color: var(--maroon); text-decoration: none; }
       a:hover { text-decoration: underline; }
@@ -186,12 +224,37 @@ const siteStructuredData = {
       .brand-text em { color: var(--saffron); font-style: normal; }
       .nav-links { display: flex; align-items: center; gap: 1.4rem; font-weight: 500; }
       .nav-links a { color: var(--muted); }
+      .nav-links a:not(.nav-cta) { display: inline-flex; align-items: center; gap: 0.35rem; }
       .nav-cta {
-        background: linear-gradient(120deg, #6d28d9, #7c3aed 40%, #0ea5a4); color: #fff !important; padding: 0.45rem 1rem;
-        border-radius: 999px; font-size: 0.95rem;
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 40px; padding: 0 1rem; border-radius: 12px;
+        background: linear-gradient(120deg, var(--saffron), var(--gold)); color: var(--indigo) !important;
+        font-size: 0.9rem; font-weight: 600; letter-spacing: 0.01em;
       }
-      .nav-cta:hover { background: linear-gradient(120deg, #5b21b6, #6d28d9 40%, #0f8f8e); text-decoration: none; }
-      @media (max-width: 560px) { .nav-links a:not(.nav-cta) { display: none; } }
+      .nav-cta:hover { filter: brightness(1.05); text-decoration: none; }
+      .nav-toggle { display: none; }
+      .nav-toggle-close { display: none; }
+      @media (max-width: 760px) {
+        .site-nav { position: sticky; }
+        .nav-toggle {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 44px; height: 44px; padding: 0; border: 1px solid var(--border);
+          border-radius: 12px; background: var(--card); color: var(--indigo); cursor: pointer;
+        }
+        .nav-links {
+          display: none; position: absolute; top: calc(100% + 0.4rem); left: 1rem; right: 1rem;
+          max-height: min(70vh, 420px); overflow-y: auto; flex-direction: column; align-items: stretch;
+          gap: 0.25rem; padding: 0.65rem; background: rgba(255,253,248,0.98);
+          border: 1px solid var(--border); border-radius: 16px;
+          box-shadow: 0 18px 40px rgba(27,20,64,0.16);
+        }
+        .nav-links.open { display: flex; }
+        .nav-links a { min-height: 44px; display: flex; align-items: center; padding: 0.55rem 0.75rem; border-radius: 10px; }
+        .nav-links a:hover { background: #f8edd0; text-decoration: none; }
+        .nav-links .nav-cta { justify-content: center; margin-top: 0.25rem; }
+        .nav-toggle[aria-expanded="true"] .nav-toggle-menu { display: none; }
+        .nav-toggle[aria-expanded="true"] .nav-toggle-close { display: inline-flex; }
+      }
 
       /* ---------- Hero ---------- */
       .hero {
@@ -215,9 +278,7 @@ const siteStructuredData = {
       .guarantee-box,
       .faq details,
       .btn,
-      .cta-card {
-        transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-      }
+      .hero { transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease; }
       .card:hover,
       .step:hover,
       .quote:hover,
@@ -256,26 +317,29 @@ const siteStructuredData = {
 
       /* ---------- Buttons ---------- */
       .btn {
-        display: inline-block; text-align: center; cursor: pointer;
-        font-family: var(--sans); font-weight: 700; font-size: 1.05rem;
-        color: var(--indigo); border: none; border-radius: 999px;
-        padding: 0.9rem 1.8rem;
+        display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+        min-height: 52px; text-align: center; cursor: pointer;
+        font-family: var(--sans); font-weight: 600; font-size: 1rem; letter-spacing: 0.01em;
+        color: var(--indigo); border: none; border-radius: 12px; padding: 0 1.6rem;
         background: linear-gradient(180deg, var(--gold-soft), var(--gold));
-        box-shadow: 0 8px 22px rgba(201,162,39,0.4);
+        box-shadow: 0 8px 20px rgba(201,162,39,0.28);
         transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
       }
       .btn:hover { transform: translateY(-1px); text-decoration: none; box-shadow: 0 12px 28px rgba(201,162,39,0.5); }
+      .btn:focus-visible, .nav-cta:focus-visible, .nav-toggle:focus-visible {
+        outline: none; box-shadow: 0 0 0 3px rgba(201,162,39,0.5), 0 0 0 6px rgba(27,20,64,0.25);
+      }
       .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-      .btn-block { display: block; width: 100%; margin-top: 1.5rem; }
+      .btn-block { display: flex; width: 100%; margin-top: 1.5rem; }
       .btn-ghost {
-        background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,0.5);
+        min-height: 52px; background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,0.5);
         box-shadow: none;
       }
       .btn-ghost:hover { background: rgba(255,255,255,0.1); }
       .btn-outline {
-        background: transparent;
+        min-height: 52px; background: transparent;
         color: var(--maroon);
-        border: 1.5px solid var(--maroon);
+        border: 1.5px solid var(--maroon); border-radius: 12px;
         box-shadow: none;
       }
       .btn-outline:hover {
