@@ -51,10 +51,11 @@
   "observability": {
     "enabled": true
   },
-  // Keep paid fulfillment on Devin until the Cloud Run report service is deployed.
-  // Flip to "false" or remove this var once Cloud Run is live.
+  // Paid fulfillment runs on the Cloud Run report service. The webhook falls
+  // back to Devin automatically if birthplace geocoding fails.
   "vars": {
-    "USE_DEVIN_FULFILLMENT": "true"
+    "USE_DEVIN_FULFILLMENT": "false",
+    "KUNDLI_SERVICE_URL": "https://kundli-service-89885474668.us-central1.run.app"
   },
 
   // Runtime secrets/vars are NOT stored here. Set them with:
