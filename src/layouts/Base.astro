@@ -85,7 +85,7 @@ const siteStructuredData = {
         <a href="/#about">About</a>
         <a href="/#faq">FAQ</a>
         <a href={Astro.locals.user ? '/account' : '/login'}>Login</a>
-        <a class="nav-cta" href={Astro.locals.user ? '/#order' : `/register?next=${encodeURIComponent('/#order')}`}>Get started</a>
+        <a class="nav-cta" href={Astro.locals.user ? '/order' : `/register?next=${encodeURIComponent('/order')}`}>Get started</a>
       </nav>
       <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mobile-nav" aria-label="Menu">
         <span class="nav-toggle-menu"><Icon name="menu" size={22} /></span>
