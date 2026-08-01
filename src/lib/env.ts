@@ -94,4 +94,10 @@ export const env = {
   get adminApiToken() {
     return required('ADMIN_API_TOKEN');
   },
+
+  admin: {
+    get apiToken() {
+      return required('ADMIN_API_TOKEN');
+    },
+  },
 } as const;
