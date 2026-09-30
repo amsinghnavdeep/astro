@@ -10,6 +10,7 @@ export const prerender = false;
 const country = detectCountry(Astro.request, Astro.locals.runtime);
 const { currency, pricing } = await getCurrencyPricing(Astro.locals.runtime?.env?.SIDDH_KV, country);
 const kundliNow = formatMoney(pricing.kundliCents, currency);
+const followupNow = formatMoney(pricing.followupCents, currency);
 ---
 
 <Base title="Contact a Vedic Astrologer | Siddh Jyotish" description="Contact Siddh Jyotish for help with your Janma Kundli report, delivery questions, or refunds. Speak with a Vedic astrology team by email." >
@@ -66,9 +67,10 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
 
       <div class="contact-ctas">
         <h3>Ready to begin?</h3>
+        <p>One birth chart, one price — ask anything about your chart in one place.</p>
         <div class="contact-cta-actions">
-          <a class="btn" href="/#order">Create my Kundli &amp; ask 3 questions — {kundliNow}</a>
-          <a class="btn btn-outline" href="/returning">Ask additional questions</a>
+          <a class="btn" href="/order">Get my Kundli — {kundliNow}</a>
+          <a class="btn btn-outline" href="/returning">Follow up on my chart — {followupNow}</a>
         </div>
       </div>
     </section>

@@ -16,10 +16,12 @@ import { env } from './env';
 import { countryToCurrency } from './geo';
 
 export interface CurrencyPricing {
+  /** Price of one reading on one birth chart. Two-chart readings cost 2× this. */
   kundliCents: number;
   kundliWasCents: number;
-  followupTierCents: { 1: number; 2: number; 3: number };
-  followupTierWasCents: { 1: number; 2: number; 3: number };
+  /** Price of a follow-up on an already-computed chart. */
+  followupCents: number;
+  followupWasCents: number;
 }
 
 export interface PricingConfig {
@@ -30,16 +32,8 @@ export interface PricingConfig {
 export const currencyPricingSchema = z.object({
   kundliCents: z.number().int().positive(),
   kundliWasCents: z.number().int().positive(),
-  followupTierCents: z.object({
-    1: z.number().int().positive(),
-    2: z.number().int().positive(),
-    3: z.number().int().positive(),
-  }),
-  followupTierWasCents: z.object({
-    1: z.number().int().positive(),
-    2: z.number().int().positive(),
-    3: z.number().int().positive(),
-  }),
+  followupCents: z.number().int().positive(),
+  followupWasCents: z.number().int().positive(),
 });
 
 /** Validation schema for an incoming pricing config (admin PUT). */
@@ -74,22 +68,17 @@ export const pricingConfigSchema = z.object({
 });
 
 const KV_KEY = 'pricing:config';
-const CACHE_TTL_MS = 30_000;
+export const PRICING_CACHE_TTL_MS = 30_000;
 
 let cache: { value: PricingConfig; expiresAt: number } | null = null;
 
 function currencyPricingSeed(
   kundliCents: number,
   kundliWasCents: number,
-  followupTierCents: { 1: number; 2: number; 3: number },
-  followupTierWasCents: { 1: number; 2: number; 3: number },
+  followupCents: number,
+  followupWasCents: number,
 ): CurrencyPricing {
-  return {
-    kundliCents,
-    kundliWasCents,
-    followupTierCents,
-    followupTierWasCents,
-  };
+  return { kundliCents, kundliWasCents, followupCents, followupWasCents };
 }
 
 /** The default seed: the existing env-var pricing (USD). */
@@ -97,46 +86,12 @@ function defaultPricing(): PricingConfig {
   return {
     defaultCurrency: 'usd',
     currencies: {
-      usd: currencyPricingSeed(
-        env.pricing.kundliCents,
-        5100,
-        {
-          1: env.pricing.followupTierCents[1],
-          2: env.pricing.followupTierCents[2],
-          3: env.pricing.followupTierCents[3],
-        },
-        { 1: 1300, 2: 1800, 3: 2100 },
-      ),
-      inr: currencyPricingSeed(
-        250000,
-        410000,
-        { 1: 60000, 2: 85000, 3: 110000 },
-        { 1: 110000, 2: 150000, 3: 180000 },
-      ),
-      gbp: currencyPricingSeed(
-        2500,
-        4100,
-        { 1: 650, 2: 900, 3: 1050 },
-        { 1: 1050, 2: 1450, 3: 1700 },
-      ),
-      eur: currencyPricingSeed(
-        2900,
-        4800,
-        { 1: 750, 2: 1000, 3: 1200 },
-        { 1: 1200, 2: 1650, 3: 1950 },
-      ),
-      aud: currencyPricingSeed(
-        4700,
-        7700,
-        { 1: 1200, 2: 1650, 3: 1950 },
-        { 1: 1950, 2: 2700, 3: 3200 },
-      ),
-      cad: currencyPricingSeed(
-        4300,
-        7000,
-        { 1: 1100, 2: 1500, 3: 1800 },
-        { 1: 1800, 2: 2500, 3: 2900 },
-      ),
+      usd: currencyPricingSeed(env.pricing.kundliCents, 5100, env.pricing.followupCents, 1300),
+      inr: currencyPricingSeed(250000, 410000, 60000, 110000),
+      gbp: currencyPricingSeed(2500, 4100, 650, 1050),
+      eur: currencyPricingSeed(2900, 4800, 750, 1200),
+      aud: currencyPricingSeed(4700, 7700, 1200, 1950),
+      cad: currencyPricingSeed(4300, 7000, 1100, 1800),
     },
   };
 }
@@ -145,23 +100,35 @@ function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * A stored block may be in the current shape, or in the legacy tiered shape
+ * (`followupTierCents: {1,2,3}`), in which case the 1-question tier becomes
+ * the single follow-up price.
+ */
+type StoredCurrencyPricing = Partial<CurrencyPricing> & {
+  followupTierCents?: Partial<Record<'1' | '2' | '3', unknown>>;
+  followupTierWasCents?: Partial<Record<'1' | '2' | '3', unknown>>;
+};
+
+function legacyTier1(tiers: StoredCurrencyPricing['followupTierCents']): number | undefined {
+  const value = tiers?.['1'];
+  return typeof value === 'number' ? value : undefined;
+}
+
 function mergeCurrencyPricing(
   base: Partial<CurrencyPricing>,
-  override: Partial<CurrencyPricing>,
+  override: StoredCurrencyPricing,
 ): CurrencyPricing {
   return {
     kundliCents: override.kundliCents ?? base.kundliCents ?? 0,
     kundliWasCents: override.kundliWasCents ?? base.kundliWasCents ?? 0,
-    followupTierCents: {
-      1: override.followupTierCents?.[1] ?? base.followupTierCents?.[1] ?? 0,
-      2: override.followupTierCents?.[2] ?? base.followupTierCents?.[2] ?? 0,
-      3: override.followupTierCents?.[3] ?? base.followupTierCents?.[3] ?? 0,
-    },
-    followupTierWasCents: {
-      1: override.followupTierWasCents?.[1] ?? base.followupTierWasCents?.[1] ?? 0,
-      2: override.followupTierWasCents?.[2] ?? base.followupTierWasCents?.[2] ?? 0,
-      3: override.followupTierWasCents?.[3] ?? base.followupTierWasCents?.[3] ?? 0,
-    },
+    followupCents:
+      override.followupCents ?? legacyTier1(override.followupTierCents) ?? base.followupCents ?? 0,
+    followupWasCents:
+      override.followupWasCents ??
+      legacyTier1(override.followupTierWasCents) ??
+      base.followupWasCents ??
+      0,
   };
 }
 
@@ -175,11 +142,7 @@ function mergeParsedPricing(parsed: unknown): PricingConfig | null {
   const input = parsed as Record<string, unknown>;
 
   if (Object.prototype.hasOwnProperty.call(input, 'kundliCents')) {
-    const old = input as {
-      currency?: unknown;
-      kundliCents?: unknown;
-      followupTierCents?: Partial<CurrencyPricing['followupTierCents']>;
-    };
+    const old = input as { currency?: unknown; kundliCents?: unknown } & StoredCurrencyPricing;
     const targetKeyRaw = typeof old.currency === 'string' && old.currency.trim() ? old.currency : 'usd';
     const targetKey = targetKeyRaw.toLowerCase();
     const base = merged.currencies[targetKey] ?? merged.currencies[defaults.defaultCurrency];
@@ -187,14 +150,10 @@ function mergeParsedPricing(parsed: unknown): PricingConfig | null {
       return null;
     }
 
-    merged.currencies[targetKey] = {
-      ...base,
+    merged.currencies[targetKey] = mergeCurrencyPricing(base, {
       kundliCents: old.kundliCents,
-      followupTierCents: {
-        ...base.followupTierCents,
-        ...old.followupTierCents,
-      },
-    };
+      followupTierCents: old.followupTierCents,
+    });
     return merged;
   }
 
@@ -210,7 +169,7 @@ function mergeParsedPricing(parsed: unknown): PricingConfig | null {
 
       const key = cur.toLowerCase();
       const base = merged.currencies[key] ?? defaults.currencies[key] ?? ({} as Partial<CurrencyPricing>);
-      merged.currencies[key] = mergeCurrencyPricing(base, block as Partial<CurrencyPricing>);
+      merged.currencies[key] = mergeCurrencyPricing(base, block as StoredCurrencyPricing);
     }
   }
 
@@ -242,7 +201,7 @@ export async function getPricing(kv?: KVNamespace): Promise<PricingConfig> {
     }
   }
 
-  cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+  cache = { value, expiresAt: Date.now() + PRICING_CACHE_TTL_MS };
   return value;
 }
 
@@ -258,7 +217,7 @@ export async function setPricing(
   }
 
   await kv.put(KV_KEY, JSON.stringify(value));
-  cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+  cache = { value, expiresAt: Date.now() + PRICING_CACHE_TTL_MS };
   return value;
 }
 

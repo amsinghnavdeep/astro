@@ -15,9 +15,7 @@ const country = detectCountry(Astro.request, Astro.locals.runtime);
 const { currency, pricing } = await getCurrencyPricing(Astro.locals.runtime?.env?.SIDDH_KV, country);
 const kundliNow = formatMoney(pricing.kundliCents, currency);
 const kundliWas = formatMoney(pricing.kundliWasCents, currency);
-const f1 = formatMoney(pricing.followupTierCents[1], currency);
-const f2 = formatMoney(pricing.followupTierCents[2], currency);
-const f3 = formatMoney(pricing.followupTierCents[3], currency);
+const followupNow = formatMoney(pricing.followupCents, currency);
 
 const faqItems = [
   {
@@ -34,6 +32,10 @@ const faqItems = [
     question: 'Do I need an account?',
     answer:
       'Yes. A free account is required to place an order, keeps your reports together, and lets you return for follow-up questions.',
+  },
+  {
+    question: 'What does a reading cost?',
+    answer: `One reading is one birth chart at one price: ${kundliNow}. Ask anything you like about your chart in one place. A follow-up on a chart you already have is ${followupNow}.`,
   },
   {
     question: 'What is the money-back guarantee?',
@@ -59,7 +61,7 @@ const homeStructuredData = {
       '@type': 'Service',
       name: 'Siddh Jyotish Janma Kundli Report',
       description:
-        'A precise, hand-crafted Vedic Janma Kundli report with up to 3 included questions, prepared by respected astrologers.',
+        'A precise, hand-crafted Vedic Janma Kundli report on your birth chart — ask anything about your chart in one place — prepared by respected astrologers.',
       url: 'https://siddhjyotish.com/order',
       provider: { '@id': 'https://siddhjyotish.com#organization' },
       areaServed: 'Worldwide',
@@ -88,7 +90,7 @@ const homeStructuredData = {
 
 <Base
   title="Vedic Janma Kundli Reports | Siddh Jyotish"
-  description="Order a precise Vedic Janma Kundli report with 3 included questions, or return later to ask follow-up astrology questions from the same chart."
+  description="Order a precise Vedic Janma Kundli report and ask anything about your chart in one place, or return later for a follow-up on the same chart."
 >
   <div class="wrap wrap-wide">
     <section class="hero hero-split">
@@ -270,7 +272,7 @@ const homeStructuredData = {
       </div>
       <p class="center" style="margin-top:1.5rem">
         Already have a reference number?
-        <a href="/returning">Ask follow-up questions →</a>
+        <a href="/returning">Ask a follow-up →</a>
       </p>
     </section>
   </div>
@@ -286,9 +288,14 @@ const homeStructuredData = {
           gifting insight to a loved one — a precise Janma Kundli from Siddh
           Jyotish gives you the guide you deserve.
         </p>
+        <div class="price-tag final-cta-price">
+          <s class="was">{kundliWas}</s> <b>{kundliNow}</b>
+          <span>· one birth chart — ask anything about it in one place</span>
+        </div>
+        <p class="final-cta-followup">Already have your chart? A follow-up on it is {followupNow}.</p>
         <div class="final-cta-actions">
           <a class="btn" href={orderCta}>Get my Kundli — {kundliNow}</a>
-          <a class="btn btn-ghost-dark" href="/returning">I have a reference — ask questions</a>
+          <a class="btn btn-ghost-dark" href="/returning">I have a reference — ask a follow-up</a>
         </div>
         <p class="final-cta-reassure">100% money-back guarantee · Private account · Delivered by email</p>
       </div>
@@ -417,6 +424,8 @@ const homeStructuredData = {
     box-shadow: none;
   }
   .btn-ghost-dark:hover { background: rgba(255,255,255,0.1); text-decoration: none; }
+  .final-cta-price { justify-content: center; flex-wrap: wrap; margin: 0.25rem 0 0.4rem; }
+  .final-cta-followup { font-size: 0.95rem; }
   .final-cta-reassure { font-size: 0.88rem; color: #a99fd6 !important; margin-top: 0.5rem !important; }
   .hero-split .hero-copy {
     order: 1;

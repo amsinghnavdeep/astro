@@ -1,6 +1,6 @@
 /**
- * Returning-customer checkout: reference + 1-3 questions, tiered-price Stripe
- * Checkout ($8 / $11 / $13 for 1 / 2 / 3 questions).
+ * Returning-customer checkout: reference + follow-up, single-price Stripe
+ * Checkout (`followupCents`, regardless of how the follow-up is phrased).
  *
  * We validate the reference decrypts to a session id BEFORE taking payment, so a
  * bad reference fails fast. The reference + questions ride along in metadata.
@@ -41,17 +41,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return json({ error: 'That reference number is invalid.' }, 400);
   }
 
-  if (count < 1 || count > 3) {
-    return json({ error: 'You may ask between 1 and 3 questions.' }, 400);
-  }
-
   const country = detectCountry(request, locals.runtime);
   const config = await getPricing(locals.runtime.env.SIDDH_KV);
   const currency = resolveCurrency(config, country);
   const pricing = config.currencies[currency];
   const usdBlock = config.currencies.usd ?? config.currencies[config.defaultCurrency];
-  const unitAmount = pricing.followupTierCents[count as 1 | 2 | 3];
-  const usdUnitAmount = usdBlock.followupTierCents[count as 1 | 2 | 3];
+  const unitAmount = pricing.followupCents;
+  const usdUnitAmount = usdBlock.followupCents;
 
   const makeSessionArgs = (sessionCurrency: string, amount: number) => ({
     mode: 'payment' as const,
@@ -63,7 +59,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
           currency: sessionCurrency,
           unit_amount: amount,
           product_data: {
-            name: `Siddh Jyotish Follow-up — ${count} precise question${count === 1 ? '' : 's'}`,
+            name: 'Siddh Jyotish Follow-up — on your existing chart',
             description: 'Answered from your existing chart. No new report.',
           },
         },

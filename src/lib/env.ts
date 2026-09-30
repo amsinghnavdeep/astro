@@ -32,11 +32,10 @@ export const env = {
 
   pricing: {
     kundliCents: usdToCents('PRICE_KUNDLI_USD', 31),
-    followupTierCents: {
-      1: usdToCents('PRICE_FOLLOWUP_1_USD', 8),
-      2: usdToCents('PRICE_FOLLOWUP_2_USD', 11),
-      3: usdToCents('PRICE_FOLLOWUP_3_USD', 13),
-    } as Record<number, number>,
+    followupCents: usdToCents(
+      process.env.PRICE_FOLLOWUP_USD ? 'PRICE_FOLLOWUP_USD' : 'PRICE_FOLLOWUP_1_USD',
+      8,
+    ),
   },
 
   devin: {

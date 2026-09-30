@@ -1,0 +1,242 @@
+---
+/**
+ * Owner-facing price editor. Same credentials as the rest of admin: HTTP Basic
+ * Auth (DOCS_AUTH_USER / DOCS_AUTH_PASS) for browsers, or
+ * `Authorization: Bearer <ADMIN_API_TOKEN>` for scripts.
+ */
+export const prerender = false;
+import Base from '../../layouts/Base.astro';
+import { authorized } from '../../lib/adminAuth';
+import { basicAuthGuard } from '../../lib/basicAuth';
+import { formatMoney } from '../../lib/money';
+import {
+  PRICING_CACHE_TTL_MS,
+  getPricing,
+  pricingConfigSchema,
+  setPricing,
+  type CurrencyPricing,
+  type PricingConfig,
+} from '../../lib/pricing';
+
+if (!authorized(Astro.request)) {
+  const denied = basicAuthGuard(Astro.request);
+  if (denied) return denied;
+}
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+
+const FIELDS = [
+  { key: 'kundliCents', label: 'Reading (one birth chart)', hint: 'Two-chart readings are charged at 2× this.' },
+  { key: 'kundliWasCents', label: 'Reading — "was" price', hint: 'Shown struck through next to the price.' },
+  { key: 'followupCents', label: 'Follow-up on an existing chart', hint: '' },
+  { key: 'followupWasCents', label: 'Follow-up — "was" price', hint: 'Shown struck through next to the price.' },
+] as const satisfies ReadonlyArray<{ key: keyof CurrencyPricing; label: string; hint: string }>;
+
+const ttlSeconds = Math.round(PRICING_CACHE_TTL_MS / 1000);
+
+function fractionDigits(currency: string): number {
+  return (
+    new Intl.NumberFormat('en', { style: 'currency', currency: currency.toUpperCase() }).resolvedOptions()
+      .maximumFractionDigits ?? 2
+  );
+}
+
+function toMajor(cents: number, currency: string): string {
+  const digits = fractionDigits(currency);
+  return (cents / 10 ** digits).toFixed(digits);
+}
+
+function toMinor(raw: string, currency: string): number | null {
+  const digits = fractionDigits(currency);
+  const text = raw.trim().replace(/,/g, '');
+  const pattern = digits > 0 ? new RegExp(`^(\\d+)(?:\\.(\\d{1,${digits}}))?$`) : /^(\d+)$/;
+  const match = pattern.exec(text);
+  if (!match) return null;
+  const whole = Number(match[1]);
+  const fraction = Number((match[2] ?? '').padEnd(digits, '0') || '0');
+  const minor = whole * 10 ** digits + fraction;
+  return Number.isSafeInteger(minor) ? minor : null;
+}
+
+function sameOrigin(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  if (origin) return origin === new URL(request.url).origin;
+  return request.headers.get('sec-fetch-site') === 'same-origin';
+}
+
+let current: PricingConfig = await getPricing(Astro.locals.runtime?.env?.SIDDH_KV);
+let values: Record<string, Record<string, string>> = {};
+let defaultCurrency = current.defaultCurrency;
+let status: 'idle' | 'saved' | 'error' = 'idle';
+const errors: string[] = [];
+const fieldErrors = new Set<string>();
+
+if (Astro.request.method === 'POST') {
+  if (!sameOrigin(Astro.request)) {
+    return new Response('Forbidden', { status: 403 });
+  }
+
+  const form = await Astro.request.formData();
+  const currencies: Record<string, CurrencyPricing> = {};
+  const submittedDefault = String(form.get('defaultCurrency') ?? '');
+
+  for (const currency of Object.keys(current.currencies)) {
+    const block: Partial<Record<keyof CurrencyPricing, number>> = {};
+    values[currency] = {};
+    for (const field of FIELDS) {
+      const name = `${currency}.${field.key}`;
+      const raw = String(form.get(name) ?? '');
+      values[currency][field.key] = raw;
+      const minor = toMinor(raw, currency);
+      if (minor === null || minor <= 0) {
+        fieldErrors.add(name);
+        errors.push(`${currency.toUpperCase()} · ${field.label}: enter an amount greater than 0, e.g. ${toMajor(current.currencies[currency][field.key], currency)}.`);
+      } else {
+        block[field.key] = minor;
+      }
+    }
+    currencies[currency] = block as CurrencyPricing;
+  }
+  defaultCurrency = submittedDefault;
+
+  if (errors.length === 0) {
+    const parsed = pricingConfigSchema.safeParse({ defaultCurrency: submittedDefault, currencies });
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) errors.push(`${issue.path.join('.')}: ${issue.message}`);
+    } else {
+      try {
+        current = await setPricing(Astro.locals.runtime?.env?.SIDDH_KV, parsed.data);
+        defaultCurrency = current.defaultCurrency;
+        values = {};
+        status = 'saved';
+      } catch (err) {
+        errors.push(err instanceof Error ? `Could not save: ${err.message}` : 'Could not save the new prices.');
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    status = 'error';
+    Astro.response.status = 400;
+  }
+}
+
+const currencyKeys = Object.keys(current.currencies);
+function fieldValue(currency: string, key: keyof CurrencyPricing): string {
+  return values[currency]?.[key] ?? toMajor(current.currencies[currency][key], currency);
+}
+---
+
+<Base title="Pricing admin | Siddh Jyotish" description="Siddh Jyotish pricing admin." noindex>
+  <div class="wrap">
+    <section class="block admin-pricing">
+      <div class="section-head">
+        <span class="eyebrow">Admin</span>
+        <h2>Prices</h2>
+        <p>
+          One reading is one birth chart at one price. A follow-up on an existing
+          chart has its own price. Enter amounts in normal money (e.g. 31.00), not cents.
+        </p>
+      </div>
+
+      {status === 'saved' && (
+        <div class="notice notice-ok" role="status">
+          <strong>Saved.</strong> The prices below are now in effect. Public pages pick them up
+          within about {ttlSeconds} seconds (prices are cached for {ttlSeconds}s; Cloudflare may take
+          up to a minute more to reach every region).
+        </div>
+      )}
+      {status === 'error' && (
+        <div class="error" role="alert">
+          <strong>Nothing was saved.</strong> Please fix the following and try again:
+          <ul>{errors.map((message) => <li>{message}</li>)}</ul>
+        </div>
+      )}
+
+      <form method="post" class="card card-accent">
+        <label for="defaultCurrency">Default currency</label>
+        <select id="defaultCurrency" name="defaultCurrency">
+          {currencyKeys.map((currency) => (
+            <option value={currency} selected={currency === defaultCurrency}>{currency.toUpperCase()}</option>
+          ))}
+        </select>
+        <p class="helper">Used for visitors whose country has no currency configured below.</p>
+
+        <div class="currency-grid">
+          {currencyKeys.map((currency) => (
+            <fieldset class="currency">
+              <legend>
+                {currency.toUpperCase()}
+                <span class="now-live">
+                  Live: {formatMoney(current.currencies[currency].kundliCents, currency)} reading ·
+                  {' '}{formatMoney(current.currencies[currency].followupCents, currency)} follow-up
+                </span>
+              </legend>
+              {FIELDS.map((field) => {
+                const name = `${currency}.${field.key}`;
+                return (
+                  <div class="price-field">
+                    <label for={name}>{field.label}</label>
+                    <div class="money-input">
+                      <span aria-hidden="true">{currency.toUpperCase()}</span>
+                      <input
+                        id={name}
+                        name={name}
+                        type="text"
+                        inputmode="decimal"
+                        autocomplete="off"
+                        required
+                        pattern={fractionDigits(currency) > 0 ? `\\d+(\\.\\d{1,${fractionDigits(currency)}})?` : '\\d+'}
+                        value={fieldValue(currency, field.key)}
+                        class={fieldErrors.has(name) ? 'is-invalid' : undefined}
+                        aria-invalid={fieldErrors.has(name) ? 'true' : 'false'}
+                      />
+                    </div>
+                    {field.hint && <p class="helper">{field.hint}</p>}
+                  </div>
+                );
+              })}
+            </fieldset>
+          ))}
+        </div>
+
+        <button type="submit" class="btn btn-block">Save prices</button>
+        <p class="helper center">
+          After saving, public pages update within about {ttlSeconds} seconds.
+        </p>
+      </form>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .admin-pricing { max-width: 960px; margin: 0 auto; }
+  .notice {
+    border-radius: 10px; padding: 0.75rem 0.9rem; margin: 0 0 1rem;
+  }
+  .notice-ok { color: var(--green); background: #e8f5ee; border: 1px solid #b7dcc7; }
+  .admin-pricing .error { margin: 0 0 1rem; }
+  .admin-pricing .error ul { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+  .currency-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem; margin-top: 1.5rem;
+  }
+  .currency {
+    border: 1px solid var(--border); border-radius: 14px; padding: 0.9rem 1rem 1rem; margin: 0;
+    background: #fffdf8;
+  }
+  .currency legend {
+    font-family: var(--serif); font-size: 1.15rem; color: var(--maroon); padding: 0 0.35rem;
+  }
+  .now-live { display: block; font-family: var(--sans); font-size: 0.8rem; color: var(--muted); }
+  .price-field label { margin-top: 0.8rem; font-size: 0.92rem; }
+  .money-input { display: flex; align-items: stretch; }
+  .money-input span {
+    display: grid; place-items: center; padding: 0 0.6rem; font-size: 0.85rem; font-weight: 600;
+    color: var(--muted); background: #f7efe0; border: 1px solid var(--border); border-right: none;
+    border-radius: 10px 0 0 10px;
+  }
+  .money-input input { border-radius: 0 10px 10px 0; }
+  input.is-invalid { border-color: var(--error); box-shadow: 0 0 0 3px rgba(161, 32, 32, 0.14); }
+</style>

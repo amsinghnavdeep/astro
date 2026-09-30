@@ -4,7 +4,10 @@
  *   GET  /api/admin/pricing  → current effective pricing config
  *   PUT  /api/admin/pricing  → validate + persist a new config
  *
- * Both require `Authorization: Bearer <ADMIN_API_TOKEN>`.
+ * Both require `Authorization: Bearer <ADMIN_API_TOKEN>`. Amounts are integers
+ * in the smallest currency unit, per currency:
+ *   { kundliCents, kundliWasCents, followupCents, followupWasCents }
+ * The owner-facing form for the same config lives at /admin/pricing.
  */
 export const prerender = false;
 import type { APIRoute } from 'astro';
