@@ -2,34 +2,43 @@
  * Stripe webhook — the core fulfillment endpoint.
  *
  * When a Checkout Session completes, Stripe calls this endpoint. We verify the
- * signature against the RAW request body, then act on the order stored in the
- * session metadata:
- *   - kind 'kundli':   start a new Devin session and email the reference number.
+ * signature against the RAW request body, claim the session exactly once, then
+ * fulfil in the background (Stripe gets a fast 200):
+ *   - kind 'kundli':   read the order payload from the KV lead record, pre-compute
+ *                      the chart(s) in the Worker and start the `!kundli` playbook
+ *                      session, which emails the PDF + reference number.
  *   - kind 'followup': decode the reference back to the session id and ask the
  *                      follow-up questions on that same session.
  */
 export const prerender = false;
 import type { APIRoute } from 'astro';
 import type Stripe from 'stripe';
-import type { D1Database } from '@cloudflare/workers-types';
+import type { D1Database, ExecutionContext, KVNamespace } from '@cloudflare/workers-types';
 import { stripe, cryptoProvider } from '../../../lib/stripe';
 import { env } from '../../../lib/env';
 import {
   createKundliSession,
   askFollowup,
   instructKundliDelivery,
+  type PersonDetails,
 } from '../../../lib/devin';
 import { encodeReference, decodeReference } from '../../../lib/reference';
 import { recordOrder, type OrderRecord } from '../../../lib/orders';
-import { deleteLead } from '../../../lib/leads';
+import { deleteLead, getLead, type LeadPerson, type LeadRecord } from '../../../lib/leads';
 import { computeChart, chartToPromptText } from '../../../lib/kundli/chart';
 import {
   findOrderById,
   upsertOrder,
   type OrderRecord as AccountOrderRecord,
 } from '../../../lib/auth';
-import { geocodeBirthplace } from '../../../lib/kundli/geocode';
-import { generateReport, type GeneratePayload } from '../../../lib/reportService';
+
+const KV_CLAIM_PREFIX = 'fulfilment-claim:';
+const KV_CLAIM_TTL_SECONDS = 60 * 60 * 24 * 30;
+
+interface Stores {
+  db: D1Database | undefined;
+  kv: KVNamespace | undefined;
+}
 
 export const POST: APIRoute = async ({ request, locals }) => {
   // Signature verification needs the RAW body — never call request.json() first.
@@ -59,221 +68,332 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
   const session = event.data.object as Stripe.Checkout.Session;
   const m = session.metadata ?? {};
+  const kind: OrderRecord['kind'] = m.kind === 'followup' ? 'followup' : 'kundli';
+  const stores: Stores = { db: locals.runtime.env.SIDDH_DB, kv: locals.runtime.env.SIDDH_KV };
+
+  // Kundli orders are fulfilled from the KV lead written at checkout. If it is
+  // not readable yet, ask Stripe to retry rather than fulfil without the
+  // customer's questions.
+  let lead: LeadRecord | null = null;
+  try {
+    lead = await getLead(stores.kv, session.id);
+  } catch (err) {
+    console.error('Lead lookup error:', err);
+  }
+  if (lead && lead.kind !== kind) lead = null;
+  if (kind === 'kundli') {
+    lead ??= leadFromLegacyMetadata(session);
+    if (!lead) {
+      // Already fulfilled sessions have had their lead deleted.
+      if (await isClaimed(stores, session.id).catch(() => false)) {
+        console.info('Duplicate checkout.session.completed ignored:', session.id);
+        return json({ received: true, duplicate: true }, 200);
+      }
+      console.error('Order payload not found for paid session; asking Stripe to retry:', session.id);
+      return json({ error: 'order_payload_unavailable' }, 500);
+    }
+  }
+
   const createdAt = new Date(event.created * 1000);
   const order: OrderRecord = {
     id: session.id,
-    kind: m.kind === 'followup' ? 'followup' : 'kundli',
+    kind,
     amountTotal: session.amount_total ?? 0,
     currency: session.currency ?? '',
-    email: session.customer_email ?? m.email ?? '',
-    fullName: m.fullName || undefined,
-    questionCount:
-      m.kind === 'kundli'
-        ? JSON.parse(m.questions || '[]').length
-        : m.kind === 'followup'
-          ? Number(m.questionCount)
-          : undefined,
+    email: session.customer_email ?? lead?.email ?? m.email ?? '',
+    fullName: lead?.fullName ?? (m.fullName || undefined),
+    questionCount: lead ? lead.questions.length : Number(m.questionCount) || undefined,
     createdAt: createdAt.toISOString(),
     createdAtMs: createdAt.getTime(),
   };
 
+  let claimed: boolean;
   try {
-    await recordOrder(locals.runtime.env.SIDDH_KV, order);
+    claimed = await claimFulfilment(stores, {
+      id: order.id,
+      user_id: m.userId || lead?.userId || null,
+      email: order.email,
+      kind: order.kind,
+      service_type: order.kind,
+      full_name: order.fullName ?? null,
+      amount_total: order.amountTotal,
+      currency: order.currency,
+      status: 'fulfilling',
+      pdf_key: null,
+      reference_number: m.reference || null,
+      created_at: order.createdAt,
+    });
+  } catch (err) {
+    console.error('Fulfilment claim error; asking Stripe to retry:', err);
+    return json({ error: 'claim_unavailable' }, 500);
+  }
+  if (!claimed) {
+    console.info('Duplicate checkout.session.completed ignored:', session.id);
+    return json({ received: true, duplicate: true }, 200);
+  }
+
+  try {
+    await recordOrder(stores.kv, order);
   } catch (err) {
     console.error('Order persistence error:', err);
   }
 
-  try {
-    const db = locals.runtime.env.SIDDH_DB;
-    if (db) {
-      const accountOrder: AccountOrderRecord = {
-        id: order.id,
-        user_id: m.userId || null,
-        email: order.email,
-        kind: order.kind,
-        service_type: order.kind,
-        full_name: order.fullName ?? null,
-        amount_total: order.amountTotal,
-        currency: order.currency,
-        status: 'paid',
-        pdf_key: null,
-        reference_number: m.reference || null,
-        created_at: order.createdAt,
-      };
-      await upsertOrder(db, accountOrder);
-    }
-  } catch (err) {
-    console.error('Account order persistence error:', err);
-  }
-
-  try {
-    await deleteLead(locals.runtime.env.SIDDH_KV, session.id);
-  } catch (err) {
-    console.error('Lead deletion error:', err);
-  }
-
-  try {
-    if (m.kind === 'kundli') {
-      const questions = JSON.parse(m.questions || '[]') as string[];
-      const pandit = m.pandit || 'our senior astrologer';
-
-      const runDevinFulfillment = async (): Promise<void> => {
-        // Pre-compute the chart in the Worker so the Devin session only has to
-        // interpret it (big ACU saving). If anything fails (geocoding, parsing),
-        // fall back gracefully: the playbook computes the chart itself.
-        let precomputedChart: string | undefined;
-        try {
-          if (m.timezone && m.dateOfBirth && m.timeOfBirth && m.placeOfBirth) {
-            const chart = await computeChart({
-              dateOfBirth: m.dateOfBirth,
-              timeOfBirth: m.timeOfBirth,
-              placeOfBirth: m.placeOfBirth,
-              timezone: m.timezone,
-            });
-            precomputedChart = chartToPromptText(chart);
-          }
-        } catch (err) {
-          console.error('Chart pre-computation failed; playbook will compute it:', err);
-        }
-
-        const devinSession = await createKundliSession({
-          fullName: m.fullName,
-          gender: (m.gender as 'Male' | 'Female' | 'Other') || 'Other',
-          dateOfBirth: m.dateOfBirth,
-          timeOfBirth: m.timeOfBirth,
-          placeOfBirth: m.placeOfBirth,
-          timezone: m.timezone || undefined,
-          email: m.email,
-          questions,
-          pandit,
-          precomputedChart,
-        });
-        console.info('Created Devin Kundli session:', devinSession.session_id);
-        const reference = encodeReference(devinSession.session_id);
-        const delivery = instructKundliDelivery(devinSession.session_id, {
-          reference,
-          pandit,
-          email: m.email,
-          fullName: m.fullName,
-        })
-          .then(() => {
-            console.info('Kundli delivery instruction accepted:', devinSession.session_id);
-          })
-          .catch((err) => {
-            console.error('Kundli delivery instruction error:', err);
-          });
-
-        // No backend email here (Stripe needs a fast 200). We hand the session the
-        // reference + delivery instruction; the `!kundli` playbook then sends the
-        // customer EXACTLY ONE email — framed as from their Pandit — with the PDF
-        // attached and the reference number included. No polling needed.
-        const waitUntil = (locals.runtime as { ctx?: { waitUntil(promise: Promise<unknown>): void } }).ctx?.waitUntil;
-        if (waitUntil) {
-          waitUntil(delivery);
-        } else {
-          await delivery;
-        }
-      };
-
-      if (env.reportService.useDevinFulfillment) {
-        await runDevinFulfillment();
-      } else {
-        const geo = await geocodeBirthplace(m.placeOfBirth || '');
-        if (!geo) {
-          console.error('Report service geocoding failed; falling back to Devin.');
-          await runDevinFulfillment();
-        } else {
-          const reference = encodeReference(session.id);
-          const payload: GeneratePayload = {
-            orderId: session.id,
-            serviceType: m.serviceType || 'kundli',
-            person: {
-              fullName: m.fullName || 'Seeker',
-              gender: m.gender || 'Other',
-              dateOfBirth: m.dateOfBirth || '',
-              timeOfBirth: m.timeOfBirth || '',
-              placeOfBirth: m.placeOfBirth || '',
-              latitude: geo.latitude,
-              longitude: geo.longitude,
-              timezone: m.timezone || '',
-              ...(m.timezoneOffset ? { timezoneOffset: m.timezoneOffset } : {}),
-            },
-            partner: null,
-            questions,
-            extras: {},
-            pandit: {
-              name: pandit,
-              referenceNumber: reference,
-              customerEmail: order.email,
-            },
-            dryRun: false,
-          };
-
-          const serviceWork = generateReport(payload)
-            .then(async (result) => {
-              if (result.ok) {
-                try {
-                  const db = locals.runtime.env.SIDDH_DB;
-                  // TODO(phase-8b): service should return PDF bytes; store to SIDDH_PDF and set pdf_key.
-                  await setAccountOrderStatus(db, session.id, 'delivered');
-                } catch (err) {
-                  console.error('Delivered order status update failed:', err);
-                }
-              } else if (result.status !== 409) {
-                try {
-                  const db = locals.runtime.env.SIDDH_DB;
-                  await setAccountOrderStatus(db, session.id, 'failed');
-                } catch (err) {
-                  console.error('Failed order status update failed:', err);
-                }
-              }
-            })
-            .catch(async (err) => {
-              console.error('Report service fulfillment failed:', err);
-              try {
-                const db = locals.runtime.env.SIDDH_DB;
-                await setAccountOrderStatus(db, session.id, 'failed');
-              } catch (statusErr) {
-                console.error('Failed order status update failed:', statusErr);
-              }
-            });
-          const waitUntil = (locals.runtime as { ctx?: { waitUntil(promise: Promise<unknown>): void } }).ctx?.waitUntil;
-          if (waitUntil) {
-            waitUntil(serviceWork);
-          } else {
-            await serviceWork;
-          }
-        }
-      }
-    } else if (m.kind === 'followup') {
-      const sessionId = decodeReference(m.reference);
-      const questions = JSON.parse(m.questions || '[]') as string[];
-      await askFollowup(sessionId, questions);
-    }
-  } catch (err) {
-    // Permanent errors (bad metadata, decode failure) should NOT be retried
-    // forever by Stripe, so we log and still return 200. If you want Stripe to
-    // retry a transient failure, return 500 instead.
-    console.error('Webhook fulfillment error:', err);
-    if (m.kind === 'kundli') {
-      try {
-        await setAccountOrderStatus(locals.runtime.env.SIDDH_DB, session.id, 'failed');
-      } catch (statusErr) {
-        console.error('Failed order status update failed:', statusErr);
-      }
-    }
-    return json({ received: true }, 200);
+  const work =
+    kind === 'kundli' && lead
+      ? fulfilKundli(stores, session.id, lead)
+      : fulfilFollowup(
+          stores,
+          session.id,
+          lead?.reference ?? m.reference ?? '',
+          lead ? lead.questions : parseMetadataQuestions(m.questions),
+        );
+  const ctx = locals.runtime.ctx as ExecutionContext | undefined;
+  if (ctx) {
+    ctx.waitUntil(work);
+  } else {
+    await work;
   }
 
   return json({ received: true }, 200);
 };
 
+async function fulfilKundli(stores: Stores, sessionId: string, lead: LeadRecord): Promise<void> {
+  const primary = leadPrimary(lead);
+  if (!primary) {
+    console.error('Kundli lead is missing birth details:', sessionId);
+    await releaseClaim(stores, sessionId);
+    return;
+  }
+  const pandit = lead.pandit || 'our senior astrologer';
+  const email = lead.email;
+
+  // Pre-compute the chart(s) in the Worker so the Devin session only has to
+  // interpret them (big ACU saving). If a computation fails, the playbook
+  // computes that chart itself.
+  const [primaryChart, partnerChart] = await Promise.all([
+    precompute(primary, 'primary'),
+    lead.partner ? precompute(lead.partner, 'partner') : Promise.resolve(undefined),
+  ]);
+  const partner: PersonDetails | undefined = lead.partner
+    ? { ...lead.partner, precomputedChart: partnerChart }
+    : undefined;
+
+  let devinSessionId: string;
+  try {
+    const devinSession = await createKundliSession({
+      ...primary,
+      precomputedChart: primaryChart,
+      email,
+      questions: lead.questions.join('\n\n'),
+      pandit,
+      partner,
+    });
+    devinSessionId = devinSession.session_id;
+  } catch (err) {
+    console.error('Devin Kundli session creation failed:', err);
+    await releaseClaim(stores, sessionId);
+    return;
+  }
+  console.info('Created Devin Kundli session:', devinSessionId);
+
+  try {
+    await deleteLead(stores.kv, sessionId);
+  } catch (err) {
+    console.error('Lead deletion error:', err);
+  }
+
+  // No backend email here. We hand the session the reference + delivery
+  // instruction; the `!kundli` playbook then sends the customer EXACTLY ONE
+  // email — framed as from their Pandit — with the PDF and reference number.
+  try {
+    await instructKundliDelivery(devinSessionId, {
+      reference: encodeReference(devinSessionId),
+      pandit,
+      email,
+      fullName: primary.fullName,
+    });
+    console.info('Kundli delivery instruction accepted:', devinSessionId);
+  } catch (err) {
+    console.error('Kundli delivery instruction error:', err);
+  }
+}
+
+async function fulfilFollowup(
+  stores: Stores,
+  sessionId: string,
+  reference: string,
+  questions: string[],
+): Promise<void> {
+  try {
+    await askFollowup(decodeReference(reference), questions);
+  } catch (err) {
+    console.error('Follow-up fulfilment error:', err);
+    await releaseClaim(stores, sessionId);
+    return;
+  }
+  try {
+    await deleteLead(stores.kv, sessionId);
+  } catch (err) {
+    console.error('Lead deletion error:', err);
+  }
+}
+
+/** Metadata copy of follow-up questions; only used when the KV lead is missing. */
+function parseMetadataQuestions(raw: string | undefined): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw || '[]');
+    if (Array.isArray(parsed)) return parsed.filter((q): q is string => typeof q === 'string');
+  } catch {
+    // Truncated metadata is not valid JSON; fall through.
+  }
+  return raw ? [raw] : [];
+}
+
+async function precompute(person: LeadPerson, label: string): Promise<string | undefined> {
+  try {
+    const chart = await computeChart({
+      dateOfBirth: person.dateOfBirth,
+      timeOfBirth: person.timeOfBirth,
+      placeOfBirth: person.placeOfBirth,
+      timezone: person.timezone,
+    });
+    return chartToPromptText(chart);
+  } catch {
+    // Deliberately no error detail: messages can echo birth details.
+    console.error(`Chart pre-computation failed (${label}); playbook will compute it.`);
+    return undefined;
+  }
+}
+
+function leadPrimary(lead: LeadRecord): LeadPerson | null {
+  if (!lead.fullName || !lead.gender || !lead.dateOfBirth || !lead.timeOfBirth || !lead.placeOfBirth || !lead.timezone) {
+    return null;
+  }
+  return {
+    fullName: lead.fullName,
+    gender: lead.gender,
+    dateOfBirth: lead.dateOfBirth,
+    timeOfBirth: lead.timeOfBirth,
+    placeOfBirth: lead.placeOfBirth,
+    timezone: lead.timezone,
+  };
+}
+
+/**
+ * Sessions created before the order payload moved to KV carried the birth
+ * details in metadata; keep fulfilling those if their lead is gone.
+ */
+function leadFromLegacyMetadata(session: Stripe.Checkout.Session): LeadRecord | null {
+  const m = session.metadata ?? {};
+  const gender = m.gender === 'Male' || m.gender === 'Female' || m.gender === 'Other' ? m.gender : 'Other';
+  if (!m.fullName || !m.dateOfBirth || !m.timeOfBirth || !m.placeOfBirth || !m.timezone) return null;
+  let questions: string[] = [];
+  try {
+    const parsed: unknown = JSON.parse(m.questions || '[]');
+    if (Array.isArray(parsed)) questions = parsed.filter((q): q is string => typeof q === 'string');
+  } catch {
+    questions = [];
+  }
+  const createdAt = new Date(session.created * 1000);
+  return {
+    id: session.id,
+    kind: 'kundli',
+    userId: m.userId || undefined,
+    email: session.customer_email ?? m.email ?? '',
+    fullName: m.fullName,
+    gender,
+    dateOfBirth: m.dateOfBirth,
+    timeOfBirth: m.timeOfBirth,
+    placeOfBirth: m.placeOfBirth,
+    timezone: m.timezone,
+    questions,
+    charts: 1,
+    pandit: m.pandit || undefined,
+    amountTotal: session.amount_total ?? 0,
+    currency: session.currency ?? '',
+    createdAt: createdAt.toISOString(),
+    createdAtMs: createdAt.getTime(),
+  };
+}
+
+/**
+ * Claim a Checkout Session for fulfilment exactly once, so a re-delivered
+ * `checkout.session.completed` never starts a second session or email.
+ *
+ * With D1 the claim is the atomic insert of the account order row: it only
+ * succeeds for a new order, or re-claims one whose earlier fulfilment failed.
+ * Without D1 it falls back to a (best-effort) KV marker.
+ */
+async function claimFulfilment(stores: Stores, row: AccountOrderRecord): Promise<boolean> {
+  if (stores.db) {
+    const result = await stores.db
+      .prepare(
+        `INSERT INTO orders
+         (id, user_id, email, kind, service_type, full_name, amount_total,
+          currency, status, pdf_key, reference_number, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           user_id = excluded.user_id,
+           email = excluded.email,
+           full_name = excluded.full_name,
+           amount_total = excluded.amount_total,
+           currency = excluded.currency,
+           status = excluded.status
+         WHERE orders.status = 'failed'`,
+      )
+      .bind(
+        row.id,
+        row.user_id,
+        row.email,
+        row.kind,
+        row.service_type,
+        row.full_name,
+        row.amount_total,
+        row.currency,
+        row.status,
+        row.pdf_key,
+        row.reference_number,
+        row.created_at,
+      )
+      .run();
+    return result.meta.changes > 0;
+  }
+  if (stores.kv) {
+    const key = `${KV_CLAIM_PREFIX}${row.id}`;
+    if (await stores.kv.get(key)) return false;
+    await stores.kv.put(key, new Date().toISOString(), { expirationTtl: KV_CLAIM_TTL_SECONDS });
+    return true;
+  }
+  throw new Error('Neither D1 nor KV is configured for the fulfilment claim');
+}
+
+async function isClaimed(stores: Stores, orderId: string): Promise<boolean> {
+  if (stores.db) {
+    const existing = await findOrderById(stores.db, orderId);
+    return Boolean(existing && existing.status !== 'failed');
+  }
+  if (stores.kv) return Boolean(await stores.kv.get(`${KV_CLAIM_PREFIX}${orderId}`));
+  return false;
+}
+
+/** Mark a claimed order failed so a later (manual) re-delivery can fulfil it. */
+async function releaseClaim(stores: Stores, orderId: string): Promise<void> {
+  try {
+    if (stores.db) {
+      await setAccountOrderStatus(stores.db, orderId, 'failed');
+    } else if (stores.kv) {
+      await stores.kv.delete(`${KV_CLAIM_PREFIX}${orderId}`);
+    }
+  } catch (err) {
+    console.error('Failed order status update failed:', err);
+  }
+}
+
 async function setAccountOrderStatus(
-  db: D1Database | undefined,
+  db: D1Database,
   orderId: string,
   status: AccountOrderRecord['status'],
 ): Promise<void> {
-  if (!db) return;
   const existing = await findOrderById(db, orderId);
   if (existing) await upsertOrder(db, { ...existing, status });
 }

@@ -1,5 +1,20 @@
 import type { KVNamespace } from '@cloudflare/workers-types';
 
+export interface LeadPerson {
+  fullName: string;
+  gender: 'Male' | 'Female' | 'Other';
+  dateOfBirth: string;
+  timeOfBirth: string;
+  placeOfBirth: string;
+  timezone: string;
+}
+
+/**
+ * Pre-payment order intent, keyed by Checkout Session id. For kundli orders it
+ * is also the authoritative order payload the Stripe webhook fulfils from, so
+ * the customer's full question text and the partner details never have to fit
+ * in Stripe metadata.
+ */
 export interface LeadRecord {
   id: string;
   kind: 'kundli' | 'followup';
@@ -12,7 +27,12 @@ export interface LeadRecord {
   placeOfBirth?: string;
   timezone?: string;
   reference?: string;
+  /** Kundli: the single free-text "ask anything" box, verbatim (0 or 1 entry). */
   questions: string[];
+  /** Number of birth charts purchased (1, or 2 for a two-person reading). */
+  charts?: 1 | 2;
+  partner?: LeadPerson;
+  pandit?: string;
   amountTotal: number;
   currency: string;
   createdAt: string;
@@ -46,6 +66,29 @@ export async function deleteLead(
     throw new Error('KV not configured');
   }
   await kv.delete(leadKey(id));
+}
+
+export async function getLead(
+  kv: KVNamespace | undefined,
+  id: string,
+): Promise<LeadRecord | null> {
+  if (!kv) {
+    throw new Error('KV not configured');
+  }
+  return parseLead(await kv.get(leadKey(id)));
+}
+
+function isLeadPerson(value: unknown): value is LeadPerson {
+  if (typeof value !== 'object' || value === null) return false;
+  const p = value as Record<string, unknown>;
+  return (
+    typeof p.fullName === 'string' &&
+    (p.gender === 'Male' || p.gender === 'Female' || p.gender === 'Other') &&
+    typeof p.dateOfBirth === 'string' &&
+    typeof p.timeOfBirth === 'string' &&
+    typeof p.placeOfBirth === 'string' &&
+    typeof p.timezone === 'string'
+  );
 }
 
 function parseLead(value: string | null): LeadRecord | null {
@@ -117,6 +160,16 @@ function parseLead(value: string | null): LeadRecord | null {
       parsed.reference !== undefined &&
       typeof parsed.reference !== 'string'
     ) {
+      return null;
+    }
+
+    if (parsed.charts !== undefined && parsed.charts !== 1 && parsed.charts !== 2) {
+      return null;
+    }
+    if (parsed.partner !== undefined && !isLeadPerson(parsed.partner)) {
+      return null;
+    }
+    if (parsed.pandit !== undefined && typeof parsed.pandit !== 'string') {
       return null;
     }
 

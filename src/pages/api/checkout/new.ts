@@ -1,9 +1,11 @@
 /**
- * First-timer checkout: collect birth details, start a $2100 Stripe Checkout.
+ * First-timer checkout: collect birth details (one person, or two for a
+ * compatibility reading) and the free-text questions, then start a Stripe
+ * Checkout priced at one chart (`kundliCents`) per person.
  *
- * The birth details are stashed in the Checkout Session metadata (Stripe is our
- * only "store" — no DB). After payment, the webhook reads them back and runs
- * the Kundli playbook.
+ * The full order payload is stored as the KV lead record keyed by the Checkout
+ * Session id; Stripe metadata only carries identifiers. After payment, the
+ * webhook reads the lead back and runs the Kundli playbook.
  */
 export const prerender = false;
 import type { APIRoute } from 'astro';
@@ -32,6 +34,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return json({ error: 'Invalid birth details', issues: parsed.error.issues }, 400);
   }
   const d = parsed.data;
+  const charts: 1 | 2 = d.partner ? 2 : 1;
   const pandit = randomPandit();
   const country = detectCountry(request, locals.runtime);
   const config = await getPricing(locals.runtime.env.SIDDH_KV);
@@ -43,29 +46,31 @@ export const POST: APIRoute = async ({ request, locals }) => {
     customer_email: d.email,
     line_items: [
       {
-        quantity: 1,
+        // One unit per birth chart, so a two-person reading shows as 2 × the chart price.
+        quantity: charts,
         price_data: {
           currency: sessionCurrency,
           unit_amount: unitAmount,
-          product_data: {
-            name: 'Siddh Jyotish — Full Vedic Birth Chart Report (includes 3 questions)',
-            description: 'Detailed PDF birth-chart report, computed to arc-second precision.',
-          },
+          product_data:
+            charts === 2
+              ? {
+                  name: 'Siddh Jyotish — Two-Person Compatibility Reading (2 birth charts, ask anything)',
+                  description:
+                    'Two charts, two people: both Vedic birth charts computed to arc-second precision and read together, with everything you asked answered in one PDF report. Priced per chart.',
+                }
+              : {
+                  name: 'Siddh Jyotish — Full Vedic Birth Chart Report (ask anything)',
+                  description:
+                    'Your Vedic birth chart computed to arc-second precision, with everything you asked answered in one PDF report.',
+                },
         },
       },
     ],
     metadata: {
       kind: 'kundli',
       userId,
-      fullName: d.fullName,
-      gender: d.gender,
-      dateOfBirth: d.dateOfBirth,
-      timeOfBirth: d.timeOfBirth,
-      placeOfBirth: d.placeOfBirth,
-      timezone: d.timezone,
-      email: d.email,
       pandit,
-      questions: JSON.stringify(d.questions ?? []).slice(0, 480),
+      charts: String(charts),
     },
     success_url: `${env.siteUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${env.siteUrl}/?canceled=1`,
@@ -75,16 +80,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
     stripe().checkout.sessions.create(makeSessionArgs(sessionCurrency, unitAmount));
 
   let session;
+  let unitAmount = pricing.kundliCents;
   try {
-    session = await createSession(currency, pricing.kundliCents);
+    session = await createSession(currency, unitAmount);
   } catch (err) {
     if (currency !== 'usd' && isUnsupportedCurrencyError(err)) {
-      session = await createSession('usd', usdBlock.kundliCents);
+      unitAmount = usdBlock.kundliCents;
+      session = await createSession('usd', unitAmount);
     } else {
       throw err;
     }
   }
 
+  // The lead is the only copy of the order payload. If it cannot be stored,
+  // expire the Checkout Session so the customer can never pay for an order
+  // whose questions or birth details we would not have.
   try {
     const createdAt = new Date();
     const lead: LeadRecord = {
@@ -98,8 +108,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
       timeOfBirth: d.timeOfBirth,
       placeOfBirth: d.placeOfBirth,
       timezone: d.timezone,
-      questions: d.questions ?? [],
-      amountTotal: session.amount_total ?? pricing.kundliCents,
+      questions: d.questions ? [d.questions] : [],
+      charts,
+      ...(d.partner ? { partner: d.partner } : {}),
+      pandit,
+      amountTotal: session.amount_total ?? unitAmount * charts,
       currency: session.currency ?? currency,
       createdAt: createdAt.toISOString(),
       createdAtMs: createdAt.getTime(),
@@ -107,6 +120,15 @@ export const POST: APIRoute = async ({ request, locals }) => {
     await recordLead(locals.runtime.env.SIDDH_KV, lead);
   } catch (err) {
     console.error('Lead capture error (kundli):', err);
+    try {
+      await stripe().checkout.sessions.expire(session.id);
+    } catch (expireErr) {
+      console.error('Checkout Session expiry failed after lead capture error:', expireErr);
+    }
+    return json(
+      { error: 'We could not save your order details. You have not been charged — please try again.' },
+      503,
+    );
   }
 
   return json({ url: session.url });

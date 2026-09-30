@@ -13,6 +13,9 @@ const authRedirect = '/register?next=/order';
 const country = detectCountry(Astro.request, Astro.locals.runtime);
 const { currency, pricing } = await getCurrencyPricing(Astro.locals.runtime?.env?.SIDDH_KV, country);
 const kundliNow = formatMoney(pricing.kundliCents, currency);
+const kundliDouble = formatMoney(pricing.kundliCents * 2, currency);
+const payLabelSingle = `Pay ${kundliNow} & Get Kundli Report and Answers`;
+const payLabelDouble = `Pay ${kundliDouble} & Get Both Charts Read Together`;
 ---
 
 <Base
@@ -37,6 +40,7 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
           </div>
         )}
         <form id="kundli-form" data-authed={isAuthed ? 'true' : 'false'} data-auth-redirect={authRedirect} novalidate>
+          <p class="person-heading" id="person1-heading" hidden>Person 1 — the customer (or the person the reading is for)</p>
           <div class="field">
             <label for="fullName">Full name</label>
             <input type="text" id="fullName" name="fullName" required autocomplete="name" />
@@ -158,6 +162,69 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
             <p class="field-error" id="timezone-error" aria-live="polite"></p>
           </div>
 
+          <div class="field two-people-field">
+            <label class="toggle" for="twoPeople">
+              <input type="checkbox" id="twoPeople" name="twoPeople" aria-controls="partner-fields" aria-expanded="false" />
+              <span><strong>This reading is about two people</strong> — compatibility / marriage matching (Kundli Milan)</span>
+            </label>
+            <p class="helper">
+              Two charts, two people: matching needs a second birth chart to be computed and read, so it is priced as two charts —
+              <strong>2 × {kundliNow} = {kundliDouble}</strong>. Asking about a spouse or partner in your own reading
+              (for example "when will I marry?") stays one chart.
+            </p>
+          </div>
+
+          <fieldset id="partner-fields" class="partner-fields" hidden>
+            <legend>Person 2 — their birth details</legend>
+            <div class="field">
+              <label for="partnerFullName">Their full name</label>
+              <input type="text" id="partnerFullName" name="partnerFullName" autocomplete="off" />
+              <p class="field-error" id="partnerFullName-error" aria-live="polite"></p>
+            </div>
+
+            <div class="grid-2">
+              <div class="field">
+                <label for="partnerGender">Their gender</label>
+                <select id="partnerGender" name="partnerGender">
+                  <option value="" disabled selected>Select…</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                <p class="field-error" id="partnerGender-error" aria-live="polite"></p>
+              </div>
+              <div class="field">
+                <label for="partnerDateOfBirth">Their date of birth</label>
+                <input type="date" id="partnerDateOfBirth" name="partnerDateOfBirth" min="1900-01-01" />
+                <p class="field-error" id="partnerDateOfBirth-error" aria-live="polite"></p>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="partnerTimeOfBirth">Their time of birth</label>
+              <input type="time" id="partnerTimeOfBirth" name="partnerTimeOfBirth" />
+              <p class="field-error" id="partnerTimeOfBirth-error" aria-live="polite"></p>
+            </div>
+
+            <div class="field place-field">
+              <label for="partnerPlaceOfBirth">Their place of birth</label>
+              <div class="autocomplete-shell">
+                <input type="text" id="partnerPlaceOfBirth" name="partnerPlaceOfBirth" placeholder="City, State, Country" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="partnerPlaceOfBirth-suggestions" />
+                <div id="partnerPlaceOfBirth-suggestions" class="autocomplete-list" role="listbox" aria-label="Place suggestions" hidden></div>
+              </div>
+              <p class="field-error" id="partnerPlaceOfBirth-error" aria-live="polite"></p>
+            </div>
+
+            <div class="field">
+              <label for="partnerTimezone">Timezone of their birthplace</label>
+              <select id="partnerTimezone" name="partnerTimezone">
+                <option value="" disabled selected>Select the timezone of their birthplace…</option>
+              </select>
+              <p class="helper" style="margin-top:0.35rem">The timezone of the town/city where they were born — not where they live now.</p>
+              <p class="field-error" id="partnerTimezone-error" aria-live="polite"></p>
+            </div>
+          </fieldset>
+
           <div class="field">
             <label for="email">Email</label>
             <input type="email" id="email" name="email" value={userEmail} required autocomplete="email" />
@@ -165,16 +232,24 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
           </div>
 
           <div class="field">
-            <label for="q1">3 questions included with your report (max 18 words each)</label>
-            <input type="text" id="q1" name="q1" placeholder="When will I get married?" />
-            <p class="field-error" id="q1-error" aria-live="polite"></p>
-            <input type="text" id="q2" name="q2" placeholder="When will I get a good job / promotion?" style="margin-top:0.5rem" />
-            <p class="field-error" id="q2-error" aria-live="polite"></p>
-            <input type="text" id="q3" name="q3" placeholder="When will we be blessed with a child?" style="margin-top:0.5rem" />
-            <p class="field-error" id="q3-error" aria-live="polite"></p>
+            <label for="questions">Ask anything about your chart</label>
+            <p class="helper questions-helper">
+              One payment covers your whole chart — ask as much as you like, in your own words. Everything you ask is answered in your report.
+            </p>
+            <textarea
+              id="questions"
+              name="questions"
+              rows="7"
+              placeholder={"For example:\n• Is a job or my own business better for me, and when is a good time to change careers?\n• When is marriage likely, and what kind of partner suits me?\n• Any health tendencies I should be mindful of?\n• Which gemstone and mantra suit me?\n• When does my current dasha change, and what will the next one bring? Am I in sade sati?"}
+            ></textarea>
+            <p class="field-error" id="questions-error" aria-live="polite"></p>
           </div>
 
-          <button type="submit" id="submit-btn" class="btn btn-block">Pay {kundliNow} &amp; Get Kundli Report and Answers</button>
+          <p class="price-summary" id="price-summary" aria-live="polite">
+            <span id="price-single">One birth chart · <strong>{kundliNow}</strong></span>
+            <span id="price-double" hidden>Two charts, two people · 2 × {kundliNow} = <strong>{kundliDouble}</strong></span>
+          </p>
+          <button type="submit" id="submit-btn" class="btn btn-block" data-label-single={payLabelSingle} data-label-double={payLabelDouble}>{payLabelSingle}</button>
           <div id="error" class="error" hidden></div>
           <p class="helper center secure-helper" style="margin-top:1rem"><Icon name="lock" size={16} /> Secure Stripe checkout · 100% money-back guarantee</p>
         </form>
@@ -287,6 +362,50 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
   .account-required p { margin: 0.35rem 0 0; }
   .account-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.85rem; }
   .secure-helper { display: flex; align-items: center; gap: 0.4rem; }
+
+  .field textarea {
+    width: 100%;
+    min-height: 9.5rem;
+    resize: vertical;
+    font: inherit;
+    line-height: 1.5;
+  }
+  .questions-helper { margin: 0 0 0.5rem; }
+  .toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    cursor: pointer;
+    font-weight: 400;
+  }
+  .toggle input {
+    width: 1.15rem;
+    height: 1.15rem;
+    margin-top: 0.2rem;
+    flex: none;
+    accent-color: var(--maroon);
+  }
+  .two-people-field .helper { margin: 0.4rem 0 0 1.75rem; }
+  .person-heading,
+  .partner-fields legend {
+    color: var(--maroon);
+    font-weight: 700;
+    margin: 0 0 0.75rem;
+  }
+  .partner-fields {
+    border: 1px solid rgba(201, 162, 39, 0.45);
+    border-radius: 14px;
+    background: rgba(255, 250, 235, 0.6);
+    padding: 1rem 1.1rem 0.25rem;
+    margin: 0 0 1rem;
+    min-width: 0;
+  }
+  .partner-fields legend { padding: 0 0.35rem; margin: 0; }
+  .price-summary {
+    text-align: center;
+    margin: 0.25rem 0 0.75rem;
+    color: var(--text);
+  }
 </style>
 
 <script>
@@ -303,30 +422,56 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
   const authRedirect = form.dataset.authRedirect ?? '/register';
   const btn = document.getElementById('submit-btn') as HTMLButtonElement;
   const serverErrorEl = document.getElementById('error') as HTMLDivElement;
-  const fullNameInput = document.getElementById('fullName') as HTMLInputElement;
-  const genderSelect = document.getElementById('gender') as HTMLSelectElement;
-  const dateInput = document.getElementById('dateOfBirth') as HTMLInputElement;
-  const timeInput = document.getElementById('timeOfBirth') as HTMLInputElement;
-  const placeInput = document.getElementById('placeOfBirth') as HTMLInputElement;
-  const placeMenu = document.getElementById('placeOfBirth-suggestions') as HTMLDivElement;
-  const timezoneSelect = document.getElementById('timezone') as HTMLSelectElement;
   const emailInput = document.getElementById('email') as HTMLInputElement;
-  const questionInputs = ['q1', 'q2', 'q3']
-    .map((id) => document.getElementById(id) as HTMLInputElement)
-    .filter(Boolean);
+  const questionsInput = document.getElementById('questions') as HTMLTextAreaElement;
+  const twoPeopleInput = document.getElementById('twoPeople') as HTMLInputElement;
+  const partnerFieldset = document.getElementById('partner-fields') as HTMLFieldSetElement;
+  const person1Heading = document.getElementById('person1-heading') as HTMLElement;
+  const priceSingle = document.getElementById('price-single') as HTMLElement;
+  const priceDouble = document.getElementById('price-double') as HTMLElement;
 
-  const placeShell = placeInput.closest('.autocomplete-shell') as HTMLElement | null;
+  // Invisible server-side ceiling (QUESTIONS_MAX_CHARS); never displayed.
+  const QUESTIONS_MAX_CHARS = 1000;
 
-  let debounceHandle: number | undefined;
-  let requestToken = 0;
-  let suggestions: string[] = [];
-  let activeIndex = -1;
+  type PersonFields = {
+    who: 'your' | 'their';
+    fullName: HTMLInputElement;
+    gender: HTMLSelectElement;
+    date: HTMLInputElement;
+    time: HTMLInputElement;
+    place: HTMLInputElement;
+    placeMenu: HTMLDivElement;
+    timezone: HTMLSelectElement;
+  };
+
+  function personFields(prefix: '' | 'partner', who: PersonFields['who']): PersonFields {
+    const byName = <T extends HTMLElement>(name: string) =>
+      document.getElementById(prefix ? `${prefix}${name[0].toUpperCase()}${name.slice(1)}` : name) as T;
+    const place = byName<HTMLInputElement>('placeOfBirth');
+    return {
+      who,
+      fullName: byName<HTMLInputElement>('fullName'),
+      gender: byName<HTMLSelectElement>('gender'),
+      date: byName<HTMLInputElement>('dateOfBirth'),
+      time: byName<HTMLInputElement>('timeOfBirth'),
+      place,
+      placeMenu: document.getElementById(`${place.id}-suggestions`) as HTMLDivElement,
+      timezone: byName<HTMLSelectElement>('timezone'),
+    };
+  }
+
+  const primary = personFields('', 'your');
+  const partner = personFields('partner', 'their');
+
+  primary.timezone.querySelectorAll('optgroup').forEach((group) => {
+    partner.timezone.appendChild(group.cloneNode(true));
+  });
 
   function pad2(value: number): string {
     return String(value).padStart(2, '0');
   }
 
-  function setTodayLimits() {
+  function setTodayLimits(dateInput: HTMLInputElement) {
     const now = new Date();
     dateInput.max = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
     dateInput.min = MIN_BIRTH_DATE;
@@ -353,10 +498,6 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
 
   function trimValue(field: ValidationTarget): string {
     return field.value.trim();
-  }
-
-  function words(value: string): number {
-    return value.trim().split(/\s+/).filter(Boolean).length;
   }
 
   function formatBirthDate(value: string): string {
@@ -401,70 +542,84 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
     return true;
   }
 
-  function validateDateField(): boolean {
-    if (!trimValue(dateInput)) {
-      setFieldError(dateInput, 'dateOfBirth', 'Please select your date of birth.');
+  function validateNameField(p: PersonFields): boolean {
+    return validateRequiredField(p.fullName, p.fullName.id, `Please enter ${p.who} full name.`);
+  }
+
+  function validateGenderField(p: PersonFields): boolean {
+    return validateRequiredField(p.gender, p.gender.id, `Please select ${p.who} gender.`);
+  }
+
+  function validateDateField(p: PersonFields): boolean {
+    if (!trimValue(p.date)) {
+      setFieldError(p.date, p.date.id, `Please select ${p.who} date of birth.`);
       return false;
     }
-    if (!dateInput.checkValidity()) {
-      setFieldError(dateInput, 'dateOfBirth', 'Please select a valid date of birth.');
+    if (!p.date.checkValidity()) {
+      setFieldError(p.date, p.date.id, 'Please select a valid date of birth.');
       return false;
     }
-    clearFieldError(dateInput, 'dateOfBirth');
+    clearFieldError(p.date, p.date.id);
     return true;
   }
 
-  function validateTimeField(): boolean {
-    if (!trimValue(timeInput)) {
-      setFieldError(timeInput, 'timeOfBirth', 'Please select your time of birth.');
+  function validateTimeField(p: PersonFields): boolean {
+    if (!trimValue(p.time)) {
+      setFieldError(p.time, p.time.id, `Please select ${p.who} time of birth.`);
       return false;
     }
-    if (!timeInput.checkValidity()) {
-      setFieldError(timeInput, 'timeOfBirth', 'Please select a valid time of birth.');
+    if (!p.time.checkValidity()) {
+      setFieldError(p.time, p.time.id, 'Please select a valid time of birth.');
       return false;
     }
-    clearFieldError(timeInput, 'timeOfBirth');
+    clearFieldError(p.time, p.time.id);
     return true;
   }
 
-  function validatePlaceField(): boolean {
-    if (!trimValue(placeInput)) {
-      setFieldError(placeInput, 'placeOfBirth', 'Please enter your place of birth.');
+  function validatePlaceField(p: PersonFields): boolean {
+    if (!trimValue(p.place)) {
+      setFieldError(p.place, p.place.id, `Please enter ${p.who} place of birth.`);
       return false;
     }
-    clearFieldError(placeInput, 'placeOfBirth');
+    clearFieldError(p.place, p.place.id);
     return true;
   }
 
-  function validateTimezoneField(): boolean {
-    if (!timezoneSelect.value) {
-      setFieldError(timezoneSelect, 'timezone', 'Please select the timezone of your birthplace.');
+  function validateTimezoneField(p: PersonFields): boolean {
+    if (!p.timezone.value) {
+      setFieldError(p.timezone, p.timezone.id, `Please select the timezone of ${p.who} birthplace.`);
       return false;
     }
-    clearFieldError(timezoneSelect, 'timezone');
+    clearFieldError(p.timezone, p.timezone.id);
     return true;
   }
 
-  function validateQuestionField(input: HTMLInputElement): boolean {
-    const value = trimValue(input);
-    if (!value) {
-      clearFieldError(input, input.id);
-      return true;
-    }
-    if (words(value) > 18) {
-      setFieldError(input, input.id, 'Each question must be 18 words or fewer.');
-      return false;
-    }
-    clearFieldError(input, input.id);
-    return true;
+  function validatePerson(p: PersonFields): boolean[] {
+    return [
+      validateNameField(p),
+      validateGenderField(p),
+      validateDateField(p),
+      validateTimeField(p),
+      validatePlaceField(p),
+      validateTimezoneField(p),
+    ];
   }
 
-  function validateQuestions(): boolean {
-    let valid = true;
-    questionInputs.forEach((input) => {
-      if (!validateQuestionField(input)) valid = false;
-    });
-    return valid;
+  function personInputs(p: PersonFields): ValidationTarget[] {
+    return [p.fullName, p.gender, p.date, p.time, p.place, p.timezone];
+  }
+
+  function validateQuestionsField(): boolean {
+    if (trimValue(questionsInput).length > QUESTIONS_MAX_CHARS) {
+      setFieldError(
+        questionsInput,
+        'questions',
+        "That's a lot for one reading — please trim it to the questions that matter most to you.",
+      );
+      return false;
+    }
+    clearFieldError(questionsInput, 'questions');
+    return true;
   }
 
   function clearServerError() {
@@ -477,34 +632,49 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
     serverErrorEl.hidden = false;
   }
 
-  function collectQuestions(): string[] {
-    return questionInputs.map((input) => input.value.trim()).filter((q) => q.length > 0);
-  }
-
   function focusFirstInvalid(fields: ValidationTarget[]): void {
     const firstInvalid = fields.find((field) => field.classList.contains('is-invalid'));
     firstInvalid?.focus();
+  }
+
+  function isTwoPeople(): boolean {
+    return twoPeopleInput.checked;
   }
 
   function validateAllFields(): boolean {
     clearServerError();
 
     const validFields = [
-      validateRequiredField(fullNameInput, 'fullName', 'Please enter your full name.'),
-      validateRequiredField(genderSelect, 'gender', 'Please select your gender.'),
-      validateDateField(),
-      validateTimeField(),
-      validatePlaceField(),
-      validateTimezoneField(),
+      ...validatePerson(primary),
+      ...(isTwoPeople() ? validatePerson(partner) : []),
       validateEmailField(),
-      validateQuestions(),
+      validateQuestionsField(),
     ];
 
     const isValid = validFields.every(Boolean);
     if (!isValid) {
-      focusFirstInvalid([fullNameInput, genderSelect, dateInput, timeInput, placeInput, timezoneSelect, emailInput, ...questionInputs]);
+      focusFirstInvalid([
+        ...personInputs(primary),
+        ...(isTwoPeople() ? personInputs(partner) : []),
+        emailInput,
+        questionsInput,
+      ]);
     }
     return isValid;
+  }
+
+  function syncTwoPeople() {
+    const on = isTwoPeople();
+    partnerFieldset.hidden = !on;
+    person1Heading.hidden = !on;
+    twoPeopleInput.setAttribute('aria-expanded', String(on));
+    personInputs(partner).forEach((field) => {
+      field.required = on;
+      if (!on) clearFieldError(field, field.id);
+    });
+    priceSingle.hidden = on;
+    priceDouble.hidden = !on;
+    btn.textContent = (on ? btn.dataset.labelDouble : btn.dataset.labelSingle) ?? btn.textContent;
   }
 
   function bindLiveValidation(field: ValidationTarget, handler: () => boolean, eventName: 'input' | 'change') {
@@ -512,85 +682,22 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
     field.addEventListener(eventName, handler);
   }
 
-  setTodayLimits();
+  function bindPersonValidation(p: PersonFields) {
+    setTodayLimits(p.date);
+    bindLiveValidation(p.fullName, () => validateNameField(p), 'input');
+    bindLiveValidation(p.gender, () => validateGenderField(p), 'change');
+    bindLiveValidation(p.date, () => validateDateField(p), 'input');
+    bindLiveValidation(p.time, () => validateTimeField(p), 'input');
+    bindLiveValidation(p.place, () => validatePlaceField(p), 'input');
+    bindLiveValidation(p.timezone, () => validateTimezoneField(p), 'change');
+  }
 
-  bindLiveValidation(fullNameInput, () => validateRequiredField(fullNameInput, 'fullName', 'Please enter your full name.'), 'input');
-  bindLiveValidation(genderSelect, () => validateRequiredField(genderSelect, 'gender', 'Please select your gender.'), 'change');
-  bindLiveValidation(dateInput, validateDateField, 'input');
-  bindLiveValidation(timeInput, validateTimeField, 'input');
-  bindLiveValidation(placeInput, validatePlaceField, 'input');
-  bindLiveValidation(timezoneSelect, validateTimezoneField, 'change');
+  bindPersonValidation(primary);
+  bindPersonValidation(partner);
   bindLiveValidation(emailInput, validateEmailField, 'input');
-  questionInputs.forEach((input) => {
-    input.addEventListener('blur', () => validateQuestionField(input));
-    input.addEventListener('input', () => validateQuestionField(input));
-  });
-
-  function renderPlaceSuggestions(items: string[]) {
-    suggestions = items;
-    activeIndex = items.length ? 0 : -1;
-    placeMenu.innerHTML = '';
-
-    if (!items.length) {
-      placeMenu.hidden = true;
-      placeInput.setAttribute('aria-expanded', 'false');
-      placeInput.removeAttribute('aria-activedescendant');
-      return;
-    }
-
-    items.forEach((label, index) => {
-      const option = document.createElement('button');
-      option.type = 'button';
-      option.className = `autocomplete-option${index === activeIndex ? ' is-active' : ''}`;
-      option.id = `place-option-${index}`;
-      option.setAttribute('role', 'option');
-      option.setAttribute('aria-selected', String(index === activeIndex));
-      option.textContent = label;
-      option.addEventListener('mousedown', (event) => {
-        event.preventDefault();
-        choosePlaceSuggestion(index);
-      });
-      placeMenu.appendChild(option);
-    });
-
-    placeMenu.hidden = false;
-    placeInput.setAttribute('aria-expanded', 'true');
-    updateActiveOption();
-  }
-
-  function updateActiveOption() {
-    const options = Array.from(placeMenu.querySelectorAll<HTMLButtonElement>('.autocomplete-option'));
-    options.forEach((option, index) => {
-      const isActive = index === activeIndex;
-      option.classList.toggle('is-active', isActive);
-      option.setAttribute('aria-selected', String(isActive));
-    });
-    const activeOption = activeIndex >= 0 ? options[activeIndex] : null;
-    if (activeOption) {
-      placeInput.setAttribute('aria-activedescendant', activeOption.id);
-      activeOption.scrollIntoView({ block: 'nearest' });
-    } else {
-      placeInput.removeAttribute('aria-activedescendant');
-    }
-  }
-
-  function hidePlaceSuggestions() {
-    placeMenu.hidden = true;
-    placeMenu.innerHTML = '';
-    suggestions = [];
-    activeIndex = -1;
-    placeInput.setAttribute('aria-expanded', 'false');
-    placeInput.removeAttribute('aria-activedescendant');
-  }
-
-  function choosePlaceSuggestion(index: number) {
-    const label = suggestions[index];
-    if (!label) return;
-    placeInput.value = label;
-    clearFieldError(placeInput, 'placeOfBirth');
-    hidePlaceSuggestions();
-    placeInput.focus();
-  }
+  bindLiveValidation(questionsInput, validateQuestionsField, 'input');
+  twoPeopleInput.addEventListener('change', syncTwoPeople);
+  syncTwoPeople();
 
   function composePlaceLabel(feature: PhotonFeature): string {
     const props = feature.properties ?? {};
@@ -604,82 +711,176 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
     return unique.join(', ');
   }
 
-  async function searchPlaces(query: string) {
-    const currentToken = ++requestToken;
-    try {
-      const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lang=en`);
-      if (!response.ok) throw new Error('Lookup failed');
-      const data = (await response.json()) as { features?: PhotonFeature[] };
-      if (currentToken !== requestToken) return;
-      const labels = (data.features ?? [])
-        .map((feature) => composePlaceLabel(feature))
-        .filter((label) => label.length > 0)
-        .slice(0, 5);
-      renderPlaceSuggestions(labels);
-    } catch {
-      if (currentToken === requestToken) hidePlaceSuggestions();
-    }
-  }
+  type PlaceAutocomplete = { hide: () => void };
 
-  function schedulePlaceSearch() {
-    window.clearTimeout(debounceHandle);
-    const query = trimValue(placeInput);
-    if (query.length < 3) {
-      hidePlaceSuggestions();
-      return;
-    }
-    debounceHandle = window.setTimeout(() => {
-      void searchPlaces(query);
-    }, 350);
-  }
+  function setupPlaceAutocomplete(p: PersonFields): PlaceAutocomplete {
+    const placeInput = p.place;
+    const placeMenu = p.placeMenu;
+    const placeShell = placeInput.closest('.autocomplete-shell') as HTMLElement | null;
 
-  placeInput.addEventListener('input', () => {
-    validatePlaceField();
-    schedulePlaceSearch();
-  });
-  placeInput.addEventListener('focus', () => {
-    if (trimValue(placeInput).length >= 3) {
-      if (suggestions.length) {
-        renderPlaceSuggestions(suggestions);
+    let debounceHandle: number | undefined;
+    let requestToken = 0;
+    let suggestions: string[] = [];
+    let activeIndex = -1;
+
+    function renderPlaceSuggestions(items: string[]) {
+      suggestions = items;
+      activeIndex = items.length ? 0 : -1;
+      placeMenu.innerHTML = '';
+
+      if (!items.length) {
+        placeMenu.hidden = true;
+        placeInput.setAttribute('aria-expanded', 'false');
+        placeInput.removeAttribute('aria-activedescendant');
+        return;
+      }
+
+      items.forEach((label, index) => {
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.className = `autocomplete-option${index === activeIndex ? ' is-active' : ''}`;
+        option.id = `${placeInput.id}-option-${index}`;
+        option.setAttribute('role', 'option');
+        option.setAttribute('aria-selected', String(index === activeIndex));
+        option.textContent = label;
+        option.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          choosePlaceSuggestion(index);
+        });
+        placeMenu.appendChild(option);
+      });
+
+      placeMenu.hidden = false;
+      placeInput.setAttribute('aria-expanded', 'true');
+      updateActiveOption();
+    }
+
+    function updateActiveOption() {
+      const options = Array.from(placeMenu.querySelectorAll<HTMLButtonElement>('.autocomplete-option'));
+      options.forEach((option, index) => {
+        const isActive = index === activeIndex;
+        option.classList.toggle('is-active', isActive);
+        option.setAttribute('aria-selected', String(isActive));
+      });
+      const activeOption = activeIndex >= 0 ? options[activeIndex] : null;
+      if (activeOption) {
+        placeInput.setAttribute('aria-activedescendant', activeOption.id);
+        activeOption.scrollIntoView({ block: 'nearest' });
       } else {
-        schedulePlaceSearch();
+        placeInput.removeAttribute('aria-activedescendant');
       }
     }
-  });
-  placeInput.addEventListener('blur', () => {
-    window.setTimeout(() => {
-      hidePlaceSuggestions();
-    }, 120);
-    validatePlaceField();
-  });
-  placeInput.addEventListener('keydown', (event) => {
-    if (placeMenu.hidden || !suggestions.length) return;
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      activeIndex = (activeIndex + 1) % suggestions.length;
-      updateActiveOption();
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      activeIndex = (activeIndex - 1 + suggestions.length) % suggestions.length;
-      updateActiveOption();
-    } else if (event.key === 'Enter' && activeIndex >= 0) {
-      event.preventDefault();
-      choosePlaceSuggestion(activeIndex);
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      hidePlaceSuggestions();
-    }
-  });
 
-  if (placeShell) {
-    document.addEventListener('click', (event) => {
-      if (!placeShell.contains(event.target as Node)) hidePlaceSuggestions();
+    function hidePlaceSuggestions() {
+      placeMenu.hidden = true;
+      placeMenu.innerHTML = '';
+      suggestions = [];
+      activeIndex = -1;
+      placeInput.setAttribute('aria-expanded', 'false');
+      placeInput.removeAttribute('aria-activedescendant');
+    }
+
+    function choosePlaceSuggestion(index: number) {
+      const label = suggestions[index];
+      if (!label) return;
+      placeInput.value = label;
+      clearFieldError(placeInput, placeInput.id);
+      hidePlaceSuggestions();
+      placeInput.focus();
+    }
+
+    async function searchPlaces(query: string) {
+      const currentToken = ++requestToken;
+      try {
+        const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5&lang=en`);
+        if (!response.ok) throw new Error('Lookup failed');
+        const data = (await response.json()) as { features?: PhotonFeature[] };
+        if (currentToken !== requestToken) return;
+        const labels = (data.features ?? [])
+          .map((feature) => composePlaceLabel(feature))
+          .filter((label) => label.length > 0)
+          .slice(0, 5);
+        renderPlaceSuggestions(labels);
+      } catch {
+        if (currentToken === requestToken) hidePlaceSuggestions();
+      }
+    }
+
+    function schedulePlaceSearch() {
+      window.clearTimeout(debounceHandle);
+      const query = trimValue(placeInput);
+      if (query.length < 3) {
+        hidePlaceSuggestions();
+        return;
+      }
+      debounceHandle = window.setTimeout(() => {
+        void searchPlaces(query);
+      }, 350);
+    }
+
+    placeInput.addEventListener('input', () => {
+      validatePlaceField(p);
+      schedulePlaceSearch();
     });
+    placeInput.addEventListener('focus', () => {
+      if (trimValue(placeInput).length >= 3) {
+        if (suggestions.length) {
+          renderPlaceSuggestions(suggestions);
+        } else {
+          schedulePlaceSearch();
+        }
+      }
+    });
+    placeInput.addEventListener('blur', () => {
+      window.setTimeout(() => {
+        hidePlaceSuggestions();
+      }, 120);
+      validatePlaceField(p);
+    });
+    placeInput.addEventListener('keydown', (event) => {
+      if (placeMenu.hidden || !suggestions.length) return;
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        activeIndex = (activeIndex + 1) % suggestions.length;
+        updateActiveOption();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        activeIndex = (activeIndex - 1 + suggestions.length) % suggestions.length;
+        updateActiveOption();
+      } else if (event.key === 'Enter' && activeIndex >= 0) {
+        event.preventDefault();
+        choosePlaceSuggestion(activeIndex);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        hidePlaceSuggestions();
+      }
+    });
+
+    if (placeShell) {
+      document.addEventListener('click', (event) => {
+        if (!placeShell.contains(event.target as Node)) hidePlaceSuggestions();
+      });
+    }
+
+    return { hide: hidePlaceSuggestions };
+  }
+
+  const placeAutocompletes = [setupPlaceAutocomplete(primary), setupPlaceAutocomplete(partner)];
+
+  function personPayload(p: PersonFields) {
+    return {
+      fullName: p.fullName.value.trim(),
+      gender: p.gender.value,
+      dateOfBirth: formatBirthDate(p.date.value),
+      timeOfBirth: formatTime(p.time.value),
+      placeOfBirth: p.place.value.trim(),
+      timezone: p.timezone.value,
+    };
   }
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    hidePlaceSuggestions();
+    placeAutocompletes.forEach((autocomplete) => autocomplete.hide());
 
     if (!isAuthed) {
       window.location.href = authRedirect;
@@ -689,15 +890,13 @@ const kundliNow = formatMoney(pricing.kundliCents, currency);
     const isValid = validateAllFields();
     if (!isValid) return;
 
+    const twoPeople = isTwoPeople();
     const payload = {
-      fullName: fullNameInput.value.trim(),
-      gender: genderSelect.value,
-      dateOfBirth: formatBirthDate(dateInput.value),
-      timeOfBirth: formatTime(timeInput.value),
-      placeOfBirth: placeInput.value.trim(),
-      timezone: timezoneSelect.value,
+      ...personPayload(primary),
       email: emailInput.value.trim(),
-      questions: collectQuestions(),
+      questions: questionsInput.value.trim(),
+      twoPeople,
+      ...(twoPeople ? { partner: personPayload(partner) } : {}),
     };
 
     btn.disabled = true;
