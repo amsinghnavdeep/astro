@@ -104,6 +104,28 @@ Devin cost; ACUs are billed per session run regardless of who triggers it.
    questions (dasha/transit timing), **no new PDF**.
 5. Backend emails the precise answers.
 
+### Flow C — "Ask Pandit ji" live chat (`/chat`, logged-in customers)
+1. Every paid Kundli grants `CHAT_CREDITS_PER_KUNDLI` (default 5) chat questions;
+   more via in-chat packs (`POST /api/checkout/chat`, default 10 for $9 / 25 for $19).
+   Credits live in an append-only D1 ledger (`chat_credit_ledger`), idempotent on
+   the Stripe Checkout Session id.
+2. The customer saves a birth profile (self, spouse, child…). The Worker computes
+   the chart with the Swiss Ephemeris engine, plus antardashas of the current/next
+   Mahadasha and Jupiter/Saturn/Rahu sign changes for the next 36 months.
+3. One Devin session per profile acts as the astrologer: an opening reading
+   (1 credit), then free-form questions about past and future (1 credit each),
+   answered with dasha/transit timing and explanation. Replies are pulled from the
+   session's v3 messages API when the browser polls `GET /api/chat/messages`.
+4. Safety: chat sessions are created with `secret_ids: []` and `knowledge_ids: []`,
+   so customer prompt-injection can't reach org secrets; customer text is wrapped as
+   untrusted input. Sessions are ACU-capped (`CHAT_MAX_ACU_PER_SESSION`); when one
+   stops accepting messages, a fresh session is seeded with the transcript.
+5. Unit economics: `GET /api/admin/chats` (Bearer `ADMIN_API_TOKEN`) lists ACUs per
+   thread and ACUs per credit; `POST /api/admin/chats {email, credits}` grants credits.
+
+Requires migration `migrations/0002_chat.sql`
+(`npx wrangler d1 migrations apply siddh-jyotish --remote`).
+
 ---
 
 ## 4. The two Devin playbooks

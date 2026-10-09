@@ -178,9 +178,12 @@ function buildDashaTimeline(
   return { balanceYears, timeline };
 }
 
-function buildAntardashas(maha: DashaPeriod): DashaPeriod[] {
+export function buildAntardashas(maha: DashaPeriod): DashaPeriod[] {
   const mahaYears = DASHA_YEARS[maha.lord];
-  const startMs = Date.parse(maha.start);
+  // The birth Mahadasha is usually partial, so sub-periods must be laid out
+  // from its theoretical start (end − full length) and clipped at birth.
+  const startMs = Date.parse(maha.end) - mahaYears * YEAR_MS;
+  const actualStartMs = Date.parse(maha.start);
   const lordIndex = DASHA_LORDS.indexOf(maha.lord as (typeof DASHA_LORDS)[number]);
   const periods: DashaPeriod[] = [];
   let cursor = startMs;
@@ -188,7 +191,9 @@ function buildAntardashas(maha: DashaPeriod): DashaPeriod[] {
     const lord = DASHA_LORDS[(lordIndex + i) % 9];
     const years = (mahaYears * DASHA_YEARS[lord]) / 120;
     const end = cursor + years * YEAR_MS;
-    periods.push({ lord, start: isoDate(cursor), end: isoDate(end) });
+    if (end > actualStartMs) {
+      periods.push({ lord, start: isoDate(Math.max(cursor, actualStartMs)), end: isoDate(end) });
+    }
     cursor = end;
   }
   return periods;
@@ -439,5 +444,84 @@ export function chartToPromptText(c: ChartData): string {
     `  Kaal Sarp: ${c.doshas.kaalSarp.present ? 'PRESENT — ' + c.doshas.kaalSarp.type : 'not present'}.`,
   );
   lines.push(`  Sade Sati: ${c.doshas.sadeSati.active ? 'ACTIVE — ' + c.doshas.sadeSati.phase : 'not active'}. ${c.doshas.sadeSati.note}`);
+  return lines.join('\n');
+}
+
+const TRANSIT_BODIES = ['Jupiter', 'Saturn', 'Rahu'] as const;
+
+function ordinal(n: number): string {
+  const suffix = n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th';
+  return `${n}${suffix}`;
+}
+
+/**
+ * Sign ingresses of the slow planets (Jupiter, Saturn, Rahu/Ketu) over the
+ * coming months, located by house from Lagna and from the natal Moon. Sampled
+ * daily, so ingress dates are accurate to a day (retrograde re-entries included).
+ */
+export async function computeTransits(
+  chart: ChartData,
+  months = 36,
+  fromMs = Date.now(),
+): Promise<string[]> {
+  const swe = await getEphemeris();
+  swe.set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
+  const flags = swe.SEFLG_MOSEPH | swe.SEFLG_SIDEREAL | swe.SEFLG_SPEED;
+  const ids: Record<(typeof TRANSIT_BODIES)[number], number> = {
+    Jupiter: swe.SE_JUPITER,
+    Saturn: swe.SE_SATURN,
+    Rahu: swe.SE_MEAN_NODE,
+  };
+  const moonSignIndex = SIGNS.indexOf(chart.moonSign as (typeof SIGNS)[number]);
+  const where = (signIndex: number): string =>
+    `${SIGNS[signIndex]} (${ordinal(((signIndex - chart.lagna.signIndex + 12) % 12) + 1)} from Lagna, ${ordinal(((signIndex - moonSignIndex + 12) % 12) + 1)} from Moon)`;
+  const signAt = (ms: number, body: number): { sign: number; retro: boolean } => {
+    const d = new Date(ms);
+    const jd = swe.julday(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), 12);
+    const p = swe.calc_ut(jd, body, flags);
+    return { sign: Math.floor(norm360(p[0]) / 30), retro: p[3] < 0 };
+  };
+
+  const lines: string[] = [];
+  const dayMs = 24 * 60 * 60 * 1000;
+  const endMs = fromMs + months * 30.44 * dayMs;
+  for (const name of TRANSIT_BODIES) {
+    const body = ids[name];
+    let prev = signAt(fromMs, body);
+    const label = name === 'Rahu' ? 'Rahu/Ketu' : name;
+    const ketu = (s: number): string => (name === 'Rahu' ? ` / Ketu in ${SIGNS[(s + 6) % 12]}` : '');
+    lines.push(`  ${label}: now in ${where(prev.sign)}${ketu(prev.sign)}${prev.retro && name !== 'Rahu' ? ', retrograde' : ''}.`);
+    for (let ms = fromMs + dayMs; ms <= endMs; ms += dayMs) {
+      const cur = signAt(ms, body);
+      if (cur.sign !== prev.sign) {
+        lines.push(`    ${isoDate(ms)} → enters ${where(cur.sign)}${ketu(cur.sign)}${cur.retro && name !== 'Rahu' ? ' (retrograde)' : ''}.`);
+      }
+      prev = cur;
+    }
+  }
+  return lines;
+}
+
+/**
+ * Extra context for the live chat astrologer on top of chartToPromptText:
+ * antardashas of the current and next Mahadasha and upcoming slow transits.
+ */
+export async function chartToChatContext(c: ChartData): Promise<string> {
+  const lines: string[] = [chartToPromptText(c), ''];
+  const nowMs = Date.now();
+  const idx = c.dasha.timeline.findIndex((d) => Date.parse(d.start) <= nowMs && nowMs < Date.parse(d.end));
+  const mahas = idx >= 0 ? c.dasha.timeline.slice(idx, idx + 2) : c.dasha.timeline.slice(0, 2);
+  for (const maha of mahas) {
+    lines.push(`Antardashas of ${maha.lord} Mahadasha (${maha.start} → ${maha.end}):`);
+    lines.push('  ' + buildAntardashas(maha).map((a) => `${a.lord} ${a.start}→${a.end}`).join('; ') + '.');
+  }
+  lines.push('');
+  lines.push(`Slow-planet transits from ${isoDate(nowMs)} (next 36 months):`);
+  try {
+    lines.push(...(await computeTransits(c)));
+  } catch (err) {
+    lines.push('  (transit computation unavailable)');
+    console.error('Transit computation failed:', err);
+  }
   return lines.join('\n');
 }

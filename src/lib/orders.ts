@@ -2,7 +2,7 @@ import type { KVNamespace } from '@cloudflare/workers-types';
 
 export interface OrderRecord {
   id: string;
-  kind: 'kundli' | 'followup';
+  kind: 'kundli' | 'followup' | 'chat_credits';
   amountTotal: number;
   currency: string;
   email: string;
@@ -34,7 +34,7 @@ function parseOrder(value: string | null): OrderRecord | null {
     const parsed = JSON.parse(value) as OrderRecord;
     if (
       typeof parsed.id !== 'string' ||
-      (parsed.kind !== 'kundli' && parsed.kind !== 'followup') ||
+      (parsed.kind !== 'kundli' && parsed.kind !== 'followup' && parsed.kind !== 'chat_credits') ||
       typeof parsed.amountTotal !== 'number' ||
       typeof parsed.currency !== 'string' ||
       typeof parsed.email !== 'string' ||

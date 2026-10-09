@@ -30,6 +30,7 @@ import {
 } from '../../../lib/auth';
 import { geocodeBirthplace } from '../../../lib/kundli/geocode';
 import { generateReport, type GeneratePayload } from '../../../lib/reportService';
+import { addCredits } from '../../../lib/chat';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   // Signature verification needs the RAW body — never call request.json() first.
@@ -62,7 +63,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
   const createdAt = new Date(event.created * 1000);
   const order: OrderRecord = {
     id: session.id,
-    kind: m.kind === 'followup' ? 'followup' : 'kundli',
+    kind: m.kind === 'followup' || m.kind === 'chat_credits' ? m.kind : 'kundli',
     amountTotal: session.amount_total ?? 0,
     currency: session.currency ?? '',
     email: session.customer_email ?? m.email ?? '',
@@ -72,7 +73,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
         ? JSON.parse(m.questions || '[]').length
         : m.kind === 'followup'
           ? Number(m.questionCount)
-          : undefined,
+          : m.kind === 'chat_credits'
+            ? Number(m.credits)
+            : undefined,
     createdAt: createdAt.toISOString(),
     createdAtMs: createdAt.getTime(),
   };
@@ -91,11 +94,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
         user_id: m.userId || null,
         email: order.email,
         kind: order.kind,
-        service_type: order.kind,
+        service_type: order.kind === 'chat_credits' ? `${order.questionCount ?? ''} Pandit chat questions` : order.kind,
         full_name: order.fullName ?? null,
         amount_total: order.amountTotal,
         currency: order.currency,
-        status: 'paid',
+        status: m.kind === 'chat_credits' ? 'delivered' : 'paid',
         pdf_key: null,
         reference_number: m.reference || null,
         created_at: order.createdAt,
@@ -105,6 +108,21 @@ export const POST: APIRoute = async ({ request, locals }) => {
   } catch (err) {
     console.error('Account order persistence error:', err);
   }
+
+  // Pandit chat credits: a Kundli purchase includes some chat questions; packs
+  // add more. Idempotent on the Checkout Session id (Stripe retries webhooks).
+  try {
+    const db = locals.runtime.env.SIDDH_DB;
+    const credits =
+      m.kind === 'chat_credits' ? Number(m.credits) : m.kind === 'kundli' ? env.chat.creditsPerKundli : 0;
+    if (db && m.userId && Number.isInteger(credits) && credits > 0) {
+      await addCredits(db, m.userId, credits, m.kind === 'chat_credits' ? 'purchase' : 'kundli_bonus', `stripe:${session.id}`);
+    }
+  } catch (err) {
+    console.error('Chat credit grant error:', err);
+  }
+
+  if (m.kind === 'chat_credits') return json({ received: true }, 200);
 
   try {
     await deleteLead(locals.runtime.env.SIDDH_KV, session.id);

@@ -27,6 +27,15 @@ function usdToCents(name: string, fallbackDollars: number): number {
   return Math.round(dollars * 100);
 }
 
+function intVar(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const value = raw ? Number(raw) : fallback;
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`Invalid integer for ${name}: ${raw}`);
+  }
+  return value;
+}
+
 export const env = {
   siteUrl: optional('PUBLIC_SITE_URL', 'http://localhost:4321'),
 
@@ -52,6 +61,19 @@ export const env = {
     // playbook_id, so follow-ups resume the original session's context.
     // Retained for documentation; will be wired in if the API adds support.
     followupPlaybook: optional('DEVIN_FOLLOWUP_PLAYBOOK'),
+  },
+
+  chat: {
+    creditsPerKundli: intVar('CHAT_CREDITS_PER_KUNDLI', 5),
+    packs: [
+      { id: 'pack10', credits: 10, cents: usdToCents('PRICE_CHAT_PACK_10_USD', 9) },
+      { id: 'pack25', credits: 25, cents: usdToCents('PRICE_CHAT_PACK_25_USD', 19) },
+    ],
+    playbook: optional('DEVIN_CHAT_PLAYBOOK'),
+    // Optional agent mode for chat sessions (e.g. "fast") to trade depth for cost.
+    devinMode: optional('DEVIN_CHAT_MODE'),
+    maxAcuPerSession: intVar('CHAT_MAX_ACU_PER_SESSION', 20),
+    maxMessageChars: intVar('CHAT_MAX_MESSAGE_CHARS', 600),
   },
 
   reportService: {
