@@ -39,6 +39,8 @@ export const env = {
   },
   support: {
     get email() { return optional('SUPPORT_EMAIL'); },
+    get maxAcu() { return int('SUPPORT_MAX_ACU', 3); },
+    get maxAiReplies() { return int('SUPPORT_MAX_AI_REPLIES', 2); },
   },
   chat: {
     get freeQuestions() { return int('FREE_QUESTIONS', 1); },

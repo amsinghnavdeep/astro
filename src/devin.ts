@@ -332,3 +332,18 @@ export async function createChatSession(
   });
   return { ...session, session_id: session.session_id ?? session.devin_id ?? '' };
 }
+
+/** One support-agent session per ticket. No tools needed: it answers from the facts in the prompt. */
+export async function createSupportSession(prompt: string, ticketNumber: string): Promise<DevinSession> {
+  const body: Record<string, unknown> = {
+    prompt,
+    title: `Kaalera support — ${ticketNumber}`,
+    tags: ['kaalera-support', `ticket:${ticketNumber}`],
+    secret_ids: [],
+    knowledge_ids: [],
+  };
+  if (env.support.maxAcu > 0) body.max_acu_limit = env.support.maxAcu;
+  if (env.chat.devinMode) body.devin_mode = env.chat.devinMode;
+  const session = await devinFetch<DevinSession>(sessionsBase(), { method: 'POST', body: JSON.stringify(body) });
+  return { ...session, session_id: session.session_id ?? session.devin_id ?? '' };
+}

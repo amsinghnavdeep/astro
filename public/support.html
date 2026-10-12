@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support — Kaalera</title>
+  <link rel="icon" href="/kaal-mark.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/developers.css">
+  <link rel="stylesheet" href="/support.css">
+</head>
+<body>
+  <div class="s-wrap">
+    <header class="s-top">
+      <a class="d-brand" href="/"><span class="d-logo"></span> Kaalera <span class="d-tag">Support</span></a>
+      <nav class="s-nav"><a href="/">App</a><a href="/developers">Developers</a><a href="/docs">Docs</a></nav>
+    </header>
+    <main class="s-main">
+      <h1>Raise a ticket</h1>
+      <p class="d-muted">Tell us what went wrong. We'll analyse it and reply here and by email.</p>
+      <form id="t-form" class="d-card s-form" novalidate>
+        <label id="t-email-row">Email<input id="t-email" type="email" autocomplete="email" placeholder="you@example.com" maxlength="200"></label>
+        <label>Topic<select id="t-topic"></select></label>
+        <label id="t-thread-row" hidden>Consultation (optional)<select id="t-thread"><option value="">None</option></select></label>
+        <label>Subject<input id="t-subject" maxlength="140" placeholder="Short summary"></label>
+        <label>Describe the issue<textarea id="t-message" rows="6" maxlength="4000" placeholder="What happened, and what did you expect?"></textarea></label>
+        <p id="t-error" class="d-error" role="alert"></p>
+        <button class="d-btn primary" id="t-submit" type="submit">Submit ticket</button>
+      </form>
+      <div id="t-done" class="d-card s-done" hidden>
+        <h2>Ticket <span id="t-num"></span> raised</h2>
+        <p class="d-muted" id="t-done-text"></p>
+        <button class="d-btn" id="t-another" type="button">Raise another ticket</button>
+      </div>
+      <p id="signin-hint" class="d-muted d-small" hidden><a href="/">Sign in</a> to track replies on this page.</p>
+      <section id="my-tickets" hidden>
+        <h2>Your tickets</h2>
+        <div id="ticket-list"></div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/support.js"></script>
+</body>
+</html>
