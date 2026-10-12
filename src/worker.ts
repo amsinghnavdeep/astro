@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type Stripe from 'stripe';
 import type { D1Database } from '@cloudflare/workers-types';
 import { env } from './env.js';
+import { deleteKundli, getKundli, kundliInput, listKundlis, MAX_KUNDLIS, publicKundli, saveKundli, type Kundli } from './kundlis.js';
 import { LANGUAGES } from './languages.js';
 import { computeChart, chartToChatContext } from './kundli/chart.js';
 import { createLoginToken, destroySession, redeemLoginToken, userForSession, type User } from './auth.js';
@@ -42,19 +43,37 @@ const coord = (min: number, max: number) =>
   z.preprocess((v) => (v === '' || v == null ? undefined : Number(v)), z.number().min(min).max(max).optional());
 const language = z.enum(LANGUAGES).default('English');
 const birthSchema = z.object({
-  fullName: z.string().trim().min(1).max(120),
+  fullName: z.string().trim().max(120).default(''),
+  newborn: z.preprocess((v) => v === true || v === 'on' || v === 'true', z.boolean()).default(false),
   gender: z.enum(['Male', 'Female', 'Other']),
   dateOfBirth: z.string().trim().min(1).max(40),
-  timeOfBirth: z.string().trim().min(1).max(20),
+  timeOfBirth: z.string().trim().regex(/^\d{1,2}:\d{2}(\s?[AaPp][Mm])?$/),
   placeOfBirth: z.string().trim().min(2).max(160),
   timezone: z.string().trim().min(1).max(64),
   latitude: coord(-90, 90),
   longitude: coord(-180, 180),
   language,
 });
+/** Name is required unless the chart is for a newborn whose name isn't chosen yet. */
+function named<T extends { fullName: string; newborn: boolean }>(v: T): T | null {
+  if (v.fullName) return v;
+  return v.newborn ? { ...v, fullName: 'Newborn baby' } : null;
+}
+const kundliSchema = birthSchema.omit({ language: true });
+const BIRTH_ERROR = 'Please add the name (or tick newborn), date, time and place of birth.';
+
+async function chartContext(k: Kundli, mainName: string): Promise<string | null> {
+  const chart = await chartText({ ...kundliInput(k), language: 'English' });
+  if (!chart) return null;
+  const name = k.full_name.replace(/[<>"]/g, '');
+  return `<additional_chart person="${name}">\n${chart}\n</additional_chart>\n(This question is about ${name}, whose birth chart is above, not about ${mainName.replace(/[<>"]/g, '')} unless the customer compares them. Answer from ${name}'s chart.)`;
+}
+
 const questionText = () => z.string().trim().min(2).max(env.chat.maxMessageChars);
 
-async function chartText(p: z.infer<typeof birthSchema>): Promise<string | null> {
+type BirthInput = Omit<z.infer<typeof birthSchema>, 'gender'> & { gender: string };
+
+async function chartText(p: BirthInput): Promise<string | null> {
   try {
     return await chartToChatContext(await computeChart(p));
   } catch (err) {
@@ -63,7 +82,7 @@ async function chartText(p: z.infer<typeof birthSchema>): Promise<string | null>
   }
 }
 
-function newThread(userId: string, p: z.infer<typeof birthSchema>, chart: string, question: string, extra: Partial<Thread>): Thread {
+function newThread(userId: string, p: BirthInput, chart: string, question: string, extra: Partial<Thread>): Thread {
   return {
     id: crypto.randomUUID(), user_id: userId, full_name: p.fullName, gender: p.gender, date_of_birth: p.dateOfBirth,
     time_of_birth: p.timeOfBirth, place_of_birth: p.placeOfBirth, timezone: p.timezone, language: p.language,
@@ -203,12 +222,41 @@ app.get('/api/threads', async (c) => {
   return c.json({ threads: (await listThreads(c.env.DB, user.id)).map(publicThread) });
 });
 
+app.get('/api/kundlis', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  return c.json({ kundlis: (await listKundlis(c.env.DB, user.id)).map(publicKundli) });
+});
+
+async function upsertKundli(c: C, id?: string) {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  const parsed = kundliSchema.safeParse(await c.req.json().catch(() => null));
+  const data = parsed.success ? named(parsed.data) : null;
+  if (!data) return c.json({ error: BIRTH_ERROR }, 400);
+  if (!id && (await listKundlis(c.env.DB, user.id)).length >= MAX_KUNDLIS) return c.json({ error: `You can save up to ${MAX_KUNDLIS} Kundlis.` }, 400);
+  if (!(await chartText({ ...data, language: 'English' }))) return c.json({ error: 'Could not compute this chart. Check the date, time and birthplace.' }, 400);
+  const k = await saveKundli(c.env.DB, user.id, data, id);
+  return k ? c.json({ kundli: publicKundli(k) }, id ? 200 : 201) : c.json({ error: 'Not found' }, 404);
+}
+app.post('/api/kundlis', (c) => upsertKundli(c));
+app.put('/api/kundlis/:id', (c) => upsertKundli(c, c.req.param('id')));
+app.delete('/api/kundlis/:id', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  return (await deleteKundli(c.env.DB, user.id, c.req.param('id'))) ? c.json({ ok: true }) : c.json({ error: 'Not found' }, 404);
+});
+
 app.post('/api/threads', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
-  const p = birthSchema.extend({ question: questionText() }).safeParse(await c.req.json().catch(() => null));
-  if (!p.success) return c.json({ error: 'Please complete all birth details and write your question.' }, 400);
+  const body = z.object({ kundliId: z.string().min(1), question: questionText(), language })
+    .safeParse(await c.req.json().catch(() => null));
+  if (!body.success) return c.json({ error: 'Choose or add a Kundli and write your question.' }, 400);
   const db = c.env.DB;
+  const k = await getKundli(db, user.id, body.data.kundliId);
+  if (!k) return c.json({ error: 'Choose or add a Kundli first.' }, 400);
+  const p = { data: { ...kundliInput(k), language: body.data.language, question: body.data.question } };
   if ((await listThreads(db, user.id)).length >= MAX_THREADS) return c.json({ error: `You can keep up to ${MAX_THREADS} consultations.` }, 400);
   const chart = await chartText(p.data);
   if (!chart) return c.json({ error: 'Could not compute this chart. Check the date, time and birthplace.' }, 400);
@@ -216,6 +264,8 @@ app.post('/api/threads', async (c) => {
   const free = await claimFreeConsultation(db, user.id);
   const t = newThread(user.id, p.data, chart, p.data.question, free ? { is_free: 1, questions_allowed: env.chat.freeQuestions } : {});
   await createThreadWithQuestion(db, t, p.data.question);
+  t.kundli_id = k.id;
+  await db.prepare('UPDATE threads SET kundli_id = ? WHERE id = ?').bind(k.id, t.id).run();
   if (!free) {
     const url = await createCheckout(user, {
       kind: 'consultation', threadId: t.id, credits: env.chat.packQuestions, cents: env.chat.packCents,
@@ -298,9 +348,17 @@ const SEND_ERRORS: Record<SendError, [402 | 409 | 429 | 503, string]> = {
 app.post('/api/threads/:id/messages', async (c) => {
   const t = await ownThread(c);
   if (!t) return c.json({ error: 'Not found' }, 404);
-  const p = z.object({ text: questionText(), language: z.enum(LANGUAGES).optional() }).safeParse(await c.req.json().catch(() => null));
+  const p = z.object({ text: questionText(), language: z.enum(LANGUAGES).optional(), kundliId: z.string().optional() })
+    .safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: `Please write a question (up to ${env.chat.maxMessageChars} characters).` }, 400);
-  const r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language);
+  let context: string | undefined;
+  if (p.data.kundliId && p.data.kundliId !== t.kundli_id) {
+    const k = await getKundli(c.env.DB, t.user_id, p.data.kundliId);
+    if (!k) return c.json({ error: 'That Kundli was not found.' }, 400);
+    context = (await chartContext(k, t.full_name)) ?? undefined;
+    if (!context) return c.json({ error: 'Could not compute that chart. Check its birth details.' }, 400);
+  }
+  const r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context);
   if (r.error) {
     const [status, error] = SEND_ERRORS[r.error];
     return c.json({ error }, status);
@@ -398,8 +456,10 @@ app.get('/v1/balance', async (c) => c.json({ credits: await apiBalance(c.env.DB,
 
 app.post('/v1/consultations', async (c) => {
   const { userId, keyId } = c.get('api');
-  const p = birthSchema.extend({ question: questionText() }).safeParse(await c.req.json().catch(() => null));
-  if (!p.success) return apiError(c, 400, 'invalid_request', p.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
+  const parsed = birthSchema.extend({ question: questionText() }).safeParse(await c.req.json().catch(() => null));
+  const named_ = parsed.success ? named(parsed.data) : null;
+  const p = named_ ? { success: true as const, data: named_ } : { success: false as const };
+  if (!p.success) return apiError(c, 400, 'invalid_request', parsed.success ? 'fullName is required unless newborn is true.' : parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   const db = c.env.DB;
   const chart = await chartText(p.data);
   if (!chart) return apiError(c, 400, 'chart_failed', 'Could not compute the chart. Check date, time, place and timezone.');

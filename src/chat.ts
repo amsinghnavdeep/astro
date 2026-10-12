@@ -15,6 +15,7 @@ export interface Thread {
   status: 'awaiting_payment' | 'starting' | 'active' | 'failed'; is_free: number;
   questions_allowed: number; questions_used: number; acus_consumed: number;
   last_synced_at: number; created_at: string; expires_at: number | null;
+  kundli_id?: string | null;
 }
 export interface Message {
   id: string; thread_id: string; role: 'user' | 'pandit'; body: string;
@@ -106,7 +107,7 @@ export function pendingCount(messages: Message[]): number {
 export type SendError = 'no_questions' | 'expired' | 'too_many_pending' | 'thread_unavailable' | 'delivery_failed';
 
 export async function sendCustomerMessage(
-  db: D1Database, t: Thread, text: string, language?: string,
+  db: D1Database, t: Thread, text: string, language?: string, context?: string,
 ): Promise<{ message?: Message; error?: SendError }> {
   if (t.status !== 'active' || !t.devin_session_id) return { error: 'thread_unavailable' };
   if (isExpired(t)) return { error: 'expired' };
@@ -124,7 +125,7 @@ export async function sendCustomerMessage(
   const message: Message = { id, thread_id: t.id, role: 'user', body: text, devin_event_id: null, created_at: nowIso() };
   await insertMessage(db, message);
   try {
-    await postSessionMessage(t.devin_session_id, wrapCustomerMessage(text, lang), { retryOnInitializing: true });
+    await postSessionMessage(t.devin_session_id, (context ? `${context}\n\n` : '') + wrapCustomerMessage(text, lang), { retryOnInitializing: true });
   } catch (err) {
     console.error('Chat delivery failed:', err);
     await db.prepare('DELETE FROM messages WHERE id = ?').bind(id).run();
@@ -193,6 +194,7 @@ export const publicThread = (t: Thread) => ({
   placeOfBirth: t.place_of_birth, language: t.language, status: t.status, isFree: !!t.is_free,
   questionsLeft: questionsLeft(t), questionsAllowed: t.questions_allowed,
   expired: isExpired(t), expiresAt: t.expires_at ? new Date(t.expires_at).toISOString() : null, createdAt: t.created_at,
+  kundliId: t.kundli_id ?? null,
 });
 
 export const publicMessage = (m: Message) => ({ id: m.id, role: m.role, body: m.body, createdAt: m.created_at });

@@ -214,3 +214,40 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
   .l-links { gap: 12px; }
   .l-links a { display: none; }
 }
+
+/* Kundli picker */
+.kundli-pick { display: flex; flex-direction: column; gap: 8px; }
+.kundli-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 500; }
+.kundli-list { display: flex; flex-direction: column; gap: 6px; }
+.kundli-card { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; background: #fff; text-align: left; }
+.kundli-card.selected { border-color: #111; box-shadow: 0 0 0 1px #111 inset; }
+.kundli-card .k-main { flex: 1; min-width: 0; }
+.kundli-card .k-name { font-weight: 500; }
+.kundli-card .k-sub { font-size: 12px; color: #6b6b6b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kundli-empty { border: 1px dashed var(--line); border-radius: 10px; padding: 14px; font-size: 13px; color: #6b6b6b; text-align: center; }
+.checkbox { flex-direction: row !important; align-items: center; gap: 8px; font-size: 13px; }
+.wide-modal { width: min(560px, calc(100% - 32px)); }
+.about-row { display: flex; align-items: center; gap: 8px; padding: 2px 2px 6px; }
+.about-select { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; background: #fafafa; max-width: 70%; }
+
+/* Future symbols */
+.logo:not(.plain) { font-size: 0 !important; background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 4.2A8 8 0 1 0 19.8 15 6.5 6.5 0 0 1 15.5 4.2z' fill='%23fff'/%3E%3Cpath d='M18 4l.6 1.4L20 6l-1.4.6L18 8l-.6-1.4L16 6l1.4-.6z' fill='%23fff'/%3E%3C/svg%3E") center/62% no-repeat; }
+.landing { background:
+  radial-gradient(1.5px 1.5px at 12% 18%, #c9c9d6 50%, transparent 51%),
+  radial-gradient(1px 1px at 28% 72%, #c9c9d6 50%, transparent 51%),
+  radial-gradient(1.5px 1.5px at 84% 14%, #c9c9d6 50%, transparent 51%),
+  radial-gradient(1px 1px at 70% 40%, #d6d6e0 50%, transparent 51%),
+  radial-gradient(1.5px 1.5px at 92% 66%, #c9c9d6 50%, transparent 51%),
+  radial-gradient(1px 1px at 6% 52%, #d6d6e0 50%, transparent 51%),
+  radial-gradient(1px 1px at 46% 8%, #c9c9d6 50%, transparent 51%),
+  #fff; background-attachment: fixed; }
+.hero-art { position: relative; width: 132px; height: 132px; margin: 0 auto 18px; display: grid; place-items: center; }
+.zodiac-wheel { position: absolute; inset: 0; width: 100%; height: 100%; color: #a3a3b2; animation: spin 120s linear infinite; }
+.hero-orb { width: 58px; height: 58px; position: relative; animation: float 5s ease-in-out infinite; }
+.heritage { font-size: 12px !important; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 auto 14px !important; }
+.l-num { font-size: 20px !important; }
+.avatar.kaal, .msg.kaal .avatar, .working .avatar { background: #171717 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 4.2A8 8 0 1 0 19.8 15 6.5 6.5 0 0 1 15.5 4.2z' fill='%23fff'/%3E%3Cpath d='M18 4l.6 1.4L20 6l-1.4.6L18 8l-.6-1.4L16 6l1.4-.6z' fill='%23fff'/%3E%3C/svg%3E") center/62% no-repeat; color: transparent; }
+.chat-view, .center-view { background-image: radial-gradient(1px 1px at 90% 10%, #e0e0ea 50%, transparent 51%), radial-gradient(1px 1px at 8% 30%, #e0e0ea 50%, transparent 51%), radial-gradient(1.5px 1.5px at 75% 85%, #e0e0ea 50%, transparent 51%); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes float { 50% { transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .zodiac-wheel, .hero-orb { animation: none; } }

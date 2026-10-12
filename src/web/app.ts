@@ -4,11 +4,12 @@ type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
 type Thread = {
   id: string; fullName: string; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string;
   language: string; status: Status; isFree: boolean; questionsLeft: number; questionsAllowed: number;
-  expired: boolean; expiresAt: string | null; createdAt: string;
+  expired: boolean; expiresAt: string | null; createdAt: string; kundliId: string | null;
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
 type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string };
 type Me = { user: { name: string; email: string }; freeAvailable: boolean; pricing: Pricing; languages: string[]; maxChars: number };
+type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -35,6 +36,7 @@ const STEPS = ['Casting your chart…', 'Reading the planets and houses…', 'Ch
 let me: Me | null = null;
 let threads: Thread[] = [];
 let current: Thread | null = null;
+let kundlis: Kundli[] = [];
 let pending = 0;
 let pollTimer: number | undefined;
 let renderedKey = '';
@@ -236,6 +238,7 @@ function selectTimezone(tz: string | null): void {
 }
 
 function showProfile(question = ''): void {
+  renderKundliList();
   stopPolling();
   current = null;
   renderThreads();
@@ -259,7 +262,7 @@ function showProfile(question = ''): void {
   } else {
     note.innerHTML = '';
     note.append(el('strong', '', `${money(p.packCents, p.currency)} for ${p.packQuestions} questions.`),
-      ` An opening reading plus answers to ${plural(p.packQuestions, 'question')}, open for ${p.consultationDays} days. You'll pay securely with Stripe.`);
+      ` An opening reading plus answers to ${plural(p.packQuestions, 'question')}, open for ${p.consultationDays} days. You'll pay securely by card.`);
     submit.textContent = `Continue to payment — ${money(p.packCents, p.currency)}`;
   }
   history.replaceState(null, '', '/');
@@ -339,6 +342,10 @@ profileForm.addEventListener('submit', async (e) => {
   const submit = $<HTMLButtonElement>('profile-submit');
   err.textContent = '';
   const body = Object.fromEntries(new FormData(profileForm).entries());
+  if (!body.kundliId) {
+    err.textContent = 'Choose a Kundli or add a new one first.';
+    return;
+  }
   const label = submit.textContent;
   submit.disabled = true;
   submit.textContent = me!.freeAvailable ? 'Casting the chart…' : 'Opening checkout…';
@@ -362,6 +369,129 @@ profileForm.addEventListener('submit', async (e) => {
   if (!ok) err.textContent = data.error ?? 'Something went wrong. Please try again.';
 });
 
+
+/* ---------- kundlis ---------- */
+const kundliModal = $<HTMLDialogElement>('kundli-modal');
+const kundliForm = $<HTMLFormElement>('kundli-form');
+const aboutSelect = $<HTMLSelectElement>('about-select');
+let editing: Kundli | null = null;
+let kundliOrigin: 'profile' | 'about' = 'profile';
+
+async function loadKundlis(): Promise<void> {
+  const { ok, data } = await api<{ kundlis: Kundli[] }>('/api/kundlis');
+  if (ok) kundlis = data.kundlis;
+}
+
+const kundliSub = (k: Kundli) => `${fmtDate(k.dateOfBirth)} · ${fmtTime(k.timeOfBirth)} · ${k.placeOfBirth}`;
+
+function renderKundliList(selected = $<HTMLInputElement>('kundli-id').value): void {
+  if (!kundlis.some((k) => k.id === selected)) selected = kundlis.length === 1 ? kundlis[0].id : '';
+  $<HTMLInputElement>('kundli-id').value = selected;
+  const list = $('kundli-list');
+  if (!kundlis.length) {
+    list.replaceChildren(el('div', 'kundli-empty', 'No Kundli saved yet. Add one to start.'));
+    return;
+  }
+  list.replaceChildren(...kundlis.map((k) => {
+    const card = el('div', `kundli-card${k.id === selected ? ' selected' : ''}`);
+    card.setAttribute('role', 'radio');
+    card.setAttribute('aria-checked', String(k.id === selected));
+    card.tabIndex = 0;
+    const main = el('div', 'k-main');
+    main.append(el('div', 'k-name', k.fullName), el('div', 'k-sub', kundliSub(k)));
+    const edit = el('button', 'btn sm ghost', 'Edit');
+    edit.type = 'button';
+    edit.addEventListener('click', (e) => { e.stopPropagation(); openKundli(k, 'profile'); });
+    card.append(main, edit);
+    card.addEventListener('click', () => renderKundliList(k.id));
+    card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); renderKundliList(k.id); } });
+    return card;
+  }));
+}
+
+function syncNewborn(): void {
+  const nb = $<HTMLInputElement>('newborn-box').checked;
+  const name = $<HTMLInputElement>('kundli-name');
+  name.required = !nb;
+  name.placeholder = nb ? 'Optional for a newborn' : 'e.g. Arjun Sharma';
+}
+$('newborn-box').addEventListener('change', syncNewborn);
+
+function openKundli(k: Kundli | null, origin: 'profile' | 'about'): void {
+  editing = k;
+  kundliOrigin = origin;
+  kundliForm.reset();
+  const f = kundliForm.elements as unknown as Record<string, HTMLInputElement>;
+  if (k) {
+    f.fullName.value = k.newborn && k.fullName === 'Newborn baby' ? '' : k.fullName;
+    f.newborn.checked = k.newborn;
+    f.gender.value = k.gender;
+    f.dateOfBirth.value = k.dateOfBirth;
+    f.timeOfBirth.value = k.timeOfBirth;
+    f.placeOfBirth.value = k.placeOfBirth;
+    $<HTMLInputElement>('lat-input').value = k.latitude == null ? '' : String(k.latitude);
+    $<HTMLInputElement>('lon-input').value = k.longitude == null ? '' : String(k.longitude);
+    selectTimezone(k.timezone);
+  } else {
+    selectTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+  }
+  syncNewborn();
+  $('kundli-title').textContent = k ? 'Edit Kundli' : 'Add a Kundli';
+  $('kundli-delete').hidden = !k;
+  $('kundli-error').textContent = '';
+  kundliModal.showModal();
+}
+
+$('kundli-add').addEventListener('click', () => openKundli(null, 'profile'));
+
+kundliForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const err = $('kundli-error');
+  const save = $<HTMLButtonElement>('kundli-save');
+  err.textContent = '';
+  const body = Object.fromEntries(new FormData(kundliForm).entries());
+  save.disabled = true;
+  const { ok, data } = await api<{ kundli: Kundli }>(editing ? `/api/kundlis/${editing.id}` : '/api/kundlis', {
+    method: editing ? 'PUT' : 'POST', body: JSON.stringify(body),
+  });
+  save.disabled = false;
+  if (!ok) {
+    err.textContent = data.error ?? 'Please check the birth details.';
+    return;
+  }
+  await loadKundlis();
+  kundliModal.close();
+  if (kundliOrigin === 'about' && current) {
+    fillAbout(current, data.kundli.id);
+  } else renderKundliList(data.kundli.id);
+});
+
+$('kundli-delete').addEventListener('click', async () => {
+  if (!editing || !confirm(`Delete the Kundli for ${editing.fullName}? Past consultations stay.`)) return;
+  await api(`/api/kundlis/${editing.id}`, { method: 'DELETE' });
+  await loadKundlis();
+  kundliModal.close();
+  renderKundliList();
+});
+
+function fillAbout(t: Thread, selected = ''): void {
+  const opts = [new Option(`${t.fullName} (this consultation)`, '')];
+  for (const k of kundlis) if (k.id !== t.kundliId) opts.push(new Option(k.fullName, k.id));
+  opts.push(new Option('+ Add new Kundli…', '__new'));
+  aboutSelect.replaceChildren(...opts);
+  aboutSelect.value = selected;
+  aboutSelect.dataset.prev = selected;
+}
+
+aboutSelect.addEventListener('change', () => {
+  if (aboutSelect.value === '__new') {
+    aboutSelect.value = aboutSelect.dataset.prev ?? '';
+    openKundli(null, 'about');
+    return;
+  }
+  aboutSelect.dataset.prev = aboutSelect.value;
+});
+
 /* ---------- conversation ---------- */
 
 function upsertThread(t: Thread): void {
@@ -379,6 +509,7 @@ function stopPolling(): void {
 }
 
 function openThread(t: Thread): void {
+  if (current?.id !== t.id) fillAbout(t);
   current = t;
   pending = 0;
   renderedKey = '';
@@ -548,7 +679,7 @@ async function ask(text: string): Promise<void> {
   renderState();
   const { ok, status, data } = await api<{ message: Msg; thread: Thread }>(`/api/threads/${encodeURIComponent(t.id)}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text, language: langSelect.value || t.language }),
+    body: JSON.stringify({ text, language: langSelect.value || t.language, kundliId: aboutSelect.value || undefined }),
   });
   sending = false;
   renderedKey = '';
@@ -619,6 +750,7 @@ async function boot(): Promise<void> {
   askInput.maxLength = me.maxChars;
   $<HTMLTextAreaElement>('profile-question').maxLength = me.maxChars;
   fillLanguages($<HTMLSelectElement>('profile-lang'), me.languages);
+  await loadKundlis();
   try {
     $<HTMLSelectElement>('tz-select').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
   } catch { /* keep placeholder */ }

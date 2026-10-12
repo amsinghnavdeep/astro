@@ -234,7 +234,7 @@ $('packs').addEventListener('click', async (e) => {
   if (!btn) return;
   $('buy-error').textContent = '';
   btn.disabled = true;
-  btn.textContent = 'Redirecting to Stripe…';
+  btn.textContent = 'Opening secure checkout…';
   const r = await api<{ checkoutUrl: string }>('/api/developer/checkout', {
     method: 'POST', body: JSON.stringify({ packId: btn.dataset.pack }),
   });
