@@ -169,3 +169,4 @@ td code { white-space: nowrap; }
 }
 
 .d-logo { font-size: 0 !important; color: transparent; background: #171717 url("/kaal-mark.svg") center/cover no-repeat; }
+.d-logo { background: transparent url("/kaal-mark.svg") center/contain no-repeat !important; }

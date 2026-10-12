@@ -131,3 +131,4 @@ label { display: flex; flex-direction: column; gap: 6px; font-weight: 500; font-
 }
 
 .d-logo { font-size: 0 !important; color: transparent; background: #171717 url("/kaal-mark.svg") center/cover no-repeat; }
+.d-logo { background: transparent url("/kaal-mark.svg") center/contain no-repeat !important; }
