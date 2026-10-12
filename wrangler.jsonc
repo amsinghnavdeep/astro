@@ -15,6 +15,14 @@
     { "binding": "DB", "database_name": "kaalera", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
   ],
   "observability": { "enabled": true },
+  // Runs the Worker next to the D1 database instead of next to the visitor: fewer slow round trips per request.
+  "placement": { "mode": "smart" },
+  // Per-IP / per-key limits (Workers Rate Limiting). namespace_id just has to be unique in the account.
+  "ratelimits": [
+    { "name": "RL_AUTH", "namespace_id": "4101", "simple": { "limit": 5, "period": 60 } },
+    { "name": "RL_WEB", "namespace_id": "4102", "simple": { "limit": 60, "period": 60 } },
+    { "name": "RL_API", "namespace_id": "4103", "simple": { "limit": 120, "period": 60 } }
+  ],
   // Secrets (wrangler secret put / .dev.vars): DEVIN_API_KEY, DEVIN_ORG_ID,
   // STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY.
   "vars": {

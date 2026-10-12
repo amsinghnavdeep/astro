@@ -87,7 +87,7 @@ export async function startThreadSession(db: D1Database, t: Thread): Promise<Thr
   if ((claim.meta?.changes ?? 0) === 0 && t.status !== 'starting') return (await getThreadById(db, t.id)) ?? t;
   try {
     const s = await createChatSession(personaOf(t), {
-      threadId: t.id, userId: t.user_id, firstQuestion: t.first_question ?? undefined,
+      threadId: t.id, userId: t.user_id, firstQuestion: t.first_question ?? undefined, isFree: !!t.is_free,
     });
     const expiresAt = Date.now() + env.chat.consultationDays * DAY_MS;
     await db.prepare("UPDATE threads SET devin_session_id = ?, status = 'active', expires_at = ? WHERE id = ?")
