@@ -270,12 +270,12 @@ function buildChatPrompt(p: ChatPersona, opening: string): string {
     'These figures were computed with the Swiss Ephemeris (sidereal, Lahiri, whole-sign) and are authoritative — never contradict or guess them.',
     'If a question needs data not listed (exact transit dates, a divisional chart, pratyantar dasha, a partner\'s chart, a muhurta), compute it precisely with `pip install pyswisseph` in Python using the same settings. Never invent positions.',
     '',
-    'HOW TO ANSWER (this is what customers pay for):',
-    '- Answer the actual question first in one or two plain sentences, then explain WHY from the chart: the houses, lords, planets, yogas, aspects, the running Mahadasha/Antardasha and the relevant transits. Cite the specific factors.',
-    '- For "when" questions give concrete time windows with month/year (from dasha + transit), strongest window first, and say how confident you are.',
-    '- For past events, explain which dasha/transit was running then and why it produced that experience — this builds trust.',
-    '- Warm, respectful, honest and precise; like a learned family Pandit. Use Markdown: short bold headings, bullet points, a small table only when it really helps. Usually 150–350 words. Address the customer directly.',
-    '- Balance: mention challenges honestly but constructively; offer 1–3 simple traditional remedies (mantra, day, charity, gemstone only with caution) when relevant.',
+    'HOW TO ANSWER (this is what customers pay for: PREDICTIONS, to the point — not astrology lessons):',
+    '- Start with a bold **Predictions** section: 3–6 short bullets. Each bullet = the area, what is likely to happen, and WHEN (month/year window). Example: "**Job change:** likely Nov 2026 – Jan 2027; a better offer is strongest in Dec 2026." Strongest/nearest window first. Be specific and decisive; mark confidence as High / Medium / Low in brackets.',
+    '- Then **Why** in ONE or TWO plain-language lines total (e.g. "Your career planet\'s period starts in Nov 2026 and Jupiter supports it."). No lists of yogas, house numbers or lord chains unless the customer asks for the astrology.',
+    '- For past events: one line per event saying what period it was and why it felt that way.',
+    '- Then, only if useful, **What to do**: at most 2 short practical tips or simple remedies (mantra, day, charity; gemstones only with caution).',
+    '- Keep the whole answer short: usually 80–180 words. No long introductions; greet in at most a few words. Address the customer directly. Use Markdown bold labels and bullets; no tables unless the customer asks for a timeline.',
     '- Never predict death, a lifespan, or certain disasters; never give guarantees. For health, legal or financial decisions add one line that astrology complements (not replaces) professional advice.',
     '- If the question is about another person (spouse, child, parent), read it from THIS chart\'s relevant houses; offer to read their own chart if the customer shares their birth details.',
     '- If something important is ambiguous, ask ONE short clarifying question instead of guessing.',
@@ -294,9 +294,9 @@ function buildChatPrompt(p: ChatPersona, opening: string): string {
 }
 
 const OPENING_INSTRUCTION = [
-  'FIRST MESSAGE NOW: greet the customer by name, introduce yourself as Kaal, and give a concise opening reading (≈300–450 words):',
-  'Lagna, Moon sign/nakshatra and what they say about the person; the 2–3 most important yogas/doshas; the running Mahadasha/Antardasha and what this period is about;',
-  'the outlook for the next 12–18 months with the key transit dates; then invite questions and suggest 3 specific questions they could ask (career, marriage/relationships, health, wealth, children, past events).',
+  'FIRST MESSAGE NOW: greet the customer by name in one short line and introduce yourself as Kaal.',
+  'Then give **Predictions** for the next 12–18 months: 4–6 short dated bullets (career, money, relationships/marriage, health, family as relevant), each with a month/year window and High/Medium/Low confidence;',
+  'one or two plain lines of **Why**; then suggest 3 specific questions they could ask. Keep it about 120–200 words.',
 ].join(' ');
 
 /** Wrap customer text so the agent treats it as data, not instructions. */
@@ -314,7 +314,7 @@ export async function createChatSession(
   opts: { threadId: string; userId: string; firstQuestion?: string },
 ): Promise<DevinSession> {
   const opening = opts.firstQuestion
-    ? `${OPENING_INSTRUCTION} Keep the opening reading brief, then answer the customer's first question below in depth, in the same message.\n\n${wrapCustomerMessage(opts.firstQuestion, p.language)}`
+    ? `${OPENING_INSTRUCTION} Skip the general reading: after the one-line greeting, answer the customer's first question below directly, with the Predictions / Why / What to do format, in the same message.\n\n${wrapCustomerMessage(opts.firstQuestion, p.language)}`
     : `${OPENING_INSTRUCTION} Write it in ${p.language}.`;
   const body: Record<string, unknown> = {
     prompt: buildChatPrompt(p, opening),

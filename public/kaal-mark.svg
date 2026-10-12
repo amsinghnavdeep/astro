@@ -1,9 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="Kaalera">
-  <rect width="48" height="48" rx="12" fill="#171717"/>
-  <g fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M13 9c0 10 4.5 16 11 16s11-6 11-16"/>
-    <path d="M24 25v16"/>
-    <path d="M24 13V7m-3 3.5L24 7l3 3.5"/>
-  </g>
-  <path d="M24 14.2q3.2 3.6 0 7.6q-3.2-4 0-7.6z" fill="#e5484d"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Kaalera"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbe7a1"/><stop offset=".5" stop-color="#e2b33f"/><stop offset="1" stop-color="#a8741a"/></linearGradient><radialGradient id="bg" cx="50%" cy="35%" r="75%"><stop offset="0" stop-color="#1d2447"/><stop offset="1" stop-color="#06070d"/></radialGradient>
+<radialGradient id="eg" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ff6b5e" stop-opacity=".9"/><stop offset="1" stop-color="#ff3b30" stop-opacity="0"/></radialGradient></defs>
+  <rect width="96" height="96" rx="22" fill="url(#bg)"/><g fill="#fff"><circle cx="16" cy="16" r=".9" opacity=".7"/><circle cx="82" cy="24" r=".7" opacity=".6"/><circle cx="80" cy="78" r=".9" opacity=".5"/><circle cx="14" cy="74" r=".7" opacity=".5"/></g>
+  <path d="M25 17C25 33 34 42 48 42S71 33 71 17" fill="none" stroke="url(#g)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M20.5 20L25 6l4.5 14z M66.5 20L71 6l4.5 14z" fill="url(#g)"/>
+  <path d="M48 5l5.5 13-3 2.5V44h-5V20.5l-3-2.5z" fill="url(#g)"/>
+  <rect x="45.5" y="42" width="5" height="44" rx="2.5" fill="url(#g)"/>
+  <rect x="39" y="44" width="18" height="4.5" rx="2.2" fill="url(#g)"/>
+  <circle cx="48" cy="54" r="3.6" fill="none" stroke="url(#g)" stroke-width="2"/>
+  <path d="M45.5 56c-4 3-6 4-8.5 4" fill="none" stroke="#e2b33f" stroke-width="1.2"/>
+  <path d="M29 55h12l-6 7z M29 69h12l-6-7z" fill="#f2dfb0" stroke="#a8741a" stroke-width="1.2" stroke-linejoin="round"/>
+  <path d="M30.5 57.5l9 0 M30.5 66.5l9 0" stroke="#a8741a" stroke-width=".8"/>
+  <circle cx="48" cy="28" r="9" fill="url(#eg)"/>
+  <path d="M48 22.5q4 5.5 0 11q-4-5.5 0-11z" fill="#ff4a3d" stroke="#ffd6cf" stroke-width=".8"/>
+  <circle cx="48" cy="28" r="1.3" fill="#fff"/>
 </svg>
