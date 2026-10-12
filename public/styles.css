@@ -255,9 +255,8 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .hero-kaal { width: 92px; height: 92px; border-radius: 50%; display: block; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
 @media (prefers-reduced-motion: reduce) { .working .avatar::after, .working .avatar::before { animation: none; } }
 .loader-mark { width: 30px; height: 30px; flex: none; }
-.loader-mark .links { opacity: .35; }
-.loader-mark .node { transform-box: fill-box; transform-origin: center; opacity: .25; animation: node-pulse 1.8s ease-in-out infinite; }
-.loader-mark .n2 { animation-delay: .3s; }
-.loader-mark .n3 { animation-delay: .6s; }
-@keyframes node-pulse { 0%, 100% { opacity: .25; transform: scale(.85); } 35% { opacity: 1; transform: scale(1.12); filter: drop-shadow(0 0 2px rgba(99,102,241,.8)); } 60% { opacity: .9; transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .loader-mark .node { animation: none; opacity: 1; } }
+.loader-mark .piece { opacity: .25; animation: piece-pulse 1.8s ease-in-out infinite; }
+.loader-mark .p2 { animation-delay: .25s; }
+.loader-mark .p3 { animation-delay: .5s; }
+@keyframes piece-pulse { 0%, 100% { opacity: .25; } 40%, 60% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .loader-mark .piece { animation: none; opacity: 1; } }

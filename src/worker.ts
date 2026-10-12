@@ -21,8 +21,9 @@ import {
   syncThread, type SendError, type Thread,
 } from './chat.js';
 
-type Bindings = { DB: D1Database };
-type AppEnv = { Bindings: Bindings; Variables: { user: User | null; api: { userId: string; keyId: string } } };
+import { support } from './support.js';
+import type { AppEnv } from './types.js';
+
 type C = Context<AppEnv>;
 
 const app = new Hono<AppEnv>();
@@ -149,7 +150,17 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
 /* ---------- web session ---------- */
 
 app.use('/api/*', async (c, next) => {
-  c.set('user', await userForSession(c.env.DB, getCookie(c, COOKIE)));
+  const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
+  c.set('user', user);
+  const seen = (user as (User & { last_seen_at?: string | null }) | null)?.last_seen_at;
+  if (user && (!seen || Date.now() - Date.parse(seen) > 5 * 60_000)) {
+    const touch = c.env.DB.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?').bind(new Date().toISOString(), user.id).run();
+    try {
+      c.executionCtx.waitUntil(touch);
+    } catch {
+      await touch;
+    }
+  }
   await next();
 });
 
@@ -513,6 +524,8 @@ app.post('/v1/consultations/:id/questions', async (c) => {
   }
   return c.json({ question_id: r.message!.id, status: 'answering', credits_remaining: await apiBalance(c.env.DB, t.user_id) }, 202);
 });
+
+app.route('/api/support', support);
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
 app.onError((err, c) => {

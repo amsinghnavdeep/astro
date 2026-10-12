@@ -20,6 +20,7 @@
   "vars": {
     "SITE_URL": "http://localhost:8787",
     "EMAIL_FROM": "Kaalera <hello@askkaali.com>",
-    "DEV_LOGIN_LINKS": "false"
+    "DEV_LOGIN_LINKS": "false",
+    "SUPPORT_EMAIL": "amsinghnavdeep@gmail.com"
   }
 }

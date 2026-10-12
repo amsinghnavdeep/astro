@@ -36,6 +36,9 @@ export const env = {
       return [2, 10, 50].map((credits) => ({ id: `api${credits}`, credits, cents: credits * cents }));
     },
   },
+  support: {
+    get email() { return optional('SUPPORT_EMAIL'); },
+  },
   chat: {
     get freeQuestions() { return int('FREE_QUESTIONS', 1); },
     get packQuestions() { return int('PACK_QUESTIONS', 2); },
