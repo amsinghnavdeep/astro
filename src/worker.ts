@@ -409,7 +409,7 @@ app.post('/v1/consultations', async (c) => {
   await createThreadWithQuestion(db, t, p.data.question);
   try {
     const started = await startThreadSession(db, t);
-    return c.json({ consultation: apiConsultation(started), credits_remaining: await apiBalance(db, userId) }, 201);
+    return c.json({ consultation: apiConsultation(started, await listMessages(db, started.id)), credits_remaining: await apiBalance(db, userId) }, 201);
   } catch (err) {
     console.error('API session start failed:', err);
     await refundApiCredit(db, userId, ref);

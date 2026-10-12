@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "build:web": "esbuild src/web/app.ts --bundle --format=esm --target=es2022 --outfile=public/app.js",
+    "build:web": "esbuild src/web/app.ts --bundle --format=esm --target=es2022 --outfile=public/app.js && esbuild src/web/developers.ts --bundle --format=esm --target=es2022 --outfile=public/developers.js",
     "dev": "npm run build:web && wrangler dev --port 8787",
     "db:migrate:local": "wrangler d1 migrations apply kaalera --local",
     "db:migrate:remote": "wrangler d1 migrations apply kaalera --remote",

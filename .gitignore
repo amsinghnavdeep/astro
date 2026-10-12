@@ -4,3 +4,4 @@ node_modules/
 public/app.js
 data/
 *.log
+public/developers.js
