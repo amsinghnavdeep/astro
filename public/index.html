@@ -3,38 +3,45 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kaalera — ask about your future</title>
+  <title>Kaalera — ask Kaal about your chart</title>
+  <meta name="description" content="Ask Kaal, an AI Vedic astrologer, about career, marriage, health or money. Every answer is read from your own birth chart and explains the planets, houses and dashas behind it." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
+  <div id="boot" class="boot"><span class="spinner"></span></div>
+
   <!-- Landing -->
   <div id="landing-view" class="landing" hidden>
     <header class="l-nav">
-      <div class="brand"><span class="logo sm">ॐ</span> Kaalera</div>
+      <a class="brand" href="/"><span class="logo sm">K</span> Kaalera</a>
       <nav class="l-links">
         <a href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
-        <button class="btn" type="button" data-signin>Sign in</button>
+        <a href="/developers">Developers</a>
+        <a href="/docs">Docs</a>
+        <button class="btn sm" type="button" data-signin>Sign in</button>
       </nav>
     </header>
 
     <main class="l-hero">
       <h1>What would you like to know?</h1>
-      <p class="muted">Ask a Vedic astrologer about career, marriage, health, money or a past event. Every answer is read from your own birth chart, with dates and reasons.</p>
+      <p class="muted">Ask Kaal about career, marriage, health, money or a past event. Every answer is read from your own birth chart and explains the planets, houses and dashas behind it.</p>
       <form id="l-form" class="composer l-composer">
-        <textarea id="l-input" rows="3" maxlength="600" placeholder="e.g. When will I get a better job?"></textarea>
+        <textarea id="l-input" rows="3" maxlength="600" placeholder="e.g. When will I get a better job?" required></textarea>
         <div class="composer-bar">
-          <span class="tiny muted">Your first chat is free</span>
-          <button class="send" type="submit" title="Ask">↑</button>
+          <span class="tiny muted">Your first question is free</span>
+          <button class="send" type="submit" title="Ask" aria-label="Ask">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         </div>
       </form>
       <div class="suggestions l-chips">
         <button type="button" class="chip l-chip">When will my career grow?</button>
         <button type="button" class="chip l-chip">When will I get married?</button>
         <button type="button" class="chip l-chip">Why was last year so hard?</button>
-        <button type="button" class="chip l-chip">Read my newborn's kundli</button>
+        <button type="button" class="chip l-chip">How will my child's education go?</button>
       </div>
     </main>
 
@@ -42,83 +49,94 @@
       <h2>How it works</h2>
       <div class="l-grid">
         <div class="l-card"><div class="l-num">1</div><h3>Ask your question</h3><p class="muted">Anything about your past or future, in plain words.</p></div>
-        <div class="l-card"><div class="l-num">2</div><h3>Add birth details</h3><p class="muted">Date, time and place of birth. We cast your kundli exactly.</p></div>
-        <div class="l-card"><div class="l-num">3</div><h3>Chat with Kaalera</h3><p class="muted">A reading of your chart, with dashas, transits and timing.</p></div>
+        <div class="l-card"><div class="l-num">2</div><h3>Add birth details</h3><p class="muted">Date, time and place of birth. Your chart is cast with Swiss Ephemeris precision.</p></div>
+        <div class="l-card"><div class="l-num">3</div><h3>Chat with Kaal</h3><p class="muted">An opening reading, then answers with timing from your dashas and transits.</p></div>
       </div>
     </section>
 
     <section id="pricing" class="l-section">
       <h2>Pricing</h2>
-      <p class="muted">Start free. Recharge chats when you want to keep going. 1 chat = 1 message to Kaalera.</p>
-      <div class="l-grid l-prices" id="l-prices"></div>
+      <p class="muted">No subscription. Pay only for the questions you ask.</p>
+      <div class="l-grid" id="l-prices"></div>
     </section>
 
-    <footer class="l-foot tiny muted">Astrological guidance for reflection only — not medical, legal or financial advice.</footer>
+    <footer class="l-foot tiny muted">
+      <div class="l-foot-links"><a href="/developers">Developers</a><a href="/docs">Docs</a></div>
+      Astrological guidance for reflection only — not medical, legal or financial advice.
+    </footer>
   </div>
 
   <!-- Sign in -->
   <dialog id="signin-modal" class="modal">
     <form id="login-form" class="modal-body">
-      <button class="icon-btn modal-x" type="button" data-close>✕</button>
-      <div class="logo">ॐ</div>
-      <h2>Sign in to continue</h2>
-      <p class="muted">New here? Your first chat is free.</p>
-      <label>Name<input name="name" placeholder="Your name" maxlength="80" /></label>
-      <label>Email<input name="email" type="email" placeholder="you@example.com" required /></label>
+      <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
+      <div class="logo">K</div>
+      <h2>Sign in to Kaalera</h2>
+      <p class="muted" id="login-sub">We'll email you a sign-in link. No password needed.</p>
+      <p class="notice" id="login-expired" hidden>That sign-in link has expired or was already used. Request a new one below.</p>
+      <label>Name<input name="name" placeholder="Your name" maxlength="80" autocomplete="name" /></label>
+      <label>Email<input name="email" type="email" placeholder="you@example.com" required autocomplete="email" /></label>
       <p class="error" id="login-error"></p>
-      <button class="btn primary wide" type="submit">Continue</button>
-      <p class="tiny muted">Demo sign-in: email only, no password.</p>
+      <button class="btn primary wide" type="submit" id="login-submit">Email me a sign-in link</button>
     </form>
-  </dialog>
-
-  <!-- Recharge -->
-  <dialog id="recharge-modal" class="modal">
-    <div class="modal-body">
-      <button class="icon-btn modal-x" type="button" data-close>✕</button>
-      <h2>Recharge chats</h2>
-      <p class="muted">Balance: <strong id="r-balance">0</strong> chats. 1 chat = 1 message to Kaalera.</p>
-      <div id="r-packs" class="r-packs"></div>
-      <button id="r-pay" class="btn primary wide" type="button">Pay</button>
-      <p class="tiny muted">Demo checkout: chats are added instantly, no card is charged.</p>
+    <div id="login-sent" class="modal-body" hidden>
+      <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
+      <div class="logo">✉</div>
+      <h2>Check your email</h2>
+      <p class="muted">We sent a sign-in link to <strong id="sent-email"></strong>. Open it on this device to continue.</p>
+      <p class="notice" id="dev-link-box" hidden>Dev mode: <a id="dev-link" href="#">open sign-in link</a></p>
+      <button class="btn wide" type="button" id="login-again">Use a different email</button>
     </div>
   </dialog>
 
   <!-- App -->
   <div id="app-view" class="app" hidden>
     <aside class="sidebar">
-      <div class="brand"><span class="logo sm">ॐ</span> Kaalera</div>
+      <div class="side-head">
+        <a class="brand" href="/"><span class="logo sm">K</span> Kaalera</a>
+        <button id="menu-close" class="icon-btn mobile-only" type="button" aria-label="Close menu">✕</button>
+      </div>
       <button id="new-thread" class="btn new" type="button"><span class="plus">+</span> New consultation</button>
       <div class="section-label">Consultations</div>
       <nav id="thread-list" class="threads"></nav>
       <div class="side-foot">
-        <div class="credits-box">
-          <div class="credits-row"><span>Chats left</span><strong id="credits">0</strong></div>
-          <button class="btn wide" type="button" data-recharge>Recharge</button>
-        </div>
+        <a class="side-link" href="/developers">Developers</a>
+        <a class="side-link" href="/docs">Docs</a>
         <div class="me">
           <div class="avatar" id="me-avatar"></div>
           <div class="me-text"><div id="me-name"></div><div class="tiny muted" id="me-email"></div></div>
-          <button id="logout" class="icon-btn" title="Sign out" type="button">⎋</button>
+          <button id="logout" class="icon-btn" title="Sign out" type="button" aria-label="Sign out">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
         </div>
       </div>
     </aside>
+    <div class="scrim" id="scrim"></div>
 
     <main class="main">
       <header class="topbar">
-        <button id="menu" class="icon-btn mobile-only" type="button">☰</button>
+        <button id="menu" class="icon-btn mobile-only" type="button" aria-label="Open menu">☰</button>
         <div class="topbar-title"><span id="top-title">New consultation</span><span id="top-sub" class="muted"></span></div>
+        <div class="topbar-right" id="top-right" hidden>
+          <span class="pill" id="q-left"></span>
+          <label class="lang-pick" title="Language Kaal answers in">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+            <select id="lang-select" aria-label="Answer language"></select>
+          </label>
+        </div>
       </header>
 
       <div id="banner" class="banner" hidden></div>
 
-      <!-- New profile -->
+      <!-- New consultation -->
       <section id="profile-view" class="center-view" hidden>
         <div class="profile-wrap">
-          <h1 class="hero">Whose chart should we read?</h1>
-          <p class="muted" id="profile-note">Add birth details once — yourself, spouse, child or parent.</p>
-          <form id="profile-form" class="card form">
+          <h1 class="hero">Whose chart should Kaal read?</h1>
+          <p class="muted">Yourself, your spouse, child or parent. One consultation per person.</p>
+          <div class="price-note" id="price-note"></div>
+          <form id="profile-form" class="card form" autocomplete="off">
             <div class="grid">
-              <label class="span2">Your question<textarea name="question" id="profile-question" rows="2" maxlength="600" placeholder="Optional — e.g. When will my career grow?"></textarea></label>
+              <label class="span2">Your question<textarea name="question" id="profile-question" rows="3" maxlength="600" required placeholder="e.g. When will my career grow?"></textarea></label>
               <label>Full name<input name="fullName" required maxlength="120" placeholder="e.g. Arjun Sharma" /></label>
               <label>Gender
                 <select name="gender" required>
@@ -128,90 +146,19 @@
               </label>
               <label>Date of birth<input type="date" name="dateOfBirth" min="1900-01-01" required /></label>
               <label>Time of birth<input type="time" name="timeOfBirth" required /></label>
-              <label class="span2">Place of birth<input name="placeOfBirth" placeholder="City, State, Country" required maxlength="160" /></label>
-              <label class="span2">Timezone of birthplace
-                <select name="timezone" required>
-                  <option value="" disabled selected>Select the timezone of the birthplace</option>
-<optgroup label="India &amp; South Asia">
-  <option value="Asia/Kolkata">India — Asia/Kolkata (IST, UTC+5:30)</option>
-  <option value="Asia/Karachi">Pakistan — Asia/Karachi (UTC+5)</option>
-  <option value="Asia/Dhaka">Bangladesh — Asia/Dhaka (UTC+6)</option>
-  <option value="Asia/Kathmandu">Nepal — Asia/Kathmandu (UTC+5:45)</option>
-  <option value="Asia/Colombo">Sri Lanka — Asia/Colombo (UTC+5:30)</option>
-  <option value="Asia/Thimphu">Bhutan — Asia/Thimphu (UTC+6)</option>
-  <option value="Asia/Kabul">Afghanistan — Asia/Kabul (UTC+4:30)</option>
-</optgroup>
-<optgroup label="Middle East &amp; West Asia">
-  <option value="Asia/Dubai">UAE — Asia/Dubai (UTC+4)</option>
-  <option value="Asia/Riyadh">Saudi Arabia — Asia/Riyadh (UTC+3)</option>
-  <option value="Asia/Qatar">Qatar — Asia/Qatar (UTC+3)</option>
-  <option value="Asia/Kuwait">Kuwait — Asia/Kuwait (UTC+3)</option>
-  <option value="Asia/Muscat">Oman — Asia/Muscat (UTC+4)</option>
-  <option value="Asia/Tehran">Iran — Asia/Tehran (UTC+3:30)</option>
-  <option value="Asia/Jerusalem">Israel — Asia/Jerusalem (UTC+2)</option>
-</optgroup>
-<optgroup label="East &amp; Southeast Asia">
-  <option value="Asia/Shanghai">China — Asia/Shanghai (UTC+8)</option>
-  <option value="Asia/Hong_Kong">Hong Kong — Asia/Hong_Kong (UTC+8)</option>
-  <option value="Asia/Singapore">Singapore — Asia/Singapore (UTC+8)</option>
-  <option value="Asia/Kuala_Lumpur">Malaysia — Asia/Kuala_Lumpur (UTC+8)</option>
-  <option value="Asia/Jakarta">Indonesia (west) — Asia/Jakarta (UTC+7)</option>
-  <option value="Asia/Bangkok">Thailand — Asia/Bangkok (UTC+7)</option>
-  <option value="Asia/Ho_Chi_Minh">Vietnam — Asia/Ho_Chi_Minh (UTC+7)</option>
-  <option value="Asia/Manila">Philippines — Asia/Manila (UTC+8)</option>
-  <option value="Asia/Tokyo">Japan — Asia/Tokyo (UTC+9)</option>
-  <option value="Asia/Seoul">South Korea — Asia/Seoul (UTC+9)</option>
-</optgroup>
-<optgroup label="Europe">
-  <option value="Europe/London">UK / Ireland — Europe/London (UTC+0)</option>
-  <option value="Europe/Paris">France — Europe/Paris (UTC+1)</option>
-  <option value="Europe/Berlin">Germany — Europe/Berlin (UTC+1)</option>
-  <option value="Europe/Madrid">Spain — Europe/Madrid (UTC+1)</option>
-  <option value="Europe/Rome">Italy — Europe/Rome (UTC+1)</option>
-  <option value="Europe/Amsterdam">Netherlands — Europe/Amsterdam (UTC+1)</option>
-  <option value="Europe/Athens">Greece — Europe/Athens (UTC+2)</option>
-  <option value="Europe/Istanbul">Turkey — Europe/Istanbul (UTC+3)</option>
-  <option value="Europe/Moscow">Russia (Moscow) — Europe/Moscow (UTC+3)</option>
-</optgroup>
-<optgroup label="Africa">
-  <option value="Africa/Lagos">Nigeria — Africa/Lagos (UTC+1)</option>
-  <option value="Africa/Cairo">Egypt — Africa/Cairo (UTC+2)</option>
-  <option value="Africa/Johannesburg">South Africa — Africa/Johannesburg (UTC+2)</option>
-  <option value="Africa/Nairobi">Kenya — Africa/Nairobi (UTC+3)</option>
-  <option value="Indian/Mauritius">Mauritius — Indian/Mauritius (UTC+4)</option>
-</optgroup>
-<optgroup label="North America">
-  <option value="America/New_York">US Eastern — America/New_York (UTC−5)</option>
-  <option value="America/Chicago">US Central — America/Chicago (UTC−6)</option>
-  <option value="America/Denver">US Mountain — America/Denver (UTC−7)</option>
-  <option value="America/Los_Angeles">US Pacific — America/Los_Angeles (UTC−8)</option>
-  <option value="America/Toronto">Canada Eastern — America/Toronto (UTC−5)</option>
-  <option value="America/Vancouver">Canada Pacific — America/Vancouver (UTC−8)</option>
-  <option value="America/Mexico_City">Mexico — America/Mexico_City (UTC−6)</option>
-</optgroup>
-<optgroup label="Central &amp; South America">
-  <option value="America/Sao_Paulo">Brazil (São Paulo) — America/Sao_Paulo (UTC−3)</option>
-  <option value="America/Argentina/Buenos_Aires">Argentina — America/Argentina/Buenos_Aires (UTC−3)</option>
-  <option value="America/Bogota">Colombia — America/Bogota (UTC−5)</option>
-  <option value="America/Lima">Peru — America/Lima (UTC−5)</option>
-  <option value="America/Santiago">Chile — America/Santiago (UTC−4)</option>
-</optgroup>
-<optgroup label="Oceania">
-  <option value="Australia/Sydney">Australia Eastern — Australia/Sydney (UTC+10)</option>
-  <option value="Australia/Perth">Australia Western — Australia/Perth (UTC+8)</option>
-  <option value="Pacific/Auckland">New Zealand — Pacific/Auckland (UTC+12)</option>
-  <option value="Pacific/Fiji">Fiji — Pacific/Fiji (UTC+12)</option>
-</optgroup>
-<optgroup label="Other">
-  <option value="UTC">UTC (Coordinated Universal Time)</option>
-</optgroup>
-                                </select>
+              <label class="span2 place-field">Place of birth
+                <input name="placeOfBirth" id="place-input" placeholder="Start typing a city…" required maxlength="160" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="place-list" />
+                <ul id="place-list" class="place-list" role="listbox" hidden></ul>
               </label>
+              <input type="hidden" name="latitude" id="lat-input" />
+              <input type="hidden" name="longitude" id="lon-input" />
+              <label>Timezone of birthplace<select name="timezone" id="tz-select" required></select></label>
+              <label>Kaal answers in<select name="language" id="profile-lang"></select></label>
             </div>
             <p class="error" id="profile-error"></p>
             <div class="row-end">
               <button class="btn ghost" type="button" id="profile-cancel">Cancel</button>
-              <button class="btn primary" type="submit" id="profile-submit">Start chat</button>
+              <button class="btn primary" type="submit" id="profile-submit">Start consultation</button>
             </div>
           </form>
         </div>
@@ -221,30 +168,26 @@
       <section id="chat-view" class="chat-view" hidden>
         <div id="scroller" class="scroller">
           <div id="messages" class="messages"></div>
-          <div id="typing" class="msg pandit" hidden>
-            <div class="who"><span class="avatar pandit-av">ॐ</span><span id="typing-name">Kaalera</span></div>
-            <div class="thinking"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="muted">Studying the chart…</span></div>
+          <div id="working" class="working" hidden aria-live="polite">
+            <span class="avatar kaal-av">K</span>
+            <div class="working-text">
+              <div class="working-line"><span class="shimmer" id="working-step">Casting your chart…</span><span class="muted tiny" id="working-time"></span></div>
+              <div class="tiny muted">Kaal is studying the chart. Answers can take a few minutes — you can leave this page and come back.</div>
+            </div>
           </div>
         </div>
         <div class="composer-wrap">
-          <div id="suggestions" class="suggestions">
-            <button type="button" class="chip">When will my career grow?</button>
-            <button type="button" class="chip">When is a good time for marriage?</button>
-            <button type="button" class="chip">Why was last year so hard for me?</button>
-            <button type="button" class="chip">What should I focus on in the next 12 months?</button>
-          </div>
-          <div id="locked" class="locked" hidden>
-            <div>
-              <strong id="locked-title">You've used your free chat</strong>
-              <div class="muted">Recharge to keep chatting with Kaalera.</div>
-            </div>
-            <button class="btn primary" type="button" data-recharge>Recharge</button>
-          </div>
+          <div id="state-panel" class="panel" hidden></div>
           <form id="ask-form" class="composer">
-            <textarea id="ask-input" rows="1" placeholder="Ask about career, marriage, health, money, a past event…"></textarea>
+            <textarea id="ask-input" rows="1" placeholder="Ask a follow-up about career, marriage, health, money…"></textarea>
             <div class="composer-bar">
-              <span class="tiny muted">1 chat per message · Enter to send, Shift+Enter for a new line</span>
-              <button id="ask-submit" class="send" type="submit" title="Send">↑</button>
+              <span class="tiny muted" id="composer-hint"></span>
+              <div class="composer-actions">
+                <button class="btn sm" type="button" id="add-inline" data-addq hidden></button>
+                <button id="ask-submit" class="send" type="submit" title="Send" aria-label="Send">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
             </div>
           </form>
           <p class="error" id="ask-error"></p>
