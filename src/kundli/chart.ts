@@ -410,6 +410,9 @@ export function chartToPromptText(c: ChartData): string {
     `Birthplace resolved to: ${c.resolved.matchedPlace} (lat ${c.resolved.latitude.toFixed(4)}, lon ${c.resolved.longitude.toFixed(4)}).`,
   );
   lines.push(
+    `Local birth date and time: ${c.input.dateOfBirth} ${c.input.timeOfBirth} (${c.input.timezone}). Always quote this local date/time to the customer; the UT line below is for calculation only.`,
+  );
+  lines.push(
     `UT of birth: ${c.resolved.utc.year}-${String(c.resolved.utc.month).padStart(2, '0')}-${String(c.resolved.utc.day).padStart(2, '0')} ${deg(c.resolved.utc.hour).replace('°', 'h').replace("'", 'm')}; ayanamsa ${c.resolved.ayanamsa.toFixed(4)}°.`,
   );
   lines.push(
