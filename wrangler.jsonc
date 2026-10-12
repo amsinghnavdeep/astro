@@ -1,0 +1,25 @@
+{
+  "name": "kaalera",
+  "main": "src/worker.ts",
+  // >= 2025-04-01 with nodejs_compat populates process.env from vars/secrets (read by env.ts).
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*", "/v1/*"]
+  },
+  // Create with `wrangler d1 create kaalera` and paste the id here.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "kaalera", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+  ],
+  "observability": { "enabled": true },
+  // Secrets (wrangler secret put / .dev.vars): DEVIN_API_KEY, DEVIN_ORG_ID,
+  // STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY.
+  "vars": {
+    "SITE_URL": "http://localhost:8787",
+    "EMAIL_FROM": "Kaalera <hello@askkaali.com>",
+    "DEV_LOGIN_LINKS": "false"
+  }
+}
