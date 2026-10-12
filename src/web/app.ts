@@ -1,3 +1,4 @@
+import { confirmPurchase } from './consent.js';
 import { renderMarkdown } from '../markdown.js';
 
 type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
@@ -99,11 +100,12 @@ function fillLanguages(select: HTMLSelectElement, langs: string[], value = 'Engl
 }
 
 async function goToCheckout(threadId: string, btn?: HTMLButtonElement): Promise<void> {
+  if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency)))) return;
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
   }
-  const { ok, data } = await api<{ checkoutUrl: string }>(`/api/threads/${encodeURIComponent(threadId)}/checkout`, { method: 'POST' });
+  const { ok, data } = await api<{ checkoutUrl: string }>(`/api/threads/${encodeURIComponent(threadId)}/checkout`, { method: 'POST', body: JSON.stringify({ agreed: true }) });
   if (ok && data.checkoutUrl) {
     location.href = data.checkoutUrl;
     return;
@@ -345,6 +347,10 @@ profileForm.addEventListener('submit', async (e) => {
   if (!body.kundliId) {
     err.textContent = 'Choose a Kundli or add a new one first.';
     return;
+  }
+  if (!me!.freeAvailable) {
+    if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency)))) return;
+    (body as Record<string, unknown>).agreed = true;
   }
   const label = submit.textContent;
   submit.disabled = true;

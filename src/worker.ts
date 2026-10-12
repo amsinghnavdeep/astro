@@ -22,6 +22,7 @@ import {
 } from './chat.js';
 
 import { support } from './support.js';
+import { CHECKOUT_NOTE, DISCLAIMER } from './disclaimer.js';
 import type { AppEnv } from './types.js';
 
 type C = Context<AppEnv>;
@@ -102,19 +103,30 @@ async function createThreadWithQuestion(db: D1Database, t: Thread, question: str
 
 type CheckoutKind = 'consultation' | 'topup' | 'api_credits';
 
-async function createCheckout(user: User, o: { kind: CheckoutKind; threadId?: string; credits: number; cents: number; name: string; returnPath: string }): Promise<string> {
+const CONSENT_REQUIRED = { error: 'Please tick the box to accept the terms before paying.', code: 'consent_required' };
+const agreedIn = (body: unknown): boolean => !!body && typeof body === 'object' && (body as { agreed?: unknown }).agreed === true;
+
+async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadId?: string; credits: number; cents: number; name: string; returnPath: string }): Promise<string> {
+  const area = o.kind === 'api_credits' ? 'api' : 'chat';
+  const consentId = crypto.randomUUID();
+  await c.env.DB.prepare(
+    `INSERT INTO purchase_consents (id, user_id, kind, thread_id, disclaimer, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(consentId, user.id, o.kind, o.threadId ?? null, DISCLAIMER[area], c.req.header('cf-connecting-ip') ?? null,
+    (c.req.header('user-agent') ?? '').slice(0, 300) || null, new Date().toISOString()).run();
   const s = await stripe().checkout.sessions.create({
+    custom_text: { submit: { message: CHECKOUT_NOTE[area] } },
     mode: 'payment',
     customer_email: user.email,
     line_items: [{
       quantity: 1,
       price_data: { currency: env.stripe.currency, unit_amount: o.cents, product_data: { name: o.name } },
     }],
-    metadata: { kind: o.kind, userId: user.id, threadId: o.threadId ?? '', credits: String(o.credits) },
+    metadata: { kind: o.kind, userId: user.id, threadId: o.threadId ?? '', credits: String(o.credits), consentId },
     success_url: `${env.siteUrl}${o.returnPath}${o.returnPath.includes('?') ? '&' : '?'}checkout={CHECKOUT_SESSION_ID}`,
     cancel_url: `${env.siteUrl}${o.returnPath}`,
   });
   if (!s.url) throw new Error('Stripe returned no checkout URL');
+  await c.env.DB.prepare('UPDATE purchase_consents SET stripe_session_id = ? WHERE id = ?').bind(s.id, consentId).run();
   return s.url;
 }
 
@@ -261,9 +273,10 @@ app.delete('/api/kundlis/:id', async (c) => {
 app.post('/api/threads', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
-  const body = z.object({ kundliId: z.string().min(1), question: questionText(), language })
+  const body = z.object({ kundliId: z.string().min(1), question: questionText(), language, agreed: z.boolean().optional() })
     .safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: 'Choose or add a Kundli and write your question.' }, 400);
+  if (user.free_used && !body.data.agreed) return c.json(CONSENT_REQUIRED, 400);
   const db = c.env.DB;
   const k = await getKundli(db, user.id, body.data.kundliId);
   if (!k) return c.json({ error: 'Choose or add a Kundli first.' }, 400);
@@ -278,7 +291,7 @@ app.post('/api/threads', async (c) => {
   t.kundli_id = k.id;
   await db.prepare('UPDATE threads SET kundli_id = ? WHERE id = ?').bind(k.id, t.id).run();
   if (!free) {
-    const url = await createCheckout(user, {
+    const url = await createCheckout(c, user, {
       kind: 'consultation', threadId: t.id, credits: env.chat.packQuestions, cents: env.chat.packCents,
       name: `Kaalera consultation — ${env.chat.packQuestions} questions for ${t.full_name}`, returnPath: `/?t=${t.id}`,
     });
@@ -303,8 +316,9 @@ app.post('/api/threads/:id/checkout', async (c) => {
   const t = await ownThread(c);
   if (!t) return c.json({ error: 'Not found' }, 404);
   if (isExpired(t)) return c.json({ error: 'This consultation has closed. Start a new one.' }, 409);
+  if (!agreedIn(await c.req.json().catch(() => null))) return c.json(CONSENT_REQUIRED, 400);
   const kind: CheckoutKind = t.status === 'awaiting_payment' ? 'consultation' : 'topup';
-  const url = await createCheckout(user, {
+  const url = await createCheckout(c, user, {
     kind, threadId: t.id, credits: env.chat.packQuestions, cents: env.chat.packCents,
     name: kind === 'topup'
       ? `Kaalera — ${env.chat.packQuestions} more questions for ${t.full_name}`
@@ -431,10 +445,11 @@ app.delete('/api/developer/keys/:id', async (c) => {
 app.post('/api/developer/checkout', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
-  const body = (await c.req.json().catch(() => ({}))) as { packId?: string };
+  const body = (await c.req.json().catch(() => ({}))) as { packId?: string; agreed?: boolean };
   const pack = env.api.packs.find((p) => p.id === body.packId);
   if (!pack) return c.json({ error: 'Unknown pack' }, 400);
-  const url = await createCheckout(user, {
+  if (!agreedIn(body)) return c.json(CONSENT_REQUIRED, 400);
+  const url = await createCheckout(c, user, {
     kind: 'api_credits', credits: pack.credits, cents: pack.cents,
     name: `Kaalera API — ${pack.credits} question credits`, returnPath: '/developers',
   });

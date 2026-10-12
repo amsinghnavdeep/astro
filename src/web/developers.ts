@@ -1,3 +1,4 @@
+import { confirmPurchase } from './consent.js';
 type Key = { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
 type Entry = { id: string; delta: number; reason: string; ref: string; api_key_id: string | null; thread_id: string | null; created_at: string };
 type Pack = { id: string; credits: number; cents: number };
@@ -232,11 +233,12 @@ function renderBilling(): void {
 $('packs').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pack]');
   if (!btn) return;
+  if (!(await confirmPurchase('api', (btn.textContent ?? '').replace(/^Buy\s*/, '')))) return;
   $('buy-error').textContent = '';
   btn.disabled = true;
   btn.textContent = 'Opening secure checkout…';
   const r = await api<{ checkoutUrl: string }>('/api/developer/checkout', {
-    method: 'POST', body: JSON.stringify({ packId: btn.dataset.pack }),
+    method: 'POST', body: JSON.stringify({ packId: btn.dataset.pack, agreed: true }),
   });
   if (r.ok && r.data.checkoutUrl) {
     location.href = r.data.checkoutUrl;
