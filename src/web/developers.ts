@@ -217,9 +217,11 @@ $('revoke-confirm').addEventListener('click', async () => {
 function renderBilling(): void {
   if (!state) return;
   const { balance, packs, creditCents } = state;
+  const lots = (state as { creditLots?: { credits: number; expiresAt: string }[] }).creditLots ?? [];
   $('balance').textContent = String(balance);
   $('side-balance').textContent = plural(balance, 'credit');
-  $('balance-sub').textContent = `${plural(balance, 'credit')} = ${plural(balance, 'question')}`;
+  $('balance-sub').textContent = `${plural(balance, 'credit')} = ${plural(balance, 'question')}`
+    + (lots.length ? ` · ${plural(lots[0].credits, 'credit')} expire on ${new Date(lots[0].expiresAt).toLocaleDateString()}` : '');
   $('per-credit').textContent = `${usd(creditCents)} per credit`;
   $('packs').innerHTML = packs.map((p) => `
     <div class="d-pack">

@@ -23,9 +23,15 @@ import {
 
 import { support } from './support.js';
 import { CHECKOUT_NOTE, DISCLAIMER } from './disclaimer.js';
+import { creditBalance, creditLots, spendCredit } from './credits.js';
 import type { AppEnv } from './types.js';
 
 type C = Context<AppEnv>;
+const chatCredits = (c: C): Promise<number> => {
+  const u = c.get('user');
+  return u ? creditBalance(c.env.DB, 'chat', u.id) : Promise.resolve(0);
+};
+const pubT = async (c: C, t: Thread) => publicThread(t, await chatCredits(c));
 
 const app = new Hono<AppEnv>();
 const COOKIE = 'kaalera_session';
@@ -213,11 +219,12 @@ app.post('/api/logout', async (c) => {
 
 app.get('/api/plans', (c) => c.json({ ...pricing(), languages: LANGUAGES }));
 
-app.get('/api/me', (c) => {
+app.get('/api/me', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
   return c.json({
     user: { name: user.name, email: user.email }, freeAvailable: !user.free_used,
+    chatCredits: await creditLots(c.env.DB, 'chat', user.id),
     pricing: pricing(), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
   });
 });
@@ -242,7 +249,8 @@ app.get('/api/places', async (c) => {
 app.get('/api/threads', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
-  return c.json({ threads: (await listThreads(c.env.DB, user.id)).map(publicThread) });
+  const credits = await chatCredits(c);
+  return c.json({ threads: (await listThreads(c.env.DB, user.id)).map((t) => publicThread(t, credits)) });
 });
 
 app.get('/api/kundlis', async (c) => {
@@ -276,7 +284,7 @@ app.post('/api/threads', async (c) => {
   const body = z.object({ kundliId: z.string().min(1), question: questionText(), language, agreed: z.boolean().optional() })
     .safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: 'Choose or add a Kundli and write your question.' }, 400);
-  if (user.free_used && !body.data.agreed) return c.json(CONSENT_REQUIRED, 400);
+  if (user.free_used && !body.data.agreed && (await chatCredits(c)) < 1) return c.json(CONSENT_REQUIRED, 400);
   const db = c.env.DB;
   const k = await getKundli(db, user.id, body.data.kundliId);
   if (!k) return c.json({ error: 'Choose or add a Kundli first.' }, 400);
@@ -290,18 +298,21 @@ app.post('/api/threads', async (c) => {
   await createThreadWithQuestion(db, t, p.data.question);
   t.kundli_id = k.id;
   await db.prepare('UPDATE threads SET kundli_id = ? WHERE id = ?').bind(k.id, t.id).run();
-  if (!free) {
+  if (!free && (await spendCredit(db, 'chat', user.id, `first:${t.id}`, { threadId: t.id }))) {
+    await db.prepare('UPDATE threads SET questions_allowed = 1 WHERE id = ?').bind(t.id).run();
+    t.questions_allowed = 1;
+  } else if (!free) {
     const url = await createCheckout(c, user, {
       kind: 'consultation', threadId: t.id, credits: env.chat.packQuestions, cents: env.chat.packCents,
       name: `Kaalera consultation — ${env.chat.packQuestions} questions for ${t.full_name}`, returnPath: `/?t=${t.id}`,
     });
-    return c.json({ thread: publicThread(t), checkoutUrl: url });
+    return c.json({ thread: await pubT(c, t), checkoutUrl: url });
   }
   try {
-    return c.json({ thread: publicThread(await startThreadSession(db, t)) });
+    return c.json({ thread: await pubT(c, await startThreadSession(db, t)) });
   } catch (err) {
     console.error('Session creation failed:', err);
-    return c.json({ thread: publicThread((await getThreadById(db, t.id))!), error: 'Kaal is unavailable right now. Tap retry in a minute.' }, 503);
+    return c.json({ thread: await pubT(c, (await getThreadById(db, t.id))!), error: 'Kaal is unavailable right now. Tap retry in a minute.' }, 503);
   }
 });
 
@@ -333,7 +344,7 @@ app.post('/api/threads/:id/retry', async (c) => {
   if (!t) return c.json({ error: 'Not found' }, 404);
   if (t.status !== 'failed' || t.questions_allowed < 1) return c.json({ error: 'Nothing to retry.' }, 409);
   try {
-    return c.json({ thread: publicThread(await startThreadSession(c.env.DB, t)) });
+    return c.json({ thread: await pubT(c, await startThreadSession(c.env.DB, t)) });
   } catch {
     return c.json({ error: 'Kaal is still unavailable. Please try again shortly.' }, 503);
   }
@@ -345,7 +356,7 @@ app.patch('/api/threads/:id', async (c) => {
   const p = z.object({ language }).safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: 'Unsupported language.' }, 400);
   await c.env.DB.prepare('UPDATE threads SET language = ? WHERE id = ?').bind(p.data.language, t.id).run();
-  return c.json({ thread: publicThread({ ...t, language: p.data.language }) });
+  return c.json({ thread: await pubT(c, { ...t, language: p.data.language }) });
 });
 
 app.get('/api/threads/:id/messages', async (c) => {
@@ -359,7 +370,7 @@ app.get('/api/threads/:id/messages', async (c) => {
   const fresh = (await getThreadById(c.env.DB, t.id))!;
   const messages = await listMessages(c.env.DB, t.id);
   const live = fresh.status === 'active' || fresh.status === 'starting';
-  return c.json({ thread: publicThread(fresh), messages: messages.map(publicMessage), pending: live ? pendingCount(messages) : 0 });
+  return c.json({ thread: await pubT(c, fresh), messages: messages.map(publicMessage), pending: live ? pendingCount(messages) : 0 });
 });
 
 const SEND_ERRORS: Record<SendError, [402 | 409 | 429 | 503, string]> = {
@@ -388,7 +399,7 @@ app.post('/api/threads/:id/messages', async (c) => {
     const [status, error] = SEND_ERRORS[r.error];
     return c.json({ error }, status);
   }
-  return c.json({ message: publicMessage(r.message!), thread: publicThread((await getThreadById(c.env.DB, t.id))!) });
+  return c.json({ message: publicMessage(r.message!), thread: await pubT(c, (await getThreadById(c.env.DB, t.id))!) });
 });
 
 app.get('/api/checkout/confirm', async (c) => {
@@ -424,7 +435,7 @@ app.get('/api/developer', async (c) => {
   if (!user) return unauth(c);
   const db = c.env.DB;
   const [keys, balance, ledger] = await Promise.all([listApiKeys(db, user.id), apiBalance(db, user.id), listApiLedger(db, user.id)]);
-  return c.json({ keys, balance, ledger, packs: env.api.packs, creditCents: env.api.creditCents });
+  return c.json({ keys, balance, ledger, packs: env.api.packs, creditCents: env.api.creditCents, creditLots: await creditLots(db, 'api', user.id) });
 });
 
 app.post('/api/developer/keys', async (c) => {

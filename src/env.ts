@@ -31,6 +31,7 @@ export const env = {
   },
   api: {
     get creditCents() { return int('API_CREDIT_CENTS', 1000); },
+    get creditDays() { return int('API_CREDIT_DAYS', 180); },
     get packs() {
       const cents = this.creditCents;
       return [2, 10, 50].map((credits) => ({ id: `api${credits}`, credits, cents: credits * cents }));
@@ -43,6 +44,7 @@ export const env = {
     get freeQuestions() { return int('FREE_QUESTIONS', 1); },
     get packQuestions() { return int('PACK_QUESTIONS', 2); },
     get packCents() { return int('PACK_CENTS', 2000); },
+    get creditDays() { return int('CHAT_CREDIT_DAYS', 90); },
     get consultationDays() { return int('CONSULTATION_DAYS', 7); },
     get playbook() { return optional('DEVIN_CHAT_PLAYBOOK'); },
     get devinMode() { return optional('DEVIN_CHAT_MODE'); },

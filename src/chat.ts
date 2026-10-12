@@ -6,6 +6,7 @@ import {
   type ChatPersona,
 } from './devin.js';
 import { refundApiCredit, spendApiCredit } from './api.js';
+import { grantCredits, refundCredit, spendCredit } from './credits.js';
 
 export interface Thread {
   id: string; user_id: string; full_name: string; gender: string; date_of_birth: string;
@@ -114,11 +115,16 @@ export async function sendCustomerMessage(
   if (pendingCount(await listMessages(db, t.id)) >= MAX_UNANSWERED) return { error: 'too_many_pending' };
   const id = crypto.randomUUID();
   const ref = `question:${id}`;
-  const spent = t.source === 'api'
+  let fromCredits = false;
+  let spent = t.source === 'api'
     ? await spendApiCredit(db, t.user_id, ref, t.api_key_id, t.id)
     : ((await db.prepare(
         "UPDATE threads SET questions_used = questions_used + 1 WHERE id = ? AND status = 'active' AND questions_used < questions_allowed AND (expires_at IS NULL OR expires_at > ?)",
       ).bind(t.id, Date.now()).run()).meta?.changes ?? 0) > 0;
+  if (!spent && t.source === 'web' && (await spendCredit(db, 'chat', t.user_id, ref, { threadId: t.id }))) {
+    await db.prepare('UPDATE threads SET questions_used = questions_used + 1, questions_allowed = questions_allowed + 1 WHERE id = ?').bind(t.id).run();
+    spent = fromCredits = true;
+  }
   if (!spent) return { error: 'no_questions' };
   const lang = language ?? t.language;
   if (lang !== t.language) await db.prepare('UPDATE threads SET language = ? WHERE id = ?').bind(lang, t.id).run();
@@ -130,7 +136,10 @@ export async function sendCustomerMessage(
     console.error('Chat delivery failed:', err);
     await db.prepare('DELETE FROM messages WHERE id = ?').bind(id).run();
     if (t.source === 'api') await refundApiCredit(db, t.user_id, ref);
-    else await db.prepare('UPDATE threads SET questions_used = questions_used - 1 WHERE id = ?').bind(t.id).run();
+    else if (fromCredits) {
+      await refundCredit(db, 'chat', t.user_id, ref);
+      await db.prepare('UPDATE threads SET questions_used = questions_used - 1, questions_allowed = questions_allowed - 1 WHERE id = ?').bind(t.id).run();
+    } else await db.prepare('UPDATE threads SET questions_used = questions_used - 1 WHERE id = ?').bind(t.id).run();
     return { error: 'delivery_failed' };
   }
   return { message };
@@ -184,15 +193,18 @@ export async function applyPayment(db: D1Database, p: PaymentInfo): Promise<Thre
      VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(stripe_session_id) DO NOTHING`,
   ).bind(p.stripeSessionId, p.userId, p.threadId, p.kind, p.amountCents, p.currency, nowIso()).run();
   if ((ins.meta?.changes ?? 0) === 0) return null;
-  await db.prepare('UPDATE threads SET questions_allowed = questions_allowed + ? WHERE id = ?')
-    .bind(env.chat.packQuestions, p.threadId).run();
+  await grantCredits(db, 'chat', p.userId, env.chat.packQuestions, `stripe:${p.stripeSessionId}`);
+  if (p.kind === 'consultation' && t.questions_allowed < 1
+    && (await spendCredit(db, 'chat', p.userId, `first:${t.id}`, { threadId: t.id }))) {
+    await db.prepare('UPDATE threads SET questions_allowed = 1 WHERE id = ?').bind(t.id).run();
+  }
   return getThreadById(db, p.threadId);
 }
 
-export const publicThread = (t: Thread) => ({
+export const publicThread = (t: Thread, chatCredits = 0) => ({
   id: t.id, fullName: t.full_name, gender: t.gender, dateOfBirth: t.date_of_birth, timeOfBirth: t.time_of_birth,
   placeOfBirth: t.place_of_birth, language: t.language, status: t.status, isFree: !!t.is_free,
-  questionsLeft: questionsLeft(t), questionsAllowed: t.questions_allowed,
+  questionsLeft: questionsLeft(t) + (t.source === 'web' && !isExpired(t) ? chatCredits : 0), questionsAllowed: t.questions_allowed,
   expired: isExpired(t), expiresAt: t.expires_at ? new Date(t.expires_at).toISOString() : null, createdAt: t.created_at,
   kundliId: t.kundli_id ?? null,
 });

@@ -1,5 +1,6 @@
 /** Developer API: hashed keys and a prepaid credit ledger (1 credit = 1 question). */
 import type { D1Database } from '@cloudflare/workers-types';
+import { creditBalance, grantCredits, refundCredit, spendCredit } from './credits.js';
 import { randomToken, sha256 } from './auth.js';
 
 export interface ApiKey {
@@ -44,40 +45,16 @@ export async function authenticateApiKey(db: D1Database, raw: string): Promise<{
   return { userId: row.user_id, keyId: row.id };
 }
 
-export async function apiBalance(db: D1Database, userId: string): Promise<number> {
-  const r = await db.prepare('SELECT COALESCE(SUM(delta), 0) AS n FROM api_credit_ledger WHERE user_id = ?')
-    .bind(userId).first<{ n: number }>();
-  return r?.n ?? 0;
-}
+export const apiBalance = (db: D1Database, userId: string): Promise<number> => creditBalance(db, 'api', userId);
 
-/** Atomic: only inserts the -1 row when the balance is at least 1. */
-export async function spendApiCredit(
+export const spendApiCredit = (
   db: D1Database, userId: string, ref: string, keyId: string | null, threadId: string | null,
-): Promise<boolean> {
-  const r = await db.prepare(
-    `INSERT INTO api_credit_ledger (id, user_id, delta, reason, ref, api_key_id, thread_id, created_at)
-     SELECT ?, ?, -1, 'question', ?, ?, ?, ?
-     WHERE (SELECT COALESCE(SUM(delta), 0) FROM api_credit_ledger WHERE user_id = ?) >= 1
-     ON CONFLICT(ref) DO NOTHING`,
-  ).bind(crypto.randomUUID(), userId, ref, keyId, threadId, nowIso(), userId).run();
-  return (r.meta?.changes ?? 0) > 0;
-}
+): Promise<boolean> => spendCredit(db, 'api', userId, ref, { keyId, threadId });
 
-export async function refundApiCredit(db: D1Database, userId: string, ref: string): Promise<void> {
-  await db.prepare(
-    `INSERT INTO api_credit_ledger (id, user_id, delta, reason, ref, created_at)
-     SELECT ?, ?, 1, 'refund', ?, ? WHERE EXISTS (SELECT 1 FROM api_credit_ledger WHERE ref = ? AND user_id = ?)
-     ON CONFLICT(ref) DO NOTHING`,
-  ).bind(crypto.randomUUID(), userId, `refund:${ref}`, nowIso(), ref, userId).run();
-}
+export const refundApiCredit = (db: D1Database, userId: string, ref: string): Promise<void> => refundCredit(db, 'api', userId, ref);
 
-export async function grantApiCredits(db: D1Database, userId: string, credits: number, ref: string): Promise<boolean> {
-  const r = await db.prepare(
-    `INSERT INTO api_credit_ledger (id, user_id, delta, reason, ref, created_at) VALUES (?, ?, ?, 'purchase', ?, ?)
-     ON CONFLICT(ref) DO NOTHING`,
-  ).bind(crypto.randomUUID(), userId, credits, ref, nowIso()).run();
-  return (r.meta?.changes ?? 0) > 0;
-}
+export const grantApiCredits = (db: D1Database, userId: string, credits: number, ref: string): Promise<boolean> =>
+  grantCredits(db, 'api', userId, credits, ref);
 
 export const listApiLedger = async (db: D1Database, userId: string, limit = 50): Promise<LedgerEntry[]> =>
   (await db.prepare(

@@ -9,7 +9,7 @@ type Thread = {
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
 type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string };
-type Me = { user: { name: string; email: string }; freeAvailable: boolean; pricing: Pricing; languages: string[]; maxChars: number };
+type Me = { user: { name: string; email: string }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
 
@@ -98,6 +98,8 @@ function showBanner(text: string, autoHide = 0): void {
 function fillLanguages(select: HTMLSelectElement, langs: string[], value = 'English'): void {
   select.replaceChildren(...langs.map((l) => new Option(l, l, false, l === value)));
 }
+
+const credTotal = (): number => (me?.chatCredits ?? []).reduce((n, l) => n + l.credits, 0);
 
 async function goToCheckout(threadId: string, btn?: HTMLButtonElement): Promise<void> {
   if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency)))) return;
@@ -261,6 +263,12 @@ function showProfile(question = ''): void {
     note.innerHTML = '<strong>This consultation is free.</strong> ';
     note.append(`Kaal gives an opening reading of the chart and answers ${plural(p.freeQuestions, 'question')}. Open for ${p.consultationDays} days.`);
     submit.textContent = 'Start free consultation';
+  } else if (credTotal() > 0) {
+    const next = me!.chatCredits[0];
+    note.innerHTML = '';
+    note.append(el('strong', '', `You have ${plural(credTotal(), 'question')} left.`),
+      ` This consultation uses 1 now for the opening reading and your first answer. Open for ${p.consultationDays} days. Questions expire 3 months after purchase (next on ${new Date(next.expiresAt).toLocaleDateString()}).`);
+    submit.textContent = 'Start consultation';
   } else {
     note.innerHTML = '';
     note.append(el('strong', '', `${money(p.packCents, p.currency)} for ${p.packQuestions} questions.`),
@@ -348,7 +356,7 @@ profileForm.addEventListener('submit', async (e) => {
     err.textContent = 'Choose a Kundli or add a new one first.';
     return;
   }
-  if (!me!.freeAvailable) {
+  if (!me!.freeAvailable && credTotal() < 1) {
     if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency)))) return;
     (body as Record<string, unknown>).agreed = true;
   }
@@ -367,6 +375,7 @@ profileForm.addEventListener('submit', async (e) => {
     sessionStorage.removeItem(PENDING_Q);
     profileForm.reset();
     me!.freeAvailable = me!.freeAvailable && !data.thread.isFree;
+    void fetch('/api/me').then((r) => (r.ok ? r.json() : null)).then((m: Me | null) => { if (m) me!.chatCredits = m.chatCredits; });
     upsertThread(data.thread);
     openThread(data.thread);
     if (status === 503) showBanner(data.error ?? 'Kaal is unavailable right now. Tap Retry in a minute.');
