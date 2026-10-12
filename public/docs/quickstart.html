@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quickstart — Kaalera API</title>
+<meta name="description" content="Create an API key, buy credits and get your first answer from Kaal.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+</head>
+<body data-page="quickstart">
+<article class="d-article">
+<h1>Quickstart</h1>
+<p class="lead">Go from zero to your first answer from Kaal: create a key, add credits, start a consultation, read the answer and ask a follow-up.</p>
+
+<ol class="steps">
+<li>
+<h2>Create an API key</h2>
+<p>Sign in and open the <a href="/developers">developer dashboard</a>. Click <strong>Create key</strong>, give it a name and copy it. The key is shown <strong>only once</strong>.</p>
+<p>Store it in an environment variable on your server:</p>
+<div class="code"><pre data-lang="Terminal"><code>export KAALERA_API_KEY=&quot;kal_live_...&quot;</code></pre></div>
+</li>
+<li>
+<h2>Buy credits</h2>
+<p>On the same dashboard, buy a credit pack (2, 10 or 50 credits). Each question costs 1 credit, including the first question of a consultation. Check your balance at any time:</p>
+<div class="code"><pre data-lang="cURL"><code>curl {BASE}/v1/balance \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/balance&quot;, {
+  headers: { Authorization: `Bearer ${process.env.KAALERA_API_KEY}` },
+});
+const data = await res.json();
+console.log(res.status, data);</code></pre><pre data-lang="Python"><code>import os, requests
+
+res = requests.get(
+    &quot;{BASE}/v1/balance&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;},
+)
+print(res.status_code, res.json())</code></pre></div>
+<div class="code"><pre data-lang="Response"><code>{
+  &quot;credits&quot;: 3
+}</code></pre></div>
+</li>
+<li>
+<h2>Create a consultation</h2>
+<p>Send the birth details and the first question. Kaalera computes the chart and starts Kaal on it.</p>
+<div class="code"><pre data-lang="cURL"><code>curl -X POST {BASE}/v1/consultations \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{
+  &quot;fullName&quot;: &quot;Asha Verma&quot;,
+  &quot;gender&quot;: &quot;Female&quot;,
+  &quot;dateOfBirth&quot;: &quot;2 Sep 1990&quot;,
+  &quot;timeOfBirth&quot;: &quot;5:24 PM&quot;,
+  &quot;placeOfBirth&quot;: &quot;Jaipur, Rajasthan, India&quot;,
+  &quot;timezone&quot;: &quot;Asia/Kolkata&quot;,
+  &quot;latitude&quot;: 26.9124,
+  &quot;longitude&quot;: 75.7873,
+  &quot;language&quot;: &quot;English&quot;,
+  &quot;question&quot;: &quot;When is a good window for a career change?&quot;
+}&#x27;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/consultations&quot;, {
+  method: &quot;POST&quot;,
+  headers: {
+    Authorization: `Bearer ${process.env.KAALERA_API_KEY}`,
+    &quot;Content-Type&quot;: &quot;application/json&quot;,
+  },
+  body: JSON.stringify({
+  &quot;fullName&quot;: &quot;Asha Verma&quot;,
+  &quot;gender&quot;: &quot;Female&quot;,
+  &quot;dateOfBirth&quot;: &quot;2 Sep 1990&quot;,
+  &quot;timeOfBirth&quot;: &quot;5:24 PM&quot;,
+  &quot;placeOfBirth&quot;: &quot;Jaipur, Rajasthan, India&quot;,
+  &quot;timezone&quot;: &quot;Asia/Kolkata&quot;,
+  &quot;latitude&quot;: 26.9124,
+  &quot;longitude&quot;: 75.7873,
+  &quot;language&quot;: &quot;English&quot;,
+  &quot;question&quot;: &quot;When is a good window for a career change?&quot;
+}),
+});
+const data = await res.json();
+console.log(res.status, data);</code></pre><pre data-lang="Python"><code>import os, requests
+
+res = requests.post(
+    &quot;{BASE}/v1/consultations&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;},
+    json={
+      &quot;fullName&quot;: &quot;Asha Verma&quot;,
+      &quot;gender&quot;: &quot;Female&quot;,
+      &quot;dateOfBirth&quot;: &quot;2 Sep 1990&quot;,
+      &quot;timeOfBirth&quot;: &quot;5:24 PM&quot;,
+      &quot;placeOfBirth&quot;: &quot;Jaipur, Rajasthan, India&quot;,
+      &quot;timezone&quot;: &quot;Asia/Kolkata&quot;,
+      &quot;latitude&quot;: 26.9124,
+      &quot;longitude&quot;: 75.7873,
+      &quot;language&quot;: &quot;English&quot;,
+      &quot;question&quot;: &quot;When is a good window for a career change?&quot;
+    },
+)
+print(res.status_code, res.json())</code></pre></div>
+<div class="code"><pre data-lang="201 Created"><code>{
+  &quot;consultation&quot;: {
+    &quot;id&quot;: &quot;6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;,
+    &quot;name&quot;: &quot;Asha Verma&quot;,
+    &quot;language&quot;: &quot;English&quot;,
+    &quot;status&quot;: &quot;ready&quot;,
+    &quot;created_at&quot;: &quot;2026-10-12T02:21:34.792Z&quot;,
+    &quot;expires_at&quot;: &quot;2026-10-19T02:21:35.278Z&quot;
+  },
+  &quot;credits_remaining&quot;: 2
+}</code></pre></div>
+<p>Save <code>consultation.id</code>. The answer is written in the background.</p>
+</li>
+<li>
+<h2>Poll for the answer</h2>
+<p>Answers usually take a few minutes. Poll every 10 seconds until <code>status</code> is <code>ready</code> and the last message has <code>role: "kaal"</code>.</p>
+<div class="code"><pre data-lang="cURL"><code># Repeat every 10 s until status is &quot;ready&quot; and the last message has role &quot;kaal&quot;
+curl {BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3 \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot;</code></pre><pre data-lang="JavaScript"><code>const headers = { Authorization: `Bearer ${process.env.KAALERA_API_KEY}` };
+const id = &quot;6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;;
+
+async function waitForAnswer() {
+  while (true) {
+    const res = await fetch(`{BASE}/v1/consultations/${id}`, { headers });
+    const { consultation } = await res.json();
+    if (consultation.status === &quot;failed&quot; || consultation.status === &quot;closed&quot;) throw new Error(consultation.status);
+    if (consultation.status === &quot;ready&quot;) {
+      const last = consultation.messages.at(-1);
+      if (last?.role === &quot;kaal&quot;) return last.content;
+    }
+    await new Promise((r) =&gt; setTimeout(r, 10_000)); // poll every 10 s
+  }
+}
+
+console.log(await waitForAnswer());</code></pre><pre data-lang="Python"><code>import os, time, requests
+
+headers = {&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;}
+cid = &quot;6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;
+
+while True:
+    c = requests.get(f&quot;{BASE}/v1/consultations/{cid}&quot;, headers=headers).json()[&quot;consultation&quot;]
+    if c[&quot;status&quot;] in (&quot;failed&quot;, &quot;closed&quot;):
+        raise RuntimeError(c[&quot;status&quot;])
+    if c[&quot;status&quot;] == &quot;ready&quot; and c[&quot;messages&quot;][-1][&quot;role&quot;] == &quot;kaal&quot;:
+        print(c[&quot;messages&quot;][-1][&quot;content&quot;])
+        break
+    time.sleep(10)  # poll every 10 s</code></pre></div>
+<div class="code"><pre data-lang="200 OK"><code>{
+  &quot;consultation&quot;: {
+    &quot;id&quot;: &quot;6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;,
+    &quot;name&quot;: &quot;Asha Verma&quot;,
+    &quot;language&quot;: &quot;English&quot;,
+    &quot;status&quot;: &quot;ready&quot;,
+    &quot;created_at&quot;: &quot;2026-10-12T02:21:34.792Z&quot;,
+    &quot;expires_at&quot;: &quot;2026-10-19T02:21:35.278Z&quot;,
+    &quot;messages&quot;: [
+      {
+        &quot;id&quot;: &quot;619016d2-4cf9-432b-848b-dcd9921a3b00&quot;,
+        &quot;role&quot;: &quot;user&quot;,
+        &quot;content&quot;: &quot;When is a good window for a career change?&quot;,
+        &quot;created_at&quot;: &quot;2026-10-12T02:21:34.792Z&quot;
+      },
+      {
+        &quot;id&quot;: &quot;e72af372-ed54-4b5e-919c-a31f24f87f06&quot;,
+        &quot;role&quot;: &quot;kaal&quot;,
+        &quot;content&quot;: &quot;**Namaste Asha ji, I am Kaal, Kaalera&#x27;s Vedic astrologer.** I have studied your chart, and here is a short overview before I answer your question.\n\n**Who you are**\n- **Lagna (Ascendant): Capricorn, Moon in Capricorn, Shravana nakshatra.** …&quot;,
+        &quot;created_at&quot;: &quot;2026-10-12T02:22:52.000Z&quot;
+      }
+    ]
+  }
+}</code></pre></div>
+<p>The first <code>kaal</code> message contains a short opening reading of the chart followed by the answer to the question. <code>content</code> is Markdown.</p>
+</li>
+<li>
+<h2>Ask a follow-up</h2>
+<p>Ask another question in the same consultation. You can switch the answer language with any question; the new language also becomes the consultation default.</p>
+<div class="code"><pre data-lang="cURL"><code>curl -X POST {BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3/questions \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{
+  &quot;question&quot;: &quot;Is the window after March 2027 better for starting my own business?&quot;,
+  &quot;language&quot;: &quot;Hinglish&quot;
+}&#x27;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3/questions&quot;, {
+  method: &quot;POST&quot;,
+  headers: {
+    Authorization: `Bearer ${process.env.KAALERA_API_KEY}`,
+    &quot;Content-Type&quot;: &quot;application/json&quot;,
+  },
+  body: JSON.stringify({
+  &quot;question&quot;: &quot;Is the window after March 2027 better for starting my own business?&quot;,
+  &quot;language&quot;: &quot;Hinglish&quot;
+}),
+});
+const data = await res.json();
+console.log(res.status, data);</code></pre><pre data-lang="Python"><code>import os, requests
+
+res = requests.post(
+    &quot;{BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3/questions&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;},
+    json={
+      &quot;question&quot;: &quot;Is the window after March 2027 better for starting my own business?&quot;,
+      &quot;language&quot;: &quot;Hinglish&quot;
+    },
+)
+print(res.status_code, res.json())</code></pre></div>
+<div class="code"><pre data-lang="202 Accepted"><code>{
+  &quot;question_id&quot;: &quot;52feaba7-c23a-4afb-bf6d-f39ec0b88005&quot;,
+  &quot;status&quot;: &quot;answering&quot;,
+  &quot;credits_remaining&quot;: 1
+}</code></pre></div>
+<p>Then poll the consultation again, exactly like step 4.</p>
+</li>
+</ol>
+
+<div class="callout warn"><span class="ic">!</span><p>Call the API from your server only. Never put an API key in browser or mobile app code.</p></div>
+</article>
+</body>
+</html>

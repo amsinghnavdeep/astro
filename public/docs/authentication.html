@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authentication — Kaalera API</title>
+<meta name="description" content="Authenticate Kaalera API requests with a Bearer API key.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+</head>
+<body data-page="authentication">
+<article class="d-article">
+<h1>Authentication</h1>
+<p class="lead">Every request is authenticated with an API key sent as a Bearer token.</p>
+
+<h2>Sending your key</h2>
+<p>Pass the key in the <code>Authorization</code> header:</p>
+<div class="code"><pre data-lang="Header"><code>Authorization: Bearer kal_live_...</code></pre></div>
+<div class="code"><pre data-lang="cURL"><code>curl {BASE}/v1/balance \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/balance&quot;, {
+  headers: { Authorization: `Bearer ${process.env.KAALERA_API_KEY}` },
+});
+const data = await res.json();
+console.log(res.status, data);</code></pre><pre data-lang="Python"><code>import os, requests
+
+res = requests.get(
+    &quot;{BASE}/v1/balance&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;},
+)
+print(res.status_code, res.json())</code></pre></div>
+<p>Keys start with <code>kal_live_</code>. A missing, wrong or revoked key returns:</p>
+<div class="code"><pre data-lang="401 Unauthorized"><code>{
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;invalid_api_key&quot;,
+    &quot;message&quot;: &quot;Missing or invalid API key.&quot;
+  }
+}</code></pre></div>
+
+<h2>Managing keys</h2>
+<ul>
+  <li>Create keys in the <a href="/developers">developer dashboard</a>. You can have up to 10 active keys.</li>
+  <li>A key is <strong>shown once</strong>, when you create it. Copy it then; it cannot be shown again.</li>
+  <li>Kaalera stores only a <strong>hash</strong> of the key, never the key itself. The dashboard shows its first characters so you can tell keys apart.</li>
+  <li><strong>Revoke</strong> a key at any time from the dashboard. It stops working immediately.</li>
+  <li>All keys on your account share the same credit balance.</li>
+</ul>
+
+<h2>Keep keys secret</h2>
+<div class="callout warn"><span class="ic">!</span><p>Never use API keys in browser code, mobile apps or public repositories. Anyone with the key can spend your credits. Call the API from your backend and keep the key in an environment variable or secret manager.</p></div>
+<p>If a key leaks, revoke it in the dashboard and create a new one.</p>
+</article>
+</body>
+</html>

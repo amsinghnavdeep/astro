@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask a follow-up — Kaalera API</title>
+<meta name="description" content="POST /v1/consultations/:id/questions — ask Kaal another question in an open consultation.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+</head>
+<body data-page="questions-create">
+<article class="d-article">
+<h1>Ask a follow-up</h1>
+<p class="lead">Asks another question in an open consultation. Kaal keeps the chart and earlier answers in mind. Costs 1 credit.</p>
+<div class="endpoint"><span class="m post">POST</span><span class="path"><span class="base"></span>/v1/consultations/:id/questions</span></div>
+
+<h2>Path parameters</h2>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">id</span><span class="param-type">string</span><span class="param-req">required</span></div><p>The consultation ID.</p></div></div>
+
+<h2>Request body</h2>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">question</span><span class="param-type">string</span><span class="param-req">required</span></div><p>The question, 2 to 600 characters.</p></div><div class="param"><div class="param-head"><span class="param-name">language</span><span class="param-type">string</span><span class="param-opt">optional</span></div><p>Answer language for this question and the ones after it (it also updates the consultation <code>language</code>). Defaults to the current consultation language. See <a href="/docs/languages">Languages</a>.</p></div></div>
+
+<h2>Request</h2>
+<div class="code"><pre data-lang="cURL"><code>curl -X POST {BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3/questions \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{
+  &quot;question&quot;: &quot;Is the window after March 2027 better for starting my own business?&quot;,
+  &quot;language&quot;: &quot;Hinglish&quot;
+}&#x27;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3/questions&quot;, {
+  method: &quot;POST&quot;,
+  headers: {
+    Authorization: `Bearer ${process.env.KAALERA_API_KEY}`,
+    &quot;Content-Type&quot;: &quot;application/json&quot;,
+  },
+  body: JSON.stringify({
+  &quot;question&quot;: &quot;Is the window after March 2027 better for starting my own business?&quot;,
+  &quot;language&quot;: &quot;Hinglish&quot;
+}),
+});
+const data = await res.json();
+console.log(res.status, data);</code></pre><pre data-lang="Python"><code>import os, requests
+
+res = requests.post(
+    &quot;{BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3/questions&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;},
+    json={
+      &quot;question&quot;: &quot;Is the window after March 2027 better for starting my own business?&quot;,
+      &quot;language&quot;: &quot;Hinglish&quot;
+    },
+)
+print(res.status_code, res.json())</code></pre></div>
+
+<h2>Response</h2>
+<div class="code"><pre data-lang="202 Accepted"><code>{
+  &quot;question_id&quot;: &quot;52feaba7-c23a-4afb-bf6d-f39ec0b88005&quot;,
+  &quot;status&quot;: &quot;answering&quot;,
+  &quot;credits_remaining&quot;: 1
+}</code></pre></div>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">question_id</span><span class="param-type">string</span></div><p>ID of your question. It appears as a <code>user</code> message in the consultation.</p></div><div class="param"><div class="param-head"><span class="param-name">status</span><span class="param-type">string</span></div><p>Always <code>answering</code>.</p></div><div class="param"><div class="param-head"><span class="param-name">credits_remaining</span><span class="param-type">integer</span></div><p>Your credit balance after this request.</p></div></div>
+<p>Then poll <a href="/docs/consultations-get">Get a consultation</a> until <code>status</code> is <code>ready</code> again.</p>
+<div class="callout info"><span class="ic">i</span><p>You can have at most 2 unanswered questions in a consultation at a time. A third returns <code>429 answer_pending</code>.</p></div>
+
+<h2>Errors</h2>
+<div class="table-wrap"><table><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>invalid_request</code></td><td><code>question</code> is missing or not 2–600 characters, or <code>language</code> is not supported.</td></tr><tr><td>401</td><td><code>invalid_api_key</code></td><td>Missing, wrong or revoked API key.</td></tr><tr><td>402</td><td><code>insufficient_credits</code></td><td>Your balance is 0.</td></tr><tr><td>404</td><td><code>not_found</code></td><td>No consultation with this ID on your account.</td></tr><tr><td>409</td><td><code>consultation_closed</code></td><td>The consultation is more than 7 days old. Create a new one.</td></tr><tr><td>409</td><td><code>consultation_not_ready</code></td><td>The consultation is not ready to take questions yet.</td></tr><tr><td>429</td><td><code>answer_pending</code></td><td>Two questions are already waiting for answers.</td></tr><tr><td>503</td><td><code>unavailable</code></td><td>The question could not be delivered. You were not charged.</td></tr></tbody></table></div>
+<div class="code"><pre data-lang="429 Too Many Requests"><code>{
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;answer_pending&quot;,
+    &quot;message&quot;: &quot;Wait for the current answer before asking again.&quot;
+  }
+}</code></pre></div>
+</article>
+</body>
+</html>

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get balance — Kaalera API</title>
+<meta name="description" content="GET /v1/balance — your remaining API credits.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+</head>
+<body data-page="balance">
+<article class="d-article">
+<h1>Get balance</h1>
+<p class="lead">Returns the number of credits left on your account. Free.</p>
+<div class="endpoint"><span class="m get">GET</span><span class="path"><span class="base"></span>/v1/balance</span></div>
+
+<h2>Request</h2>
+<div class="code"><pre data-lang="cURL"><code>curl {BASE}/v1/balance \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/balance&quot;, {
+  headers: { Authorization: `Bearer ${process.env.KAALERA_API_KEY}` },
+});
+const data = await res.json();
+console.log(res.status, data);</code></pre><pre data-lang="Python"><code>import os, requests
+
+res = requests.get(
+    &quot;{BASE}/v1/balance&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;},
+)
+print(res.status_code, res.json())</code></pre></div>
+
+<h2>Response</h2>
+<div class="code"><pre data-lang="200 OK"><code>{
+  &quot;credits&quot;: 3
+}</code></pre></div>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">credits</span><span class="param-type">integer</span></div><p>Credits available. 1 credit = 1 question.</p></div></div>
+<p>The balance is shared by all API keys on your account. Buy more in the <a href="/developers">developer dashboard</a>.</p>
+
+<h2>Errors</h2>
+<div class="table-wrap"><table><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>401</td><td><code>invalid_api_key</code></td><td>Missing, wrong or revoked API key.</td></tr></tbody></table></div>
+</article>
+</body>
+</html>

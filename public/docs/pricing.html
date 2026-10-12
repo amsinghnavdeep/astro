@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing &amp; credits — Kaalera API</title>
+<meta name="description" content="Kaalera API pricing: 1 credit = 1 question = $10.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+</head>
+<body data-page="pricing">
+<article class="d-article">
+<h1>Pricing &amp; credits</h1>
+<p class="lead">Prepaid credits. 1 credit = 1 question = $10.</p>
+
+<h2>What costs a credit</h2>
+<div class="table-wrap"><table><thead><tr><th>Request</th><th>Cost</th></tr></thead><tbody><tr><td><a href="/docs/consultations-create"><code>POST /v1/consultations</code></a> (chart + opening reading + first answer)</td><td>1 credit</td></tr><tr><td><a href="/docs/questions-create"><code>POST /v1/consultations/:id/questions</code></a></td><td>1 credit</td></tr><tr><td><a href="/docs/consultations-get"><code>GET /v1/consultations/:id</code></a></td><td>Free</td></tr><tr><td><a href="/docs/balance"><code>GET /v1/balance</code></a></td><td>Free</td></tr></tbody></table></div>
+
+<h2>Credit packs</h2>
+<div class="table-wrap"><table><thead><tr><th>Pack</th><th>Price</th></tr></thead><tbody><tr><td>2 credits</td><td>$20</td></tr><tr><td>10 credits</td><td>$100</td></tr><tr><td>50 credits</td><td>$500</td></tr></tbody></table></div>
+<p>Buy packs in the <a href="/developers">developer dashboard</a>. Payment is handled by Stripe.</p>
+
+<h2>Good to know</h2>
+<ul>
+  <li><strong>Credits never expire.</strong></li>
+  <li><strong>Failed deliveries are not charged.</strong> If Kaal cannot start or a question cannot be delivered (<code>503 unavailable</code>), the credit is not taken or is refunded automatically.</li>
+  <li>Requests rejected with a 4xx error (for example <code>invalid_request</code> or <code>answer_pending</code>) cost nothing.</li>
+  <li>All keys on an account share one balance. Check it with <a href="/docs/balance"><code>GET /v1/balance</code></a>.</li>
+</ul>
+</article>
+</body>
+</html>

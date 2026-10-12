@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Languages — Kaalera API</title>
+<meta name="description" content="Languages Kaal can answer in.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+</head>
+<body data-page="languages">
+<article class="d-article">
+<h1>Languages</h1>
+<p class="lead">Kaal can answer in nine languages. Astrological terms such as house, dasha and nakshatra names may stay in their usual form.</p>
+
+<h2>Supported values</h2>
+<p>Pass one of these exact values (case-sensitive) as <code>language</code>:</p>
+<div class="table-wrap"><table><thead><tr><th>Value</th><th>Notes</th></tr></thead><tbody><tr><td><code>English</code></td><td>Default</td></tr><tr><td><code>Hindi</code></td><td>Devanagari script</td></tr><tr><td><code>Hinglish</code></td><td>Hindi in Latin script, mixed with English</td></tr><tr><td><code>Punjabi</code></td><td></td></tr><tr><td><code>Bengali</code></td><td></td></tr><tr><td><code>Marathi</code></td><td></td></tr><tr><td><code>Gujarati</code></td><td></td></tr><tr><td><code>Tamil</code></td><td></td></tr><tr><td><code>Telugu</code></td><td></td></tr></tbody></table></div>
+
+<h2>Setting the language</h2>
+<ul>
+  <li><strong>Per consultation:</strong> set <code>language</code> in <a href="/docs/consultations-create">Create a consultation</a>. It defaults to <code>English</code>.</li>
+  <li><strong>Per question:</strong> set <code>language</code> in <a href="/docs/questions-create">Ask a follow-up</a> to switch language mid-consultation. The new language applies to that answer and becomes the consultation default for later questions.</li>
+</ul>
+<div class="code"><pre data-lang="Request body"><code>{
+  &quot;question&quot;: &quot;Is the window after March 2027 better for starting my own business?&quot;,
+  &quot;language&quot;: &quot;Hinglish&quot;
+}</code></pre></div>
+<p>An unsupported value returns <code>400 invalid_request</code>.</p>
+</article>
+</body>
+</html>
