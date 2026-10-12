@@ -231,7 +231,7 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .about-select { border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; background: #fafafa; max-width: 70%; }
 
 /* Future symbols */
-.logo:not(.plain) { font-size: 0 !important; background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 4.2A8 8 0 1 0 19.8 15 6.5 6.5 0 0 1 15.5 4.2z' fill='%23fff'/%3E%3Cpath d='M18 4l.6 1.4L20 6l-1.4.6L18 8l-.6-1.4L16 6l1.4-.6z' fill='%23fff'/%3E%3C/svg%3E") center/62% no-repeat; }
+.logo:not(.plain) { font-size: 0 !important; background: #171717 url("/kaal-mark.svg") center/cover no-repeat; }
 .landing { background:
   radial-gradient(1.5px 1.5px at 12% 18%, #c9c9d6 50%, transparent 51%),
   radial-gradient(1px 1px at 28% 72%, #c9c9d6 50%, transparent 51%),
@@ -246,8 +246,15 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .hero-orb { width: 58px; height: 58px; position: relative; animation: float 5s ease-in-out infinite; }
 .heritage { font-size: 12px !important; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 auto 14px !important; }
 .l-num { font-size: 20px !important; }
-.avatar.kaal, .msg.kaal .avatar, .working .avatar { background: #171717 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M15.5 4.2A8 8 0 1 0 19.8 15 6.5 6.5 0 0 1 15.5 4.2z' fill='%23fff'/%3E%3Cpath d='M18 4l.6 1.4L20 6l-1.4.6L18 8l-.6-1.4L16 6l1.4-.6z' fill='%23fff'/%3E%3C/svg%3E") center/62% no-repeat; color: transparent; }
+.avatar.kaal, .msg.kaal .avatar, .working .avatar, .kaal-av { font-size: 0 !important; color: transparent; background: #0d0d10 url("/kaal.svg") center/cover no-repeat; }
 .chat-view, .center-view { background-image: radial-gradient(1px 1px at 90% 10%, #e0e0ea 50%, transparent 51%), radial-gradient(1px 1px at 8% 30%, #e0e0ea 50%, transparent 51%), radial-gradient(1.5px 1.5px at 75% 85%, #e0e0ea 50%, transparent 51%); }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes float { 50% { transform: translateY(-4px); } }
 @media (prefers-reduced-motion: reduce) { .zodiac-wheel, .hero-orb { animation: none; } }
+
+.working .avatar { position: relative; overflow: visible; }
+.working .avatar::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px dashed #a1a1aa; animation: spin 6s linear infinite; }
+.working .avatar::before { content: ""; position: absolute; left: 50%; top: 31%; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: #e5484d; filter: blur(2px); animation: eye 1.6s ease-in-out infinite; }
+@keyframes eye { 0%, 100% { opacity: .15; transform: scale(.6); } 50% { opacity: .9; transform: scale(1.3); } }
+.hero-kaal { width: 92px; height: 92px; border-radius: 50%; display: block; box-shadow: 0 10px 30px rgba(0,0,0,.18); }
+@media (prefers-reduced-motion: reduce) { .working .avatar::after, .working .avatar::before { animation: none; } }

@@ -167,3 +167,5 @@ td code { white-space: nowrap; }
   .pager { grid-template-columns: 1fr; }
   .pager .next { grid-column: 1; }
 }
+
+.d-logo { font-size: 0 !important; color: transparent; background: #171717 url("/kaal-mark.svg") center/cover no-repeat; }
