@@ -1,29 +1,30 @@
 {
-  "name": "siddh-jyotish",
-  "type": "module",
-  "version": "0.1.0",
-  "private": true,
+  "name": "kaalera",
+  "version": "1.0.0",
+  "main": "index.js",
   "scripts": {
-    "dev": "astro dev",
-    "prebuild": "node ./scripts/sync-swagger-ui.mjs",
-    "build": "astro build",
-    "preview": "wrangler dev",
-    "deploy": "astro build && wrangler deploy",
-    "check": "astro check",
+    "build:web": "esbuild src/web/app.ts --bundle --format=esm --target=es2022 --outfile=public/app.js && esbuild src/web/developers.ts --bundle --format=esm --target=es2022 --outfile=public/developers.js && esbuild src/web/support.ts --bundle --format=esm --target=es2022 --outfile=public/support.js",
+    "dev": "npm run build:web && wrangler dev --port 8787",
+    "db:migrate:local": "wrangler d1 migrations apply kaalera --local",
+    "db:migrate:remote": "wrangler d1 migrations apply kaalera --remote",
+    "deploy": "npm run build:web && wrangler deploy",
     "typecheck": "tsc --noEmit"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
   "dependencies": {
-    "@astrojs/cloudflare": "^11.2.0",
-    "astro": "^4.16.19",
-    "resend": "^4.8.0",
-    "stripe": "^16.12.0",
+    "hono": "^4.13.13",
+    "stripe": "^17.7.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.9",
-    "@cloudflare/workers-types": "^5.20260707.1",
-    "swagger-ui-dist": "5.17.14",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@types/node": "^20.19.43",
+    "esbuild": "^0.25.12",
     "typescript": "^5.9.3",
     "wrangler": "^4.42.0"
-  }
+  },
+  "type": "module"
 }

@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create a consultation — Kaalera API</title>
+<meta name="description" content="POST /v1/consultations — compute a birth chart and ask Kaal the first question.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+  <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
+</head>
+<body data-page="consultations-create">
+<article class="d-article">
+<h1>Create a consultation</h1>
+<p class="lead">Computes the birth chart and asks Kaal the first question. Costs 1 credit.</p>
+<div class="endpoint"><span class="m post">POST</span><span class="path"><span class="base"></span>/v1/consultations</span></div>
+
+<h2>Request body</h2>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">fullName</span><span class="param-type">string</span><span class="param-req">required</span></div><p>Full name of the person. Up to 120 characters.</p></div><div class="param"><div class="param-head"><span class="param-name">gender</span><span class="param-type">string</span><span class="param-req">required</span></div><p>One of <code>Male</code>, <code>Female</code>, <code>Other</code>.</p></div><div class="param"><div class="param-head"><span class="param-name">dateOfBirth</span><span class="param-type">string</span><span class="param-req">required</span></div><p>Date of birth, e.g. <code>"2 Sep 1990"</code>.</p></div><div class="param"><div class="param-head"><span class="param-name">timeOfBirth</span><span class="param-type">string</span><span class="param-req">required</span></div><p>Local time of birth, e.g. <code>"5:24 PM"</code>. The more exact, the better the house placements.</p></div><div class="param"><div class="param-head"><span class="param-name">placeOfBirth</span><span class="param-type">string</span><span class="param-req">required</span></div><p>Place of birth as <code>"City, State, Country"</code>, e.g. <code>"Jaipur, Rajasthan, India"</code>.</p></div><div class="param"><div class="param-head"><span class="param-name">timezone</span><span class="param-type">string</span><span class="param-req">required</span></div><p>IANA time zone of the birth place, e.g. <code>"Asia/Kolkata"</code>.</p></div><div class="param"><div class="param-head"><span class="param-name">latitude</span><span class="param-type">number</span><span class="param-opt">optional</span></div><p>Latitude of the birth place, −90 to 90. Recommended. If omitted, the place is geocoded from <code>placeOfBirth</code>.</p></div><div class="param"><div class="param-head"><span class="param-name">longitude</span><span class="param-type">number</span><span class="param-opt">optional</span></div><p>Longitude of the birth place, −180 to 180. Recommended together with <code>latitude</code>.</p></div><div class="param"><div class="param-head"><span class="param-name">language</span><span class="param-type">string</span><span class="param-opt">optional</span></div><p>Language Kaal answers in. Defaults to <code>English</code>. See <a href="/docs/languages">Languages</a>.</p></div><div class="param"><div class="param-head"><span class="param-name">question</span><span class="param-type">string</span><span class="param-req">required</span></div><p>The first question, 2 to 600 characters.</p></div></div>
+
+<h2>Request</h2>
+<div class="code"><pre data-lang="cURL"><code>curl -X POST {BASE}/v1/consultations \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot; \
+  -H &quot;Content-Type: application/json&quot; \
+  -d &#x27;{
+  &quot;fullName&quot;: &quot;Asha Verma&quot;,
+  &quot;gender&quot;: &quot;Female&quot;,
+  &quot;dateOfBirth&quot;: &quot;2 Sep 1990&quot;,
+  &quot;timeOfBirth&quot;: &quot;5:24 PM&quot;,
+  &quot;placeOfBirth&quot;: &quot;Jaipur, Rajasthan, India&quot;,
+  &quot;timezone&quot;: &quot;Asia/Kolkata&quot;,
+  &quot;latitude&quot;: 26.9124,
+  &quot;longitude&quot;: 75.7873,
+  &quot;language&quot;: &quot;English&quot;,
+  &quot;question&quot;: &quot;When is a good window for a career change?&quot;
+}&#x27;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/consultations&quot;, {
+  method: &quot;POST&quot;,
+  headers: {
+    Authorization: `Bearer ${process.env.KAALERA_API_KEY}`,
+    &quot;Content-Type&quot;: &quot;application/json&quot;,
+  },
+  body: JSON.stringify({
+  &quot;fullName&quot;: &quot;Asha Verma&quot;,
+  &quot;gender&quot;: &quot;Female&quot;,
+  &quot;dateOfBirth&quot;: &quot;2 Sep 1990&quot;,
+  &quot;timeOfBirth&quot;: &quot;5:24 PM&quot;,
+  &quot;placeOfBirth&quot;: &quot;Jaipur, Rajasthan, India&quot;,
+  &quot;timezone&quot;: &quot;Asia/Kolkata&quot;,
+  &quot;latitude&quot;: 26.9124,
+  &quot;longitude&quot;: 75.7873,
+  &quot;language&quot;: &quot;English&quot;,
+  &quot;question&quot;: &quot;When is a good window for a career change?&quot;
+}),
+});
+const data = await res.json();
+console.log(res.status, data);</code></pre><pre data-lang="Python"><code>import os, requests
+
+res = requests.post(
+    &quot;{BASE}/v1/consultations&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;},
+    json={
+      &quot;fullName&quot;: &quot;Asha Verma&quot;,
+      &quot;gender&quot;: &quot;Female&quot;,
+      &quot;dateOfBirth&quot;: &quot;2 Sep 1990&quot;,
+      &quot;timeOfBirth&quot;: &quot;5:24 PM&quot;,
+      &quot;placeOfBirth&quot;: &quot;Jaipur, Rajasthan, India&quot;,
+      &quot;timezone&quot;: &quot;Asia/Kolkata&quot;,
+      &quot;latitude&quot;: 26.9124,
+      &quot;longitude&quot;: 75.7873,
+      &quot;language&quot;: &quot;English&quot;,
+      &quot;question&quot;: &quot;When is a good window for a career change?&quot;
+    },
+)
+print(res.status_code, res.json())</code></pre></div>
+
+<h2>Response</h2>
+<div class="code"><pre data-lang="201 Created"><code>{
+  &quot;consultation&quot;: {
+    &quot;id&quot;: &quot;6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;,
+    &quot;name&quot;: &quot;Asha Verma&quot;,
+    &quot;language&quot;: &quot;English&quot;,
+    &quot;status&quot;: &quot;ready&quot;,
+    &quot;created_at&quot;: &quot;2026-10-12T02:21:34.792Z&quot;,
+    &quot;expires_at&quot;: &quot;2026-10-19T02:21:35.278Z&quot;
+  },
+  &quot;credits_remaining&quot;: 2
+}</code></pre></div>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">consultation.id</span><span class="param-type">string</span></div><p>Consultation ID. Use it to poll and to ask follow-ups.</p></div><div class="param"><div class="param-head"><span class="param-name">consultation.name</span><span class="param-type">string</span></div><p>The <code>fullName</code> you sent.</p></div><div class="param"><div class="param-head"><span class="param-name">consultation.language</span><span class="param-type">string</span></div><p>Default answer language for this consultation.</p></div><div class="param"><div class="param-head"><span class="param-name">consultation.status</span><span class="param-type">string</span></div><p>Session state, <code>starting</code> or <code>ready</code>. The answer itself arrives later; see <a href="/docs/consultations-get">Get a consultation</a>.</p></div><div class="param"><div class="param-head"><span class="param-name">consultation.created_at</span><span class="param-type">string</span></div><p>ISO 8601 timestamp.</p></div><div class="param"><div class="param-head"><span class="param-name">consultation.expires_at</span><span class="param-type">string | null</span></div><p>When the consultation closes (7 days after it starts). After that it is read-only.</p></div><div class="param"><div class="param-head"><span class="param-name">credits_remaining</span><span class="param-type">integer</span></div><p>Your credit balance after this request.</p></div></div>
+
+<h2>Errors</h2>
+<div class="table-wrap"><table><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>400</td><td><code>invalid_request</code></td><td>A field is missing or invalid. The message lists each problem.</td></tr><tr><td>400</td><td><code>chart_failed</code></td><td>The chart could not be computed. Check date, time, place and timezone.</td></tr><tr><td>401</td><td><code>invalid_api_key</code></td><td>Missing, wrong or revoked API key.</td></tr><tr><td>402</td><td><code>insufficient_credits</code></td><td>Your balance is 0. Buy credits at <a href="/developers">/developers</a>.</td></tr><tr><td>503</td><td><code>unavailable</code></td><td>Kaal could not start. You were not charged; retry later.</td></tr></tbody></table></div>
+<div class="code"><pre data-lang="400 Bad Request"><code>{
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;invalid_request&quot;,
+    &quot;message&quot;: &quot;fullName: Required; gender: Required; dateOfBirth: Required; timeOfBirth: Required; placeOfBirth: Required; timezone: Required; question: Required&quot;
+  }
+}</code></pre></div>
+</article>
+</body>
+</html>

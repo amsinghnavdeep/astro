@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kaalera — ask Kaal about your chart</title>
+  <meta name="description" content="Ask Kaal, an AI Vedic astrologer, about career, marriage, health or money. Every answer is read from your own birth chart and explains the planets, houses and dashas behind it." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
+</head>
+<body>
+  <div id="boot" class="boot"><span class="spinner"></span></div>
+
+  <!-- Landing -->
+  <div id="landing-view" class="landing" hidden>
+    <header class="l-nav">
+      <a class="brand" href="/"><span class="logo sm">K</span> Kaalera</a>
+      <nav class="l-links">
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="/developers">Developers</a>
+        <a href="/docs">Docs</a>
+        <button class="btn sm" type="button" data-signin>Sign in</button>
+      </nav>
+    </header>
+
+    <main class="l-hero">
+      <div class="hero-art"><svg class="zodiac-wheel" viewBox="0 0 200 200" aria-hidden="true"><g fill="none" stroke="currentColor"><circle cx="100" cy="100" r="96" stroke-width=".8"/><circle cx="100" cy="100" r="78" stroke-width=".6"/><circle cx="100" cy="100" r="40" stroke-width=".6" stroke-dasharray="2 4"/><line x1="178.0" y1="100.0" x2="196.0" y2="100.0" stroke-width=".6"/><line x1="167.5" y1="139.0" x2="183.1" y2="148.0" stroke-width=".6"/><line x1="139.0" y1="167.6" x2="148.0" y2="183.1" stroke-width=".6"/><line x1="100.0" y1="178.0" x2="100.0" y2="196.0" stroke-width=".6"/><line x1="61.0" y1="167.5" x2="52.0" y2="183.1" stroke-width=".6"/><line x1="32.4" y1="139.0" x2="16.9" y2="148.0" stroke-width=".6"/><line x1="22.0" y1="100.0" x2="4.0" y2="100.0" stroke-width=".6"/><line x1="32.5" y1="61.0" x2="16.9" y2="52.0" stroke-width=".6"/><line x1="61.0" y1="32.4" x2="52.0" y2="16.9" stroke-width=".6"/><line x1="100.0" y1="22.0" x2="100.0" y2="4.0" stroke-width=".6"/><line x1="139.0" y1="32.5" x2="148.0" y2="16.9" stroke-width=".6"/><line x1="167.6" y1="61.0" x2="183.1" y2="52.0" stroke-width=".6"/></g><g font-size="9" fill="currentColor" text-anchor="middle" dominant-baseline="central"><text x="184.0" y="122.5">♈</text><text x="161.5" y="161.5">♉</text><text x="122.5" y="184.0">♊</text><text x="77.5" y="184.0">♋</text><text x="38.5" y="161.5">♌</text><text x="16.0" y="122.5">♍</text><text x="16.0" y="77.5">♎</text><text x="38.5" y="38.5">♏</text><text x="77.5" y="16.0">♐</text><text x="122.5" y="16.0">♑</text><text x="161.5" y="38.5">♒</text><text x="184.0" y="77.5">♓</text></g></svg><img class="hero-orb hero-kaal" src="/kaal.svg" alt="Kaal" /></div>
+      <p class="heritage">☾ AI trained by a 7,000-year-old lineage of Kashmiri Himalayan monks ✦</p>
+      <h1>What would you like to know?</h1>
+      <p class="muted">Ask Kaal about career, marriage, health, money or a past event. Every answer is read from your own birth chart and explains the planets, houses and dashas behind it.</p>
+      <form id="l-form" class="composer l-composer">
+        <textarea id="l-input" rows="3" maxlength="600" placeholder="e.g. When will I get a better job?" required></textarea>
+        <div class="composer-bar">
+          <span class="tiny muted">Your first question is free</span>
+          <button class="send" type="submit" title="Ask" aria-label="Ask">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </form>
+      <div class="suggestions l-chips">
+        <button type="button" class="chip l-chip">When will my career grow?</button>
+        <button type="button" class="chip l-chip">When will I get married?</button>
+        <button type="button" class="chip l-chip">Why was last year so hard?</button>
+        <button type="button" class="chip l-chip">How will my child's education go?</button>
+      </div>
+    </main>
+
+    <section id="how" class="l-section">
+      <h2>How it works</h2>
+      <div class="l-grid">
+        <div class="l-card"><div class="l-num">🔮</div><h3>Ask your question</h3><p class="muted">Anything about your past or future, in plain words.</p></div>
+        <div class="l-card"><div class="l-num">☉</div><h3>Add birth details</h3><p class="muted">Pick or add a Kundli: name, date, time and place of birth. Your chart is cast to the arc-second.</p></div>
+        <div class="l-card"><div class="l-num">☾</div><h3>Chat with Kaal</h3><p class="muted">An opening reading, then answers with timing from your dashas and transits.</p></div>
+      </div>
+    </section>
+
+    <section id="pricing" class="l-section">
+      <h2>Pricing</h2>
+      <p class="muted">No subscription. Pay only for the questions you ask.</p>
+      <p class="buy-note">Guidance only, not professional advice. All sales are final — no refunds. Chat questions expire 3 months after purchase.</p>
+      <div class="l-grid" id="l-prices"></div>
+    </section>
+
+    <footer class="l-foot tiny muted">
+      <div class="l-foot-links"><a href="/developers">Developers</a><a href="/docs">Docs</a><a href="/support">Support</a></div>
+      Astrological guidance for reflection only — not medical, legal or financial advice.
+    </footer>
+  </div>
+
+  <!-- Add / edit Kundli -->
+  <dialog id="kundli-modal" class="modal wide-modal">
+    <form id="kundli-form" class="modal-body" autocomplete="off">
+      <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
+      <h2 id="kundli-title">Add a Kundli</h2>
+      <p class="muted">Date, time and place of birth are required. An exact birth time gives the best reading.</p>
+      <div class="grid">
+              <label class="checkbox span2"><input type="checkbox" name="newborn" id="newborn-box" /> Newborn, name not chosen yet</label>
+              <label>Full name<input name="fullName" id="kundli-name" required maxlength="120" placeholder="e.g. Arjun Sharma" /></label>
+              <label>Gender
+                <select name="gender" required>
+                  <option value="" disabled selected>Select</option>
+                  <option>Male</option><option>Female</option><option>Other</option>
+                </select>
+              </label>
+              <label>Date of birth<input type="date" name="dateOfBirth" min="1900-01-01" required /></label>
+              <label>Time of birth<input type="time" name="timeOfBirth" required /></label>
+              <label class="span2 place-field">Place of birth
+                <input name="placeOfBirth" id="place-input" placeholder="Start typing a city…" required maxlength="160" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="place-list" />
+                <ul id="place-list" class="place-list" role="listbox" hidden></ul>
+              </label>
+              <input type="hidden" name="latitude" id="lat-input" />
+              <input type="hidden" name="longitude" id="lon-input" />
+              <label>Timezone of birthplace<select name="timezone" id="tz-select" required></select></label>
+      </div>
+      <p class="error" id="kundli-error"></p>
+      <div class="row-end">
+        <button class="btn ghost" type="button" id="kundli-delete" hidden>Delete</button>
+        <button class="btn primary" type="submit" id="kundli-save">Save Kundli</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Sign in -->
+  <dialog id="signin-modal" class="modal">
+    <form id="login-form" class="modal-body">
+      <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
+      <div class="logo">K</div>
+      <h2>Sign in to Kaalera</h2>
+      <p class="muted" id="login-sub">We'll email you a sign-in link. No password needed.</p>
+      <p class="notice" id="login-expired" hidden>That sign-in link has expired or was already used. Request a new one below.</p>
+      <label>Name<input name="name" placeholder="Your name" maxlength="80" autocomplete="name" /></label>
+      <label>Email<input name="email" type="email" placeholder="you@example.com" required autocomplete="email" /></label>
+      <p class="error" id="login-error"></p>
+      <button class="btn primary wide" type="submit" id="login-submit">Email me a sign-in link</button>
+    </form>
+    <div id="login-sent" class="modal-body" hidden>
+      <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
+      <div class="logo plain">✉</div>
+      <h2>Check your email</h2>
+      <p class="muted">We sent a sign-in link to <strong id="sent-email"></strong>. Open it on this device to continue.</p>
+      <p class="notice" id="dev-link-box" hidden>Dev mode: <a id="dev-link" href="#">open sign-in link</a></p>
+      <button class="btn wide" type="button" id="login-again">Use a different email</button>
+    </div>
+  </dialog>
+
+  <!-- App -->
+  <div id="app-view" class="app" hidden>
+    <aside class="sidebar">
+      <div class="side-head">
+        <a class="brand" href="/"><span class="logo sm">K</span> Kaalera</a>
+        <button id="menu-close" class="icon-btn mobile-only" type="button" aria-label="Close menu">✕</button>
+      </div>
+      <button id="new-thread" class="btn new" type="button"><span class="plus">+</span> New consultation</button>
+      <div class="section-label">Consultations</div>
+      <nav id="thread-list" class="threads"></nav>
+      <div class="side-foot">
+        <a class="side-link" href="/developers">Developers</a>
+        <a class="side-link" href="/docs">Docs</a>
+        <a class="side-link" href="/support">Support</a>
+        <div class="me">
+          <div class="avatar" id="me-avatar"></div>
+          <div class="me-text"><div id="me-name"></div><div class="tiny muted" id="me-email"></div></div>
+          <button id="logout" class="icon-btn" title="Sign out" type="button" aria-label="Sign out">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="menu" class="icon-btn mobile-only" type="button" aria-label="Open menu">☰</button>
+        <div class="topbar-title"><span id="top-title">New consultation</span><span id="top-sub" class="muted"></span></div>
+        <div class="topbar-right" id="top-right" hidden>
+          <span class="pill" id="q-left"></span>
+          <label class="lang-pick" title="Language Kaal answers in">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+            <select id="lang-select" aria-label="Answer language"></select>
+          </label>
+        </div>
+      </header>
+
+      <div id="banner" class="banner" hidden></div>
+
+      <!-- New consultation -->
+      <section id="profile-view" class="center-view" hidden>
+        <div class="profile-wrap">
+          <h1 class="hero">Whose chart should Kaal read?</h1>
+          <p class="muted">Yourself, your spouse, child or parent. One consultation per person.</p>
+          <div class="price-note" id="price-note"></div>
+          <form id="profile-form" class="card form" autocomplete="off">
+            <div class="grid">
+              <label class="span2">Your question<textarea name="question" id="profile-question" rows="3" maxlength="600" required placeholder="e.g. When will my career grow?"></textarea></label>
+              <div class="span2 kundli-pick">
+                <div class="kundli-head"><span>Kundli</span><button class="btn sm" type="button" id="kundli-add">+ Add new Kundli</button></div>
+                <div id="kundli-list" class="kundli-list"></div>
+                <input type="hidden" name="kundliId" id="kundli-id" />
+              </div>
+              <label>Kaal answers in<select name="language" id="profile-lang"></select></label>
+            </div>
+            <p class="error" id="profile-error"></p>
+            <div class="row-end">
+              <button class="btn ghost" type="button" id="profile-cancel">Cancel</button>
+              <button class="btn primary" type="submit" id="profile-submit">Start consultation</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Conversation -->
+      <section id="chat-view" class="chat-view" hidden>
+        <div id="scroller" class="scroller">
+          <div id="messages" class="messages"></div>
+          <div id="working" class="working" hidden aria-live="polite">
+            <svg class="loader-mark" aria-hidden="true" viewBox="88 66 714 714"><defs><linearGradient id="ltl" gradientUnits="userSpaceOnUse" x1="117" y1="214" x2="289" y2="386"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#0b0b0b"/></linearGradient><linearGradient id="lbl" gradientUnits="userSpaceOnUse" x1="117" y1="486" x2="289" y2="658"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#0b0b0b"/></linearGradient><linearGradient id="ltc" gradientUnits="userSpaceOnUse" x1="359" y1="84" x2="531" y2="256"><stop offset="0" stop-color="#ffa53a"/><stop offset="1" stop-color="#ec6d0a"/></linearGradient><linearGradient id="lmc" gradientUnits="userSpaceOnUse" x1="359" y1="346" x2="531" y2="518"><stop offset="0" stop-color="#ffa53a"/><stop offset="1" stop-color="#ec6d0a"/></linearGradient><linearGradient id="lbc" gradientUnits="userSpaceOnUse" x1="359" y1="609" x2="531" y2="781"><stop offset="0" stop-color="#ffa53a"/><stop offset="1" stop-color="#ec6d0a"/></linearGradient><linearGradient id="ltr" gradientUnits="userSpaceOnUse" x1="600" y1="214" x2="772" y2="386"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#0b0b0b"/></linearGradient><linearGradient id="lbr" gradientUnits="userSpaceOnUse" x1="600" y1="486" x2="772" y2="658"><stop offset="0" stop-color="#3a3a3a"/><stop offset="1" stop-color="#0b0b0b"/></linearGradient><linearGradient id="lbar" gradientUnits="userSpaceOnUse" x1="200" y1="170" x2="690" y2="700"><stop offset="0" stop-color="#ffc94d"/><stop offset="1" stop-color="#f08a12"/></linearGradient></defs><g stroke="url(#lbar)" stroke-width="34" stroke-linecap="round"><line x1="203" y1="300" x2="203" y2="572"/><line x1="445" y1="170" x2="445" y2="432"/><line x1="445" y1="432" x2="445" y2="695"/><line x1="686" y1="300" x2="686" y2="572"/><line x1="203" y1="572" x2="445" y2="695"/><line x1="686" y1="572" x2="445" y2="695"/></g><g class="piece p1" stroke-width="18" stroke-linejoin="round"><polygon points="203.0,223.0 269.7,261.5 269.7,338.5 203.0,377.0 136.3,338.5 136.3,261.5" fill="url(#ltl)" stroke="url(#ltl)"/><polygon points="203.0,217.0 274.9,258.5 274.9,341.5 203.0,383.0 131.1,341.5 131.1,258.5" fill="none" stroke="#f59e0b" stroke-width="7"/><polygon points="203.0,495.0 269.7,533.5 269.7,610.5 203.0,649.0 136.3,610.5 136.3,533.5" fill="url(#lbl)" stroke="url(#lbl)"/><polygon points="203.0,489.0 274.9,530.5 274.9,613.5 203.0,655.0 131.1,613.5 131.1,530.5" fill="none" stroke="#f59e0b" stroke-width="7"/></g><g class="piece p2" stroke-width="18" stroke-linejoin="round"><polygon points="445.0,93.0 511.7,131.5 511.7,208.5 445.0,247.0 378.3,208.5 378.3,131.5" fill="url(#ltc)" stroke="url(#ltc)"/><polygon points="445.0,355.0 511.7,393.5 511.7,470.5 445.0,509.0 378.3,470.5 378.3,393.5" fill="url(#lmc)" stroke="url(#lmc)"/><polygon points="445.0,618.0 511.7,656.5 511.7,733.5 445.0,772.0 378.3,733.5 378.3,656.5" fill="url(#lbc)" stroke="url(#lbc)"/></g><g class="piece p3" stroke-width="18" stroke-linejoin="round"><polygon points="686.0,223.0 752.7,261.5 752.7,338.5 686.0,377.0 619.3,338.5 619.3,261.5" fill="url(#ltr)" stroke="url(#ltr)"/><polygon points="686.0,217.0 757.9,258.5 757.9,341.5 686.0,383.0 614.1,341.5 614.1,258.5" fill="none" stroke="#f59e0b" stroke-width="7"/><polygon points="686.0,495.0 752.7,533.5 752.7,610.5 686.0,649.0 619.3,610.5 619.3,533.5" fill="url(#lbr)" stroke="url(#lbr)"/><polygon points="686.0,489.0 757.9,530.5 757.9,613.5 686.0,655.0 614.1,613.5 614.1,530.5" fill="none" stroke="#f59e0b" stroke-width="7"/></g></svg>
+            <div class="working-text">
+              <div class="working-line"><span class="shimmer" id="working-step">Casting your chart…</span><span class="muted tiny" id="working-time"></span></div>
+              <div class="tiny muted">Kaal is studying the chart. Answers can take a few minutes — you can leave this page and come back.</div>
+            </div>
+          </div>
+        </div>
+        <div class="composer-wrap">
+          <div id="state-panel" class="panel" hidden></div>
+          <form id="ask-form" class="composer">
+            <div class="about-row"><span class="tiny muted">Asking about</span><select id="about-select" class="about-select" aria-label="Asking about"></select></div>
+            <textarea id="ask-input" rows="1" placeholder="Ask a follow-up about career, marriage, health, money…"></textarea>
+            <div class="composer-bar">
+              <span class="tiny muted" id="composer-hint"></span>
+              <div class="composer-actions">
+                <button class="btn sm" type="button" id="add-inline" data-addq hidden></button>
+                <button id="ask-submit" class="send" type="submit" title="Send" aria-label="Send">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+          </form>
+          <p class="error" id="ask-error"></p>
+          <p class="tiny muted disclaimer">Astrological guidance for reflection only — not medical, legal or financial advice.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

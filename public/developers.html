@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Developers — Kaalera</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/developers.css" />
+  <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
+</head>
+<body>
+  <!-- Signed out -->
+  <div id="signin-view" class="d-signin" hidden>
+    <form id="signin-form" class="d-card d-signin-card">
+      <div class="d-brand"><span class="d-logo">ॐ</span> Kaalera <span class="d-tag">Developers</span></div>
+      <h1>Sign in to the developer dashboard</h1>
+      <p class="d-muted">Create API keys and buy question credits for the Kaalera API. We'll email you a sign-in link.</p>
+      <label>Email
+        <input id="signin-email" type="email" required autocomplete="email" placeholder="you@company.com" />
+      </label>
+      <button id="signin-submit" class="d-btn primary" type="submit">Email me a sign-in link</button>
+      <p id="signin-error" class="d-error" role="alert"></p>
+      <div id="signin-sent" class="d-note" hidden>
+        <strong>Check your email.</strong>
+        <span class="d-muted">Open the link we sent, then come back to this tab — it will refresh automatically.</span>
+        <div id="signin-dev" hidden>
+          <div class="d-muted d-small">Development mode: sign-in link</div>
+          <code id="signin-devlink" class="d-break"></code>
+          <button id="signin-devbtn" class="d-btn" type="button">Sign in with dev link</button>
+        </div>
+      </div>
+      <a class="d-small d-muted" href="/docs">Read the API docs →</a>
+    </form>
+  </div>
+
+  <!-- Signed in -->
+  <div id="dash-view" class="d-layout" hidden>
+    <aside class="d-side">
+      <a class="d-brand" href="/"><span class="d-logo">ॐ</span> Kaalera</a>
+      <a class="d-back" href="/">← Back to app</a>
+      <div class="d-side-label">Developers</div>
+      <nav class="d-nav">
+        <a href="#keys" data-tab="keys">API keys</a>
+        <a href="#billing" data-tab="billing">Credits &amp; billing</a>
+        <a href="#usage" data-tab="usage">Usage</a>
+      </nav>
+      <div class="d-side-label">Resources</div>
+      <nav class="d-nav">
+        <a href="/docs">API docs <span class="d-ext">↗</span></a>
+        <a href="/support">Support</a>
+        <a href="/docs/quickstart">Quickstart <span class="d-ext">↗</span></a>
+      </nav>
+      <div class="d-side-foot">
+        <div class="d-balance-pill"><span class="d-muted">Balance</span> <strong id="side-balance">–</strong></div>
+        <div class="d-me">
+          <span id="me-avatar" class="d-avatar"></span>
+          <div class="d-me-text"><div id="me-email" class="d-small"></div></div>
+          <button id="logout" class="d-icon-btn" type="button" title="Sign out">⎋</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="d-main">
+      <div id="banner" class="d-banner" hidden></div>
+
+      <!-- API keys -->
+      <section id="tab-keys" class="d-page" hidden>
+        <header class="d-head">
+          <div>
+            <h1>API keys</h1>
+            <p class="d-muted">Keys authenticate requests to the Kaalera API. Keep them secret — use them only from your server.</p>
+          </div>
+          <button id="new-key" class="d-btn primary" type="button">Create key</button>
+        </header>
+        <div class="d-card d-flush">
+          <table class="d-table">
+            <thead><tr><th>Name</th><th>Key</th><th>Created</th><th>Last used</th><th>Status</th><th></th></tr></thead>
+            <tbody id="keys-body"></tbody>
+          </table>
+          <div id="keys-empty" class="d-empty" hidden>No API keys yet. Create one to start calling the API.</div>
+        </div>
+
+        <div class="d-card">
+          <div class="d-card-head">
+            <h2>Quickstart</h2>
+            <a class="d-small" href="/docs/quickstart">Full quickstart →</a>
+          </div>
+          <p class="d-muted">Start a consultation (uses 1 credit), then poll it until Kaal's answer arrives.</p>
+          <div class="d-code">
+            <button class="d-copy" type="button" data-copy="quickstart-code">Copy</button>
+            <pre id="quickstart-code"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Billing -->
+      <section id="tab-billing" class="d-page" hidden>
+        <header class="d-head">
+          <div>
+            <h1>Credits &amp; billing</h1>
+            <p class="d-muted">The API is prepaid. 1 credit = 1 question, including the first question of a new consultation.</p>
+          </div>
+        </header>
+        <div class="d-card">
+          <div class="d-muted d-small">Current balance</div>
+          <div class="d-big"><span id="balance">–</span> <span class="d-big-unit">credits</span></div>
+          <div id="balance-sub" class="d-muted"></div>
+        </div>
+        <div class="d-card">
+          <div class="d-card-head"><h2>Buy credits</h2><span id="per-credit" class="d-small d-muted"></span></div>
+          <div id="packs" class="d-packs"></div>
+          <p id="buy-error" class="d-error" role="alert"></p>
+          <p class="d-small d-muted">Payments go through a secure card checkout. Credits are added as soon as the payment completes.
+            If a question can't be delivered, its credit is returned automatically.</p>
+          <p class="buy-note">Guidance only, not professional advice. All sales are final — no refunds. API credits expire 6 months after purchase.</p>
+        </div>
+      </section>
+
+      <!-- Usage -->
+      <section id="tab-usage" class="d-page" hidden>
+        <header class="d-head">
+          <div>
+            <h1>Usage</h1>
+            <p class="d-muted">Every credit purchase, question and refund on your account (latest 50).</p>
+          </div>
+          <button id="refresh-usage" class="d-btn" type="button">Refresh</button>
+        </header>
+        <div class="d-card d-flush">
+          <table class="d-table">
+            <thead><tr><th>Date</th><th>Type</th><th class="d-num">Credits</th><th>Consultation</th><th>Key</th></tr></thead>
+            <tbody id="usage-body"></tbody>
+          </table>
+          <div id="usage-empty" class="d-empty" hidden>No activity yet.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Create key -->
+  <dialog id="create-modal" class="d-modal">
+    <form id="create-form" method="dialog">
+      <h2>Create API key</h2>
+      <label>Name
+        <input id="create-name" maxlength="60" required placeholder="e.g. Production server" />
+      </label>
+      <p id="create-error" class="d-error" role="alert"></p>
+      <div class="d-modal-actions">
+        <button class="d-btn" type="button" data-close>Cancel</button>
+        <button id="create-submit" class="d-btn primary" type="submit">Create key</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Key created -->
+  <dialog id="key-modal" class="d-modal">
+    <h2>Your new API key</h2>
+    <div class="d-warn">Copy this key now and store it somewhere safe. <strong>You won't see it again.</strong></div>
+    <div class="d-keybox">
+      <code id="new-key-value"></code>
+      <button id="copy-key" class="d-btn" type="button">Copy</button>
+    </div>
+    <div class="d-modal-actions">
+      <button class="d-btn primary" type="button" data-close>Done</button>
+    </div>
+  </dialog>
+
+  <!-- Confirm revoke -->
+  <dialog id="revoke-modal" class="d-modal">
+    <h2>Revoke API key?</h2>
+    <p>Requests using <code id="revoke-name"></code> will fail with 401 immediately. This can't be undone.</p>
+    <p id="revoke-error" class="d-error" role="alert"></p>
+    <div class="d-modal-actions">
+      <button class="d-btn" type="button" data-close>Cancel</button>
+      <button id="revoke-confirm" class="d-btn danger" type="button">Revoke key</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="/developers.js"></script>
+</body>
+</html>

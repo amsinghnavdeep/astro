@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Introduction — Kaalera API</title>
+<meta name="description" content="Kaalera API: ask Kaal, an AI Vedic astrologer, questions about a birth chart over HTTP.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+  <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
+</head>
+<body data-page="index">
+<article class="d-article">
+<h1>Introduction</h1>
+<p class="lead">The Kaalera API lets your product ask Kaal, Kaalera's AI Vedic astrologer, questions about a person's birth chart and get back a written, explained answer.</p>
+
+<h2>What Kaal does</h2>
+<p>When you create a consultation, Kaalera computes the birth chart from the date, time and place of birth, then Kaal reads it and answers the question. Every answer shows its working: the planets, houses, dashas and transits behind it, plus the timing windows that matter.</p>
+<ul>
+  <li><strong>AI trained by a 7,000-year-old lineage of Kashmiri Himalayan monks</strong>, reading classical Vedic (sidereal) Jyotish.</li>
+  <li>Planet positions cast to the arc-second for the exact birth time and place.</li>
+  <li><strong>Vimshottari dasha</strong> periods and upcoming transits of the slow planets.</li>
+  <li>Answers in <a href="/docs/languages">nine languages</a>, including Hindi and Hinglish.</li>
+</ul>
+<div class="callout info"><span class="ic">i</span><p>Astrology is interpretation, not a guarantee. Kaal explains <em>why</em> it says what it says so your users can judge for themselves. Do not present answers as certain predictions.</p></div>
+
+<h2>How it works</h2>
+<ol class="steps">
+  <li><h3>Create a consultation</h3><p>Send the birth details and a first question to <a href="/docs/consultations-create"><code>POST /v1/consultations</code></a>. This costs 1 credit.</p></li>
+  <li><h3>Poll for the answer</h3><p>Kaal usually answers within a few minutes. Poll <a href="/docs/consultations-get"><code>GET /v1/consultations/:id</code></a> until a message with <code>role: "kaal"</code> appears.</p></li>
+  <li><h3>Ask follow-ups</h3><p>Ask more questions in the same consultation with <a href="/docs/questions-create"><code>POST /v1/consultations/:id/questions</code></a> for 1 credit each. Kaal remembers the chart and the earlier answers. Consultations stay open for 7 days.</p></li>
+</ol>
+
+<h2>Base URL</h2>
+<p>All endpoints live under <code>/v1</code> on this host:</p>
+<div class="code"><pre data-lang="Base URL"><code>{BASE}/v1</code></pre></div>
+<p>Requests and responses are JSON. Every request needs an API key, see <a href="/docs/authentication">Authentication</a>.</p>
+
+<h2>Next steps</h2>
+<div class="cards">
+  <a class="card" href="/docs/quickstart"><strong>Quickstart</strong><span>Make your first consultation in five minutes.</span></a>
+  <a class="card" href="/docs/authentication"><strong>Authentication</strong><span>Create and use API keys safely.</span></a>
+  <a class="card" href="/docs/consultations-create"><strong>API reference</strong><span>Endpoints, parameters and responses.</span></a>
+  <a class="card" href="/docs/pricing"><strong>Pricing</strong><span>1 credit = 1 question = $10.</span></a>
+</div>
+</article>
+</body>
+</html>

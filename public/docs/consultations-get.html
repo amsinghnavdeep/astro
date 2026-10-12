@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get a consultation — Kaalera API</title>
+<meta name="description" content="GET /v1/consultations/:id — read the status and messages of a consultation.">
+<link rel="stylesheet" href="/docs/docs.css">
+<script src="/docs/docs.js" defer></script>
+  <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
+</head>
+<body data-page="consultations-get">
+<article class="d-article">
+<h1>Get a consultation</h1>
+<p class="lead">Returns the consultation with its full message history. Poll this endpoint to receive Kaal's answers. Free.</p>
+<div class="endpoint"><span class="m get">GET</span><span class="path"><span class="base"></span>/v1/consultations/:id</span></div>
+
+<h2>Path parameters</h2>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">id</span><span class="param-type">string</span><span class="param-req">required</span></div><p>The consultation ID returned by <a href="/docs/consultations-create">Create a consultation</a>.</p></div></div>
+
+<h2>Request</h2>
+<div class="code"><pre data-lang="cURL"><code>curl {BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3 \
+  -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;, {
+  headers: { Authorization: `Bearer ${process.env.KAALERA_API_KEY}` },
+});
+const data = await res.json();
+console.log(res.status, data);</code></pre><pre data-lang="Python"><code>import os, requests
+
+res = requests.get(
+    &quot;{BASE}/v1/consultations/6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;,
+    headers={&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;},
+)
+print(res.status_code, res.json())</code></pre></div>
+
+<h2>Response</h2>
+<div class="code"><pre data-lang="200 OK"><code>{
+  &quot;consultation&quot;: {
+    &quot;id&quot;: &quot;6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;,
+    &quot;name&quot;: &quot;Asha Verma&quot;,
+    &quot;language&quot;: &quot;English&quot;,
+    &quot;status&quot;: &quot;ready&quot;,
+    &quot;created_at&quot;: &quot;2026-10-12T02:21:34.792Z&quot;,
+    &quot;expires_at&quot;: &quot;2026-10-19T02:21:35.278Z&quot;,
+    &quot;messages&quot;: [
+      {
+        &quot;id&quot;: &quot;619016d2-4cf9-432b-848b-dcd9921a3b00&quot;,
+        &quot;role&quot;: &quot;user&quot;,
+        &quot;content&quot;: &quot;When is a good window for a career change?&quot;,
+        &quot;created_at&quot;: &quot;2026-10-12T02:21:34.792Z&quot;
+      },
+      {
+        &quot;id&quot;: &quot;e72af372-ed54-4b5e-919c-a31f24f87f06&quot;,
+        &quot;role&quot;: &quot;kaal&quot;,
+        &quot;content&quot;: &quot;**Namaste Asha ji, I am Kaal, Kaalera&#x27;s Vedic astrologer.** I have studied your chart, and here is a short overview before I answer your question.\n\n**Who you are**\n- **Lagna (Ascendant): Capricorn, Moon in Capricorn, Shravana nakshatra.** …&quot;,
+        &quot;created_at&quot;: &quot;2026-10-12T02:22:52.000Z&quot;
+      }
+    ]
+  }
+}</code></pre></div>
+<p>The <code>kaal</code> message above is shortened; real answers are a few thousand characters of Markdown.</p>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">consultation.status</span><span class="param-type">string</span></div><p>See <a href="#status-values">status values</a>.</p></div><div class="param"><div class="param-head"><span class="param-name">consultation.messages</span><span class="param-type">array</span></div><p>All messages, oldest first.</p></div><div class="param"><div class="param-head"><span class="param-name">messages[].id</span><span class="param-type">string</span></div><p>Message ID. For your questions it equals the <code>question_id</code> returned when you asked.</p></div><div class="param"><div class="param-head"><span class="param-name">messages[].role</span><span class="param-type">string</span></div><p><code>user</code> (your question) or <code>kaal</code> (an answer).</p></div><div class="param"><div class="param-head"><span class="param-name">messages[].content</span><span class="param-type">string</span></div><p>Message text. Kaal’s answers are Markdown.</p></div><div class="param"><div class="param-head"><span class="param-name">messages[].created_at</span><span class="param-type">string</span></div><p>ISO 8601 timestamp.</p></div></div>
+<p>The other fields (<code>id</code>, <code>name</code>, <code>language</code>, <code>created_at</code>, <code>expires_at</code>) are the same as in <a href="/docs/consultations-create#response">Create a consultation</a>.</p>
+
+<h2>Status values</h2>
+<div class="table-wrap"><table><thead><tr><th>Status</th><th>Meaning</th></tr></thead><tbody><tr><td><code>starting</code></td><td>Kaal is being set up for this consultation.</td></tr><tr><td><code>answering</code></td><td>At least one question is waiting for an answer.</td></tr><tr><td><code>ready</code></td><td>All questions are answered. You can ask a follow-up.</td></tr><tr><td><code>closed</code></td><td>The consultation is more than 7 days old. Read-only; create a new one to ask more.</td></tr><tr><td><code>failed</code></td><td>The consultation could not continue. Unanswered questions are not charged.</td></tr></tbody></table></div>
+
+<h2>Polling</h2>
+<p>Answers usually take a few minutes. Poll every <strong>10 seconds</strong> and stop when <code>status</code> is <code>ready</code>, <code>closed</code> or <code>failed</code>.</p>
+<div class="code"><pre data-lang="JavaScript"><code>const headers = { Authorization: `Bearer ${process.env.KAALERA_API_KEY}` };
+const id = &quot;6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;;
+
+async function waitForAnswer() {
+  while (true) {
+    const res = await fetch(`{BASE}/v1/consultations/${id}`, { headers });
+    const { consultation } = await res.json();
+    if (consultation.status === &quot;failed&quot; || consultation.status === &quot;closed&quot;) throw new Error(consultation.status);
+    if (consultation.status === &quot;ready&quot;) {
+      const last = consultation.messages.at(-1);
+      if (last?.role === &quot;kaal&quot;) return last.content;
+    }
+    await new Promise((r) =&gt; setTimeout(r, 10_000)); // poll every 10 s
+  }
+}
+
+console.log(await waitForAnswer());</code></pre><pre data-lang="Python"><code>import os, time, requests
+
+headers = {&quot;Authorization&quot;: f&quot;Bearer {os.environ[&#x27;KAALERA_API_KEY&#x27;]}&quot;}
+cid = &quot;6e241e38-dd8f-428b-ae09-a8d7169335d3&quot;
+
+while True:
+    c = requests.get(f&quot;{BASE}/v1/consultations/{cid}&quot;, headers=headers).json()[&quot;consultation&quot;]
+    if c[&quot;status&quot;] in (&quot;failed&quot;, &quot;closed&quot;):
+        raise RuntimeError(c[&quot;status&quot;])
+    if c[&quot;status&quot;] == &quot;ready&quot; and c[&quot;messages&quot;][-1][&quot;role&quot;] == &quot;kaal&quot;:
+        print(c[&quot;messages&quot;][-1][&quot;content&quot;])
+        break
+    time.sleep(10)  # poll every 10 s</code></pre></div>
+
+<h2>Errors</h2>
+<div class="table-wrap"><table><thead><tr><th>Status</th><th>Code</th><th>When</th></tr></thead><tbody><tr><td>401</td><td><code>invalid_api_key</code></td><td>Missing, wrong or revoked API key.</td></tr><tr><td>404</td><td><code>not_found</code></td><td>No consultation with this ID on your account.</td></tr></tbody></table></div>
+<div class="code"><pre data-lang="404 Not Found"><code>{
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;not_found&quot;,
+    &quot;message&quot;: &quot;Consultation not found.&quot;
+  }
+}</code></pre></div>
+</article>
+</body>
+</html>
