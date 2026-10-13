@@ -145,6 +145,19 @@
   </dialog>
 
   <!-- Sign in -->
+  <dialog id="biz-modal" class="modal">
+    <form id="biz-form" class="modal-body">
+      <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
+      <h2>Switch to a Business account</h2>
+      <p class="muted">For pandits, astrologers and businesses. Pay <strong>$100</strong> ($115 with taxes &amp; fees) into your Business wallet. Every consultation and extra question is then <strong>10% cheaper</strong> and paid from the wallet, with no checkout each time. The same wallet works for the API. Festival offers don't apply. Your business name and number appear on your receipts.</p>
+      <label>Business name<input id="biz-name" maxlength="120" minlength="2" required placeholder="e.g. Sharma Jyotish Kendra" /></label>
+      <label>Business or tax number<input id="biz-tax" maxlength="40" minlength="3" required placeholder="GST, VAT or business number" /></label>
+      <p class="error" id="biz-error"></p>
+      <p class="muted small">By continuing you agree to the <a href="/terms" target="_blank">Terms</a>. Unused wallet money expires after 180 days.</p>
+      <button class="btn primary wide" type="submit" id="biz-submit">Pay $100 and switch</button>
+    </form>
+  </dialog>
+
   <dialog id="signin-modal" class="modal">
     <form id="login-form" class="modal-body">
       <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
@@ -185,6 +198,7 @@
         <a class="side-link" href="/affiliates">Affiliates</a>
         <a class="side-link" href="/influencers">Influencers</a>
         <button id="autocharge-toggle" class="side-link" type="button" hidden>Auto-charge: On</button>
+        <button id="biz-toggle" class="side-link" type="button">Switch to Business (10% off)</button>
         <div class="me">
           <div class="avatar" id="me-avatar"></div>
           <div class="me-text"><div id="me-name"></div><div class="tiny muted" id="me-email"></div></div>

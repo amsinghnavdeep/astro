@@ -12,8 +12,8 @@ type Thread = {
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
 type Deal = { name: string; percent: number; endsOn: string };
-type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; fullPackCents?: number };
-type Me = { user: { name: string; email: string }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
+type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number };
+type Me = { walletCents?: number | null; user: { name: string; email: string; accountType?: string; businessName?: string | null }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
 
@@ -121,7 +121,11 @@ async function goToCheckout(threadId: string, btn?: HTMLButtonElement, cents = m
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
   }
-  const { ok, data } = await api<{ checkoutUrl: string }>(`/api/threads/${encodeURIComponent(threadId)}/checkout`, { method: 'POST', body: JSON.stringify({ agreed: true }) });
+  const { ok, data } = await api<{ checkoutUrl: string; paid?: boolean }>(`/api/threads/${encodeURIComponent(threadId)}/checkout`, { method: 'POST', body: JSON.stringify({ agreed: true }) });
+  if (ok && data.paid) {
+    location.href = `/?t=${encodeURIComponent(threadId)}`;
+    return;
+  }
   if (ok && data.checkoutUrl) {
     location.href = data.checkoutUrl;
     return;
@@ -148,6 +152,43 @@ function priceCard(name: string, amt: string, note: string): HTMLElement {
   d.append(el('h3', '', name), el('div', 'price-amt', amt), el('p', 'muted', note));
   return d;
 }
+
+function renderBiz(): void {
+  const b = $<HTMLButtonElement>('biz-toggle');
+  const name = me?.user.accountType === 'business' ? me.user.businessName : null;
+  b.textContent = name ? `Business wallet: ${money(me?.walletCents ?? 0, me!.pricing.currency)}` : 'Switch to Business (10% off)';
+  b.title = name ?? '';
+  b.disabled = !!name;
+}
+
+$('biz-toggle').addEventListener('click', () => {
+  $('biz-error').textContent = '';
+  closeMenu();
+  $<HTMLDialogElement>('biz-modal').showModal();
+});
+
+$<HTMLFormElement>('biz-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $<HTMLButtonElement>('biz-submit');
+  btn.disabled = true;
+  const businessName = $<HTMLInputElement>('biz-name').value.trim();
+  const r = await api<{ ok: boolean }>('/api/account/business', {
+    method: 'POST', body: JSON.stringify({ businessName, taxId: $<HTMLInputElement>('biz-tax').value.trim() }),
+  });
+  btn.disabled = false;
+  if (!r.ok) {
+    $('biz-error').textContent = (r.data as { error?: string }).error ?? 'Could not switch. Please try again.';
+    return;
+  }
+  const pay = await api<{ checkoutUrl?: string; message?: string; error?: string }>('/api/developer/checkout', {
+    method: 'POST', body: JSON.stringify({ packId: 'usd100', agreed: true, returnTo: 'app' }),
+  });
+  if (pay.ok && pay.data.checkoutUrl) {
+    location.href = pay.data.checkoutUrl;
+    return;
+  }
+  $('biz-error').textContent = pay.data.message ?? pay.data.error ?? 'Could not open checkout. Please try again.';
+});
 
 function showDeal(p: Pricing): void {
   const d = p.deal;
@@ -1049,10 +1090,12 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   const p = me!.pricing;
   if (!ok || !data.paid) showBanner(data.error ?? "We couldn't confirm the payment yet. If you were charged, it will appear shortly.");
   else if (data.kind === 'topup') showBanner('Payment received — question added.', 6000);
+  else if (data.kind === 'api_credits') showBanner('Payment received — you are now a Business account. Chat is 10% cheaper and paid from your wallet.', 8000);
   else showBanner('Payment received — Kaal is starting your consultation.', 6000);
   const fresh = await api<Me>('/api/me');
   if (fresh.ok) me = fresh.data;
   renderAutoToggle();
+  renderBiz();
   await maybeAutoNotice();
 }
 
@@ -1145,6 +1188,7 @@ async function boot(): Promise<void> {
   }
   me = res.data;
   showDeal(me.pricing);
+  renderBiz();
   const deepLink = params.has('t') || params.has('checkout') || params.has('app') || !!sessionStorage.getItem(PENDING_Q);
   if (!deepLink && !enteringApp) {
     landingView.hidden = false;

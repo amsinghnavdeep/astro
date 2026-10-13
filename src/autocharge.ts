@@ -76,7 +76,7 @@ export async function autoChargeQuestion(db: D1Database, t: Thread, used: number
   if (!b || !b.chat_autocharge || !b.stripe_pm_id) return false;
   const day = new Date(Date.now() - 86_400_000).toISOString();
   if ((await autoSpendSince(db, t.user_id, "'topup'", day)).n >= CHAT_AUTO_DAILY_MAX) return false;
-  const p = await chatPrices(db);
+  const p = await chatPrices(db, t.user_id);
   const cents = p.extraQuestionCents + taxesAndFees(p.extraQuestionCents, p.taxFeePercent);
   const pi = await chargeSaved(b, cents, 'Kaalera — extra question', { kind: 'topup', userId: t.user_id, threadId: t.id, auto: '1' },
     `auto-q:${t.id}:${used}`);
@@ -125,12 +125,14 @@ export const RECEIPT_ITEM = { consultation: 'Kaal consultation (opening question
 /** Email a receipt. Never throws: a mail failure must not affect the payment. */
 export async function sendReceipt(db: D1Database, userId: string, o: { item: string; totalCents: number; baseCents?: number; auto: boolean; ref: string; api?: boolean }): Promise<void> {
   try {
-    const u = await db.prepare('SELECT email, card_last4 FROM users WHERE id = ?').bind(userId).first<{ email: string; card_last4: string | null }>();
+    const u = await db.prepare('SELECT email, card_last4, business_name, tax_id FROM users WHERE id = ?').bind(userId)
+      .first<{ email: string; card_last4: string | null; business_name: string | null; tax_id: string | null }>();
     if (!u) return;
     const tax = (await getPrices(db)).taxFeePercent;
     const base = o.baseCents ?? Math.round((o.totalCents * 100) / (100 + tax));
     await sendReceiptEmail({
       to: u.email, item: o.item, baseCents: base, feeCents: Math.max(0, o.totalCents - base), feePercent: tax, totalCents: o.totalCents,
+      billedTo: u.business_name ? [u.business_name, u.tax_id && `Tax no. ${u.tax_id}`].filter(Boolean).join(' · ') : null,
       last4: u.card_last4, auto: o.auto, ref: o.ref, manageUrl: `${env.siteUrl}${o.api ? '/developers#billing' : '/?billing=1'}`,
     });
   } catch (err) {

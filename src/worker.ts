@@ -40,7 +40,7 @@ import { attributeSignup, captureReferral, createInfluencer, getPayout, grantFri
 import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
 import { layout } from './seo/layout.js';
 import { TOPICS, topicPage } from './seo/topics.js';
-import { creditBalance, creditLots, spendCredit } from './credits.js';
+import { creditBalance, creditLots, grantCredits, spendCredit } from './credits.js';
 import type { AppEnv } from './types.js';
 
 type C = Context<AppEnv>;
@@ -54,12 +54,12 @@ const app = new Hono<AppEnv>();
 const COOKIE = 'kaalera_session';
 const MAX_THREADS = 20;
 
-const pricing = async (db: D1Database) => {
-  const p = await chatPrices(db);
+const pricing = async (db: D1Database, userId?: string) => {
+  const p = await chatPrices(db, userId);
   return {
     freeQuestions: p.freeQuestions, packQuestions: p.chatPackQuestions, packCents: p.chatPackCents, extraQuestionCents: p.extraQuestionCents,
     consultationDays: env.chat.consultationDays, currency: env.stripe.currency, taxFeePercent: p.taxFeePercent,
-    deal: p.deal, fullPackCents: p.fullPackCents, fullExtraQuestionCents: p.fullExtraQuestionCents,
+    deal: p.deal, business: p.business, fullPackCents: p.fullPackCents, fullExtraQuestionCents: p.fullExtraQuestionCents,
   };
 };
 
@@ -134,9 +134,9 @@ const agreedIn = (body: unknown): boolean => !!body && typeof body === 'object' 
 async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadId?: string; credits: number; cents: number; name: string; returnPath: string }): Promise<string> {
   const area = o.kind === 'api_credits' ? 'api' : 'chat';
   const consentId = crypto.randomUUID();
-  const prices = await chatPrices(c.env.DB);
+  const prices = await chatPrices(c.env.DB, user.id);
   const tax = prices.taxFeePercent;
-  const name = area === 'chat' && prices.deal ? `${o.name} (${prices.deal.name} ${prices.deal.percent}% off)` : o.name;
+  const name = area !== 'chat' ? o.name : prices.business ? `${o.name} (Business price)` : prices.deal ? `${o.name} (${prices.deal.name} ${prices.deal.percent}% off)` : o.name;
   await c.env.DB.prepare(
     `INSERT INTO purchase_consents (id, user_id, kind, thread_id, disclaimer, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(consentId, user.id, o.kind, o.threadId ?? null, disclaimer(area, prices), c.req.header('cf-connecting-ip') ?? null,
@@ -173,6 +173,7 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
   const receipt = { totalCents: s.amount_total ?? 0, baseCents: Number(m.baseCents) || undefined, auto: false, ref: s.id };
   if (kind === 'api_credits') {
     await grantApiCredits(db, m.userId, Number(m.credits), `stripe:${s.id}`);
+    await db.prepare("UPDATE users SET account_type = 'business' WHERE id = ?").bind(m.userId).run();
     const ins = await db.prepare(
       `INSERT INTO payments (stripe_session_id, user_id, thread_id, kind, amount_cents, currency, created_at)
        VALUES (?, ?, NULL, 'api_credits', ?, ?, ?) ON CONFLICT(stripe_session_id) DO NOTHING`,
@@ -436,9 +437,10 @@ app.get('/api/me', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
   return c.json({
-    user: { name: user.name, email: user.email }, freeAvailable: !user.free_used,
+    user: { name: user.name, email: user.email, accountType: user.account_type ?? 'personal', businessName: user.business_name ?? null }, freeAvailable: !user.free_used,
     chatCredits: await creditLots(c.env.DB, 'chat', user.id),
-    pricing: await pricing(c.env.DB), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
+    walletCents: user.account_type === 'business' ? await apiBalance(c.env.DB, user.id) : null,
+    pricing: await pricing(c.env.DB, user.id), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
     billing: publicBilling(await getBilling(c.env.DB, user.id)),
   });
 });
@@ -504,7 +506,7 @@ app.post('/api/threads', async (c) => {
   if ((user.free_used || blocked) && !body.data.agreed && (await chatCredits(c)) < 1)
     return c.json(blocked ? FREE_BLOCKED : CONSENT_REQUIRED, 400);
   const db = c.env.DB;
-  const pr = await chatPrices(db);
+  const pr = await chatPrices(db, user.id);
   const k = await getKundli(db, user.id, body.data.kundliId);
   if (!k) return c.json({ error: 'Choose or add a Kundli first.' }, 400);
   const p = { data: { ...kundliInput(k), language: body.data.language, question: body.data.question } };
@@ -525,7 +527,7 @@ app.post('/api/threads', async (c) => {
   if (!free && (await spendCredit(db, 'chat', user.id, `first:${t.id}`, { threadId: t.id }))) {
     await db.prepare('UPDATE threads SET questions_allowed = 1 WHERE id = ?').bind(t.id).run();
     t.questions_allowed = 1;
-  } else if (!free) {
+  } else if (!free && !(await walletPay(db, user, t, 'consultation'))) {
     const url = await createCheckout(c, user, {
       kind: 'consultation', threadId: t.id, credits: pr.chatPackQuestions, cents: pr.chatPackCents,
       name: `Kaalera consultation for ${t.full_name}`, returnPath: `/?t=${t.id}`,
@@ -540,6 +542,22 @@ app.post('/api/threads', async (c) => {
   }
 });
 
+/** Business accounts pay chat from their wallet (taxes & fees were paid at top-up). */
+async function walletPay(db: D1Database, user: User, t: Thread, kind: 'consultation' | 'topup'): Promise<boolean> {
+  if (user.account_type !== 'business') return false;
+  const pr = await chatPrices(db, user.id);
+  const cents = kind === 'topup' ? pr.extraQuestionCents : pr.chatPackCents;
+  if ((await apiBalance(db, user.id)) < cents) await autoRechargeApi(db, user.id, cents).catch(() => false);
+  const ref = `chat:${kind}:${t.id}:${kind === 'topup' ? crypto.randomUUID() : 'first'}`;
+  if (!(await spendApiCredit(db, user.id, ref, null, t.id, cents))) return false;
+  await grantCredits(db, 'chat', user.id, kind === 'topup' ? 1 : pr.chatPackQuestions, `wallet:${ref}`);
+  if (kind === 'consultation' && t.questions_allowed < 1 && (await spendCredit(db, 'chat', user.id, `first:${t.id}`, { threadId: t.id }))) {
+    await db.prepare('UPDATE threads SET questions_allowed = 1 WHERE id = ?').bind(t.id).run();
+    t.questions_allowed = 1;
+  }
+  return true;
+}
+
 const ownThread = async (c: C): Promise<Thread | null> => {
   const user = c.get('user');
   return user ? getThread(c.env.DB, user.id, c.req.param('id')!) : null;
@@ -553,7 +571,12 @@ app.post('/api/threads/:id/checkout', async (c) => {
   if (isExpired(t)) return c.json({ error: 'This consultation has closed. Start a new one.' }, 409);
   if (!agreedIn(await c.req.json().catch(() => null))) return c.json(CONSENT_REQUIRED, 400);
   const kind: CheckoutKind = t.status === 'awaiting_payment' ? 'consultation' : 'topup';
-  const pr = await chatPrices(c.env.DB);
+  if (await walletPay(c.env.DB, user, t, kind === 'topup' ? 'topup' : 'consultation')) {
+    const fresh = (await getThreadById(c.env.DB, t.id))!;
+    if (kind === 'consultation' && !fresh.devin_session_id) await startThreadSession(c.env.DB, fresh).catch((err) => console.error('Session start failed:', err));
+    return c.json({ paid: true, thread: await pubT(c, (await getThreadById(c.env.DB, t.id))!) });
+  }
+  const pr = await chatPrices(c.env.DB, user.id);
   const url = await createCheckout(c, user, {
     kind, threadId: t.id,
     credits: kind === 'topup' ? 1 : pr.chatPackQuestions,
@@ -660,7 +683,9 @@ app.post('/api/threads/:id/messages', async (c) => {
   }
   let r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context);
   let autoCharged = false;
-  if (r.error === 'no_questions' && t.source === 'web' && (await autoChargeQuestion(c.env.DB, t, t.questions_used))) {
+  const me = c.get('user');
+  if (r.error === 'no_questions' && t.source === 'web'
+    && ((me && (await walletPay(c.env.DB, me, t, 'topup'))) || (await autoChargeQuestion(c.env.DB, t, t.questions_used)))) {
     autoCharged = true;
     r = await sendCustomerMessage(c.env.DB, (await getThreadById(c.env.DB, t.id))!, p.data.text, p.data.language, context);
   }
@@ -700,6 +725,19 @@ app.post('/api/stripe/webhook', async (c) => {
 
 /* ---------- developer dashboard (cookie auth) ---------- */
 
+const BUSINESS_REQUIRED = { error: 'business_required', message: 'API keys are for Business accounts. Switch to Business with a $100 wallet payment.' };
+
+app.post('/api/account/business', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  const p = z.object({ businessName: z.string().trim().min(2).max(120), taxId: z.string().trim().min(3).max(40) }).strict()
+    .safeParse(await c.req.json().catch(() => null));
+  if (!p.success) return c.json({ error: 'Enter your business name and business or tax number.' }, 400);
+  await c.env.DB.prepare('UPDATE users SET business_name = ?, tax_id = ? WHERE id = ?').bind(p.data.businessName, p.data.taxId, user.id).run();
+  return c.json({ ok: true });
+});
+
 app.get('/api/developer', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
@@ -707,6 +745,7 @@ app.get('/api/developer', async (c) => {
   const pr = await getPrices(db);
   const [keys, balance, ledger] = await Promise.all([listApiKeys(db, user.id), apiBalance(db, user.id), listApiLedger(db, user.id)]);
   return c.json({ keys, balance, ledger, packs: apiPacks(pr), creditCents: pr.apiCreditCents, taxFeePercent: pr.taxFeePercent, apiPrice: apiPrice(pr), apiDiscountPercent: API_DISCOUNT_PERCENT,
+    business: user.account_type === 'business', businessName: user.business_name ?? null,
     activated: await apiActivated(db, user.id, pr), minRechargeCents: pr.apiMinRechargeCents, creditLots: await creditLots(db, 'api', user.id),
     billing: publicBilling(await getBilling(db, user.id)) });
 });
@@ -716,6 +755,7 @@ app.post('/api/developer/keys', async (c) => {
   if (!user) return unauth(c);
   const p = z.object({ name: z.string().trim().min(1).max(60) }).safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: 'Give the key a name.' }, 400);
+  if (user.account_type !== 'business' || !(await apiActivated(c.env.DB, user.id, await getPrices(c.env.DB)))) return c.json(BUSINESS_REQUIRED, 403);
   if ((await listApiKeys(c.env.DB, user.id)).filter((k) => !k.revoked_at).length >= 10) return c.json({ error: 'Up to 10 active keys.' }, 400);
   return c.json(await createApiKey(c.env.DB, user.id, p.data.name));
 });
@@ -729,17 +769,18 @@ app.delete('/api/developer/keys/:id', async (c) => {
 app.post('/api/developer/checkout', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
-  const body = (await c.req.json().catch(() => ({}))) as { packId?: string; agreed?: boolean };
+  const body = (await c.req.json().catch(() => ({}))) as { packId?: string; agreed?: boolean; returnTo?: string };
   const pr = await getPrices(c.env.DB);
   const pack = apiPacks(pr).find((p) => p.id === body.packId);
   if (!pack) return c.json({ error: 'Unknown pack' }, 400);
   if (pack.cents < pr.apiMinRechargeCents && !(await apiActivated(c.env.DB, user.id, pr))) {
     return c.json({ error: 'below_minimum', message: `Your first API recharge must be at least ${usdCents(pr.apiMinRechargeCents)}.` }, 400);
   }
+  if (!user.business_name) return c.json(BUSINESS_REQUIRED, 403);
   if (!agreedIn(body)) return c.json(CONSENT_REQUIRED, 400);
   const url = await createCheckout(c, user, {
     kind: 'api_credits', credits: pack.credits, cents: pack.cents,
-    name: `Kaalera API wallet — ${usdCents(pack.cents)}`, returnPath: '/developers',
+    name: `Kaalera Business wallet — ${usdCents(pack.cents)}`, returnPath: body.returnTo === 'app' ? '/' : '/developers',
   });
   return c.json({ checkoutUrl: url });
 });

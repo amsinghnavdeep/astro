@@ -176,6 +176,26 @@
     </div>
   </dialog>
 
+  <!-- Switch to Business -->
+  <dialog id="biz-modal" class="d-modal">
+    <form id="biz-form" method="dialog">
+      <h2>Switch to a Business account</h2>
+      <p>The API is for Business accounts. Your first API wallet payment of <strong id="biz-amount">$100</strong> switches your account to Business, and the full amount goes into your wallet for API calls. Business accounts also pay 10% less for chat.</p>
+      <label>Business name
+        <input id="biz-name" maxlength="120" required placeholder="e.g. Sharma Jyotish Kendra" />
+      </label>
+      <label>Business or tax number
+        <input id="biz-tax" maxlength="40" minlength="3" required placeholder="GST, VAT or business number" />
+      </label>
+      <p class="d-muted d-small">Shown on your receipts.</p>
+      <p id="biz-error" class="d-error" role="alert"></p>
+      <div class="d-modal-actions">
+        <button class="d-btn" type="button" data-close>Cancel</button>
+        <button id="biz-submit" class="d-btn primary" type="submit">Continue to payment</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Confirm revoke -->
   <dialog id="revoke-modal" class="d-modal">
     <h2>Revoke API key?</h2>

@@ -163,7 +163,41 @@ function renderKeys(): void {
     </tr>`).join('');
 }
 
+type Biz = { business?: boolean; businessName?: string | null; minRechargeCents?: number };
+const biz = (): Biz => (state ?? {}) as Biz;
+let bizPack = '';
+
+function openBiz(packId?: string): void {
+  const min = biz().minRechargeCents ?? 10000;
+  const pack = (state?.packs ?? []).filter((p) => p.cents >= min).sort((a, b) => a.cents - b.cents)[0];
+  bizPack = packId || pack?.id || '';
+  const chosen = (state?.packs ?? []).find((p) => p.id === bizPack);
+  $('biz-amount').textContent = usd(chosen?.cents ?? min);
+  $<HTMLInputElement>('biz-name').value = biz().businessName ?? '';
+  $('biz-error').textContent = '';
+  $<HTMLDialogElement>('biz-modal').showModal();
+}
+
+$<HTMLFormElement>('biz-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $<HTMLButtonElement>('biz-submit');
+  btn.disabled = true;
+  const businessName = $<HTMLInputElement>('biz-name').value.trim();
+  const taxId = $<HTMLInputElement>('biz-tax').value.trim();
+  const r = await api('/api/account/business', { method: 'POST', body: JSON.stringify({ businessName, taxId }) });
+  btn.disabled = false;
+  if (!r.ok) {
+    $('biz-error').textContent = r.data.error ?? 'Could not save your business details.';
+    return;
+  }
+  (state as Biz).businessName = businessName;
+  $<HTMLDialogElement>('biz-modal').close();
+  location.hash = 'billing';
+  document.querySelector<HTMLButtonElement>(`#packs [data-pack="${CSS.escape(bizPack)}"]`)?.click();
+});
+
 $('new-key').addEventListener('click', () => {
+  if (!biz().business || !(state as { activated?: boolean }).activated) return openBiz();
   $<HTMLInputElement>('create-name').value = '';
   $('create-error').textContent = '';
   $<HTMLDialogElement>('create-modal').showModal();
@@ -236,18 +270,12 @@ function renderBilling(): void {
       <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Add ${usd(p.cents)}</button>
     </div>`).join('');
   renderAutoRecharge();
-  $('packs').innerHTML = packs.map((p) => `
-    <div class="d-pack">
-      <div class="d-pack-credits">${plural(p.credits, 'credit')}</div>
-      <div class="d-muted d-small">${plural(p.credits, 'question')}</div>
-      <div class="d-pack-price">${usd(withFee(p.cents))}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
-      <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Buy ${usd(p.cents)}</button>
-    </div>`).join('');
 }
 
 $('packs').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pack]');
   if (!btn) return;
+  if (!biz().businessName) return openBiz(btn.dataset.pack);
   if (!(await confirmPurchase('api', `${usd(withFee((state?.packs ?? []).find((p) => p.id === btn.dataset.pack)?.cents ?? 0))}${taxFeeNote(state?.taxFeePercent ?? 0)}`, { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0 }))) return;
   $('buy-error').textContent = '';
   btn.disabled = true;

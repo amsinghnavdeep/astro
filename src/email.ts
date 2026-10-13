@@ -35,14 +35,14 @@ const usd = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
 
 export async function sendReceiptEmail(o: {
   to: string; item: string; baseCents: number; feeCents: number; feePercent: number; totalCents: number;
-  last4: string | null; auto: boolean; ref: string; manageUrl: string;
+  last4: string | null; auto: boolean; ref: string; manageUrl: string; billedTo?: string | null;
 }): Promise<void> {
   const row = (k: string, v: string, b = false) =>
     `<tr><td style="padding:4px 0;color:#555">${escapeHtml(k)}</td><td style="padding:4px 0;text-align:right${b ? ';font-weight:600' : ''}">${escapeHtml(v)}</td></tr>`;
   await sendEmail(o.to, `Kaalera receipt — ${usd(o.totalCents)}`, layout('Payment received',
     `<p>Thank you. ${o.auto ? 'This was charged automatically to your saved card.' : 'Your payment went through.'}</p>
     <table style="width:100%;border-collapse:collapse">${row(o.item, usd(o.baseCents))}${o.feeCents ? row(`Taxes & fees (${o.feePercent}%)`, usd(o.feeCents)) : ''}
-    ${row('Total (USD)', usd(o.totalCents), true)}${o.last4 ? row('Card', `•••• ${o.last4}`) : ''}${row('Date', new Date().toUTCString().slice(5, 16))}${row('Reference', o.ref)}</table>
+    ${row('Total (USD)', usd(o.totalCents), true)}${o.last4 ? row('Card', `•••• ${o.last4}`) : ''}${row('Date', new Date().toUTCString().slice(5, 16))}${row('Reference', o.ref)}${o.billedTo ? row('Billed to', o.billedTo) : ''}</table>
     <p style="color:#666;font-size:13px">All sales are final — no refunds. Auto-charge is ${o.auto ? 'on' : 'on by default'} for future questions; you can turn it off any time.</p>`
     + button(o.manageUrl, 'Manage auto-charge')));
 }

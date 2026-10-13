@@ -147,7 +147,7 @@ export async function sendFestivalEmails(db: D1Database, now = Date.now()): Prom
   const deal = await activeDeal(db, iso(now).slice(0, 10));
   if (!deal) return 0;
   const users = (await db.prepare(
-    `SELECT u.id, u.email, u.name FROM users u WHERE u.email_unsub = 0
+    `SELECT u.id, u.email, u.name FROM users u WHERE u.email_unsub = 0 AND u.account_type = 'personal'
        AND (EXISTS (SELECT 1 FROM payments p WHERE p.user_id = u.id AND p.kind != 'api_credits' AND p.created_at >= ?)
          OR EXISTS (SELECT 1 FROM email_leads l WHERE l.email = u.email AND l.marketing_opt_in = 1))
        AND NOT EXISTS (SELECT 1 FROM email_log e WHERE e.user_id = u.id AND e.kind = 'festival' AND e.ref = ?)
