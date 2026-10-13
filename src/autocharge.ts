@@ -16,6 +16,8 @@ import { applyPayment, type Thread } from './chat.js';
 import { sendReceiptEmail } from './email.js';
 
 export const CHAT_AUTO_DAILY_MAX = 10;
+/** Questions added per extension, both on the first paid extension and on each automatic reload. */
+export const CHAT_RELOAD_QUESTIONS = 2;
 export const API_LOW_CENTS = 1000;
 
 export interface Billing {
@@ -70,20 +72,21 @@ const autoSpendSince = async (db: D1Database, userId: string, kinds: string, sin
      WHERE user_id = ? AND auto = 1 AND kind IN (${kinds}) AND created_at >= ?`).bind(userId, since).first<{ n: number; cents: number }>())
   ?? { n: 0, cents: 0 };
 
-/** Charge one extra question to the saved card and add it to the consultation. Returns true when the question was paid. */
+/** Reload CHAT_RELOAD_QUESTIONS extra questions on the saved card. Returns true when they were paid. */
 export async function autoChargeQuestion(db: D1Database, t: Thread, used: number): Promise<boolean> {
   const b = await getBilling(db, t.user_id);
   if (!b || !b.chat_autocharge || !b.stripe_pm_id) return false;
   const day = new Date(Date.now() - 86_400_000).toISOString();
-  if ((await autoSpendSince(db, t.user_id, "'topup'", day)).n >= CHAT_AUTO_DAILY_MAX) return false;
+  if ((await autoSpendSince(db, t.user_id, "'topup'", day)).n * CHAT_RELOAD_QUESTIONS >= CHAT_AUTO_DAILY_MAX) return false;
   const p = await chatPrices(db, t.user_id);
-  const cents = p.extraQuestionCents + taxesAndFees(p.extraQuestionCents, p.taxFeePercent);
-  const pi = await chargeSaved(b, cents, 'Kaalera — extra question', { kind: 'topup', userId: t.user_id, threadId: t.id, auto: '1' },
+  const base = p.extraQuestionCents * CHAT_RELOAD_QUESTIONS;
+  const cents = base + taxesAndFees(base, p.taxFeePercent);
+  const pi = await chargeSaved(b, cents, `Kaalera — ${CHAT_RELOAD_QUESTIONS} extra questions (auto-reload)`, { kind: 'topup', userId: t.user_id, threadId: t.id, auto: '1' },
     `auto-q:${t.id}:${used}`);
   if (!pi) return false;
-  await applyPayment(db, { stripeSessionId: pi.id, userId: t.user_id, threadId: t.id, kind: 'topup', credits: 1, amountCents: pi.amount, currency: pi.currency });
+  await applyPayment(db, { stripeSessionId: pi.id, userId: t.user_id, threadId: t.id, kind: 'topup', credits: CHAT_RELOAD_QUESTIONS, amountCents: pi.amount, currency: pi.currency });
   await db.prepare('UPDATE payments SET auto = 1 WHERE stripe_session_id = ?').bind(pi.id).run();
-  await sendReceipt(db, t.user_id, { item: RECEIPT_ITEM.topup, totalCents: pi.amount, baseCents: p.extraQuestionCents, auto: true, ref: pi.id });
+  await sendReceipt(db, t.user_id, { item: RECEIPT_ITEM.topup, totalCents: pi.amount, baseCents: base, auto: true, ref: pi.id });
   await trackPayment(db, t.user_id);
   return true;
 }
@@ -120,7 +123,7 @@ export const publicBilling = (b: Billing | null) => ({
   apiLowCents: API_LOW_CENTS,
 });
 
-export const RECEIPT_ITEM = { consultation: 'Kaal consultation (opening question)', topup: 'Extra question' } as const;
+export const RECEIPT_ITEM = { consultation: 'Kaal consultation (opening question)', topup: `${CHAT_RELOAD_QUESTIONS} extra questions` } as const;
 
 /** Email a receipt. Never throws: a mail failure must not affect the payment. */
 export async function sendReceipt(db: D1Database, userId: string, o: { item: string; totalCents: number; baseCents?: number; auto: boolean; ref: string; api?: boolean }): Promise<void> {

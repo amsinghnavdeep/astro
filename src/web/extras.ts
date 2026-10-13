@@ -41,33 +41,6 @@ export function parseAnswer(md: string): Parsed {
   return { main: mainLines.join('\n').trimEnd(), next, timeline: timeline.length >= 2 ? timeline.slice(0, 6) : [] };
 }
 
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-
-/** First day of a predicted window, e.g. "Nov 2026 – Jan 2027" → 1 Nov 2026. */
-export function windowStart(when: string): Date | null {
-  const year = when.match(/\b(20\d{2})\b/)?.[1];
-  if (!year) return null;
-  const m = when.toLowerCase().match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/);
-  const month = m ? MONTHS.indexOf(m[1]) : /\blate\b/i.test(when) ? 8 : /\bmid\b/i.test(when) ? 5 : 0;
-  return new Date(Number(year), month, 1);
-}
-
-export interface UpNext { area: string; when: string; kind: string; days: number }
-
-/** The nearest predicted window across Kaal's answers that starts this month or later. */
-export function nextWindow(answers: string[], now = new Date()): UpNext | null {
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  let best: (Omit<UpNext, 'days'> & { at: number }) | null = null;
-  for (const a of answers) {
-    for (const p of parseAnswer(a).timeline) {
-      const at = windowStart(p.when)?.getTime();
-      if (at === undefined || at < monthStart) continue;
-      if (!best || at < best.at) best = { ...p, at };
-    }
-  }
-  return best && { area: best.area, when: best.when, kind: best.kind, days: Math.ceil((best.at - now.getTime()) / 86400000) };
-}
-
 export const isPdfRequest = (text: string): boolean =>
   text.length <= 120 && /\bpdf\b|पीडीएफ/i.test(text);
 

@@ -1,8 +1,8 @@
 import { confirmPurchase } from './consent.js';
 import { allIn, taxFeeNote } from '../disclaimer.js';
 import { renderMarkdown } from '../markdown.js';
-import { isPdfRequest, openReport, parseAnswer, nextWindow } from './extras.js';
-import { autoChargeNotice, saveBilling, type BillingInfo } from './billing.js';
+import { isPdfRequest, openReport, parseAnswer } from './extras.js';
+import { saveBilling, type BillingInfo } from './billing.js';
 
 type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
 type Thread = {
@@ -70,7 +70,8 @@ async function api<T>(url: string, init?: RequestInit) {
 const money = (cents: number, currency = 'usd') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const packLabel = (p: Pricing) => `Add a question — ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}`;
+const RELOAD = 2;
+const packLabel = (p: Pricing) => `Add ${RELOAD} questions — ${money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}`;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -142,7 +143,7 @@ document.addEventListener('click', (e) => {
   if (t.closest('#app-view a.brand')) { e.preventDefault(); showHome(); }
   if (t.closest('[data-close]')) (t.closest('dialog') as HTMLDialogElement | null)?.close();
   const add = t.closest<HTMLButtonElement>('[data-addq]');
-  if (add && current) goToCheckout(current.id, add, me!.pricing.extraQuestionCents);
+  if (add && current) goToCheckout(current.id, add, me!.pricing.extraQuestionCents * RELOAD);
 });
 
 /* ---------- landing + sign-in ---------- */
@@ -485,7 +486,7 @@ function showProfile(question = ''): void {
   } else {
     note.innerHTML = '';
     note.append(el('strong', '', `${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} to start.`),
-      ` An opening reading and the answer to your question, open for ${p.consultationDays} days. Extra questions are ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)} each. You'll pay securely by card.`);
+      ` An opening reading and the answer to your question, open for ${p.consultationDays} days. Extra questions come ${RELOAD} at a time for ${money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency)}. You'll pay securely by card.`);
     submit.textContent = `Continue to payment — ${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}`;
   }
   history.replaceState(null, '', '/');
@@ -919,66 +920,10 @@ function renderMessages(msgs: Msg[]): void {
   const nodes = msgs.map(messageNode);
   const firstKaal = msgs.findIndex((m) => m.role !== 'user');
   if (current && card?.threadId === current.id && firstKaal >= 0) nodes.splice(firstKaal, 0, cardNode(current, card.data));
-  const nudge = familyNudge(msgs);
-  if (nudge) nodes.push(nudge);
   messagesEl.replaceChildren(...nodes);
-  renderUpNext(msgs);
   if (stick) scroller.scrollTop = scroller.scrollHeight;
 }
 
-const FAMILY_NUDGE = 'kaalera_family_nudge';
-
-/** After 2 questions about themselves, suggest adding a family member's Kundli (once per consultation). */
-function familyNudge(msgs: Msg[]): HTMLElement | null {
-  const t = current;
-  if (!t || t.status !== 'active' || t.expired || t.questionsLeft < 1 || msgs.at(-1)?.role === 'user') return null;
-  if (msgs.filter((m) => m.role === 'user').length < 2) return null;
-  if (kundlis.some((k) => k.id !== t.kundliId) || localStorage.getItem(`${FAMILY_NUDGE}:${t.id}`)) return null;
-  const card = el('div', 'k-family');
-  const text = el('div');
-  text.append(el('strong', '', 'Ask about your family too'), el('div', 'muted', 'Your spouse, child or parent: add their birth details and Kaal reads their own Kundli right here, in this consultation.'));
-  const add = el('button', 'btn sm primary', 'Add a family Kundli') as HTMLButtonElement;
-  add.type = 'button';
-  add.addEventListener('click', () => openKundli(null, 'about'));
-  const close = el('button', 'icon-btn', '×') as HTMLButtonElement;
-  close.type = 'button';
-  close.setAttribute('aria-label', 'Close');
-  close.addEventListener('click', () => {
-    localStorage.setItem(`${FAMILY_NUDGE}:${t.id}`, '1');
-    card.remove();
-  });
-  card.append(text, add, close);
-  return card;
-}
-
-let upNext: HTMLElement | null = null;
-
-/** "Your career window opens in 23 days" card above the chat, from Kaal's dated predictions. */
-function renderUpNext(msgs: Msg[]): void {
-  if (!upNext) {
-    upNext = el('div', 'k-upnext');
-    messagesEl.before(upNext);
-  }
-  const t = current;
-  const w = t && t.status === 'active' && !t.expired ? nextWindow(msgs.filter((m) => m.role !== 'user').map((m) => m.body)) : null;
-  upNext.hidden = !w;
-  if (!w) return;
-  const opens = w.days <= 0 ? 'is open now' : w.days === 1 ? 'opens tomorrow' : `opens in ${w.days} days`;
-  const text = el('div', 'k-upnext-text');
-  text.append(el('span', 'k-tl-dot', TL_GLYPH[w.kind] ?? '✦'), el('strong', '', `Your ${w.area.toLowerCase()} window ${opens}`), el('span', 'muted', w.when));
-  const ask = el('button', 'btn sm primary', 'Ask Kaal about it') as HTMLButtonElement;
-  ask.type = 'button';
-  ask.addEventListener('click', () => {
-    askInput.value = `My ${w.area.toLowerCase()} window (${w.when}) is coming. What exactly should I do, and which weeks matter most?`;
-    if (askForm.hidden) {
-      document.querySelector<HTMLButtonElement>('[data-addq]')?.click();
-      return;
-    }
-    autosize();
-    askInput.focus();
-  });
-  upNext.replaceChildren(text, ask);
-}
 
 function setWorking(on: boolean): void {
   if (on === !working.hidden) return;
@@ -1033,21 +978,20 @@ function renderState(): void {
     panel('Complete payment to start', `${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} for an opening reading and the answer to your question.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
   } else if (t.status === 'failed') {
     panel("Kaal couldn't start this consultation", 'Your question is saved and you were not charged for a failed start.', btn('Retry', retry));
-  } else if (isLive && t.questionsLeft < 1 && pending === 0) {
+  } else if (isLive && t.questionsLeft < 1 && pending === 0 && !autoReload()) {
     const b = btn(packLabel(p), () => undefined);
     b.dataset.addq = '';
-    panel("You've used all questions in this consultation", `Add another question for ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} · ${timeLeft(t)} in this consultation.`, b);
+    panel("You've used all questions in this consultation", `Add ${RELOAD} more for ${money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}. After that, ${RELOAD} more are added automatically whenever you run out · ${timeLeft(t)} in this consultation.`, b);
   }
-  askForm.hidden = !isLive || t.questionsLeft < 1;
+  askForm.hidden = !isLive || (t.questionsLeft < 1 && !autoReload());
   askSubmit.disabled = sending;
   askInput.placeholder = pending > 0 ? 'Kaal is answering… you can type your next question.' : 'Ask a follow-up about career, marriage, health, money…';
-  $('composer-hint').textContent = `${plural(t.questionsLeft, 'question')} left · ${t.language}`;
+  $('composer-hint').textContent = t.questionsLeft < 1 ? `${RELOAD} more questions are added automatically when you ask (${autoPrice()}) · ${t.language}` : `${plural(t.questionsLeft, 'question')} left · ${t.language}`;
   const inline = $<HTMLButtonElement>('add-inline');
   inline.hidden = !isLive || t.questionsLeft < 1;
   inline.disabled = false;
   inline.textContent = packLabel(p);
   setWorking((t.status === 'starting' || pending > 0) && !t.expired);
-  renderUpNext(lastMsgs);
 }
 
 async function retry(b: HTMLButtonElement): Promise<void> {
@@ -1116,13 +1060,14 @@ async function ask(text: string): Promise<void> {
   sending = false;
   renderedKey = '';
   if (ok) {
-    if ((data as { autoCharged?: boolean }).autoCharged) showBanner(`Auto-charged ${autoPrice()} to card •••• ${me!.billing?.card?.last4 ?? ''} for this question. Receipt emailed.`, 7000);
+    if ((data as { autoCharged?: boolean }).autoCharged) showBanner(me!.user.accountType === 'business' ? `${RELOAD} more questions added from your Business wallet.` : `${RELOAD} more questions added: ${autoPrice()} charged to card •••• ${me!.billing?.card?.last4 ?? ''}. Receipt emailed.`, 7000);
     pending = Math.max(pending, 1);
     upsertThread(data.thread);
   } else {
     askInput.value = text;
     autosize();
     if (status === 402) {
+      reloadFailed = true;
       current = { ...t, questionsLeft: 0 };
       upsertThread(current);
     } else if (status === 429) askError.textContent = data.error ?? 'Please wait for Kaal to answer your previous question.';
@@ -1155,21 +1100,28 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   const { ok, data } = await api<{ paid: boolean; kind?: string }>(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`);
   const p = me!.pricing;
   if (!ok || !data.paid) showBanner(data.error ?? "We couldn't confirm the payment yet. If you were charged, it will appear shortly.");
-  else if (data.kind === 'topup') showBanner('Payment received — question added.', 6000);
+  else if (data.kind === 'topup') showBanner(`Payment received — ${RELOAD} questions added. When they run out, ${RELOAD} more are added automatically.`, 6000);
   else if (data.kind === 'api_credits') showBanner('Payment received — you are now a Business account. Chat is 10% cheaper and paid from your wallet.', 8000);
   else showBanner('Payment received — Kaal is starting your consultation.', 6000);
   const fresh = await api<Me>('/api/me');
   if (fresh.ok) me = fresh.data;
   renderAutoToggle();
   renderBiz();
-  await maybeAutoNotice();
 }
 
 const chatPrices = () => ({ extraQuestionCents: me!.pricing.extraQuestionCents, taxFeePercent: me!.pricing.taxFeePercent, apiCreditCents: 0 });
 
 const autoPrice = (): string => {
   const p = me!.pricing;
-  return money(p.extraQuestionCents + Math.round((p.extraQuestionCents * p.taxFeePercent) / 100), p.currency);
+  return money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency);
+};
+
+let reloadFailed = false;
+/** True when running out of questions reloads automatically (saved card with auto-reload on, or a funded Business wallet). */
+const autoReload = (): boolean => {
+  if (!me || reloadFailed) return false;
+  if (me.user.accountType === 'business') return (me.walletCents ?? 0) >= me.pricing.extraQuestionCents * RELOAD;
+  return !!(me.billing?.card && me.billing.chatAutoCharge);
 };
 
 function renderAutoToggle(): void {
@@ -1177,17 +1129,10 @@ function renderAutoToggle(): void {
   const btn = $<HTMLButtonElement>('autocharge-toggle');
   if (!btn) return;
   btn.hidden = !b?.card;
-  btn.textContent = `Auto-charge: ${b?.chatAutoCharge ? 'On' : 'Off'}`;
-  btn.title = b?.chatAutoCharge ? `Extra questions are charged ${autoPrice()} to card •••• ${b.card?.last4 ?? ''}. Click to turn off.` : 'Click to turn auto-charge on.';
+  btn.textContent = `Auto-reload: ${b?.chatAutoCharge ? 'On' : 'Off'}`;
+  btn.title = b?.chatAutoCharge ? `When you run out, ${RELOAD} questions are added for ${autoPrice()} on card •••• ${b.card?.last4 ?? ''}. Click to turn off.` : 'Click to turn auto-reload on.';
 }
 
-async function maybeAutoNotice(): Promise<void> {
-  const b = me?.billing;
-  if (!b?.card || b.chatAutoChargeAcked) return;
-  const r = await autoChargeNotice('chat', b, `When your questions run out, each extra question is charged automatically at ${autoPrice()} incl. taxes & fees, up to ${b.chatAutoDailyMax} a day. You can turn it off any time in the menu.`);
-  if (r) me!.billing = r;
-  renderAutoToggle();
-}
 
 $('autocharge-toggle')?.addEventListener('click', async () => {
   const btn = $<HTMLButtonElement>('autocharge-toggle');
@@ -1200,7 +1145,7 @@ $('autocharge-toggle')?.addEventListener('click', async () => {
   btn.classList.remove('is-busy');
   if (r && me) me.billing = r;
   renderAutoToggle();
-  showBanner(r ? (on ? `Auto-charge on: extra questions are charged ${autoPrice()} automatically.` : 'Auto-charge off: you will be asked to pay for each extra question.') : 'Could not save. Please try again.', 5000);
+  showBanner(r ? (on ? `Auto-reload on: ${RELOAD} questions are added for ${autoPrice()} whenever you run out.` : 'Auto-reload off: you will be asked to pay when you run out of questions.') : 'Could not save. Please try again.', 5000);
 });
 
 const trackHome = (): void => {
@@ -1288,10 +1233,7 @@ async function boot(): Promise<void> {
   const wantedId = params.get('t');
   const confirming = checkout?.startsWith('cs_') ? confirmCheckout(checkout) : null;
   if (confirming) await confirming;
-  else {
-    renderAutoToggle();
-    void maybeAutoNotice();
-  }
+  else renderAutoToggle();
   const { data } = await api<{ threads: Thread[] }>('/api/threads');
   threads = data.threads ?? [];
   const keepBanner = !banner.hidden ? banner.textContent : null;

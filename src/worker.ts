@@ -28,7 +28,7 @@ import { API_DISCOUNT_PERCENT, apiActivated, apiPrice, apiPacks, getPrices, taxe
 
 const usdCents = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 import { admin } from './admin.js';
-import { autoChargeQuestion, autoRechargeApi, ensureCustomer, getBilling, publicBilling, RECEIPT_ITEM, saveCardFromCheckout, sendReceipt } from './autocharge.js';
+import { autoChargeQuestion, autoRechargeApi, CHAT_RELOAD_QUESTIONS, ensureCustomer, getBilling, publicBilling, RECEIPT_ITEM, saveCardFromCheckout, sendReceipt } from './autocharge.js';
 import { CONTACT_TOPICS, contactPage, privacyPage, termsPage } from './legal.js';
 import { affiliatesPage, influencersPage } from './programs.js';
 import { chatPrices } from './festivals.js';
@@ -546,11 +546,11 @@ app.post('/api/threads', async (c) => {
 async function walletPay(db: D1Database, user: User, t: Thread, kind: 'consultation' | 'topup'): Promise<boolean> {
   if (user.account_type !== 'business') return false;
   const pr = await chatPrices(db, user.id);
-  const cents = kind === 'topup' ? pr.extraQuestionCents : pr.chatPackCents;
+  const cents = kind === 'topup' ? pr.extraQuestionCents * CHAT_RELOAD_QUESTIONS : pr.chatPackCents;
   if ((await apiBalance(db, user.id)) < cents) await autoRechargeApi(db, user.id, cents).catch(() => false);
   const ref = `chat:${kind}:${t.id}:${kind === 'topup' ? crypto.randomUUID() : 'first'}`;
   if (!(await spendApiCredit(db, user.id, ref, null, t.id, cents))) return false;
-  await grantCredits(db, 'chat', user.id, kind === 'topup' ? 1 : pr.chatPackQuestions, `wallet:${ref}`);
+  await grantCredits(db, 'chat', user.id, kind === 'topup' ? CHAT_RELOAD_QUESTIONS : pr.chatPackQuestions, `wallet:${ref}`);
   if (kind === 'consultation' && t.questions_allowed < 1 && (await spendCredit(db, 'chat', user.id, `first:${t.id}`, { threadId: t.id }))) {
     await db.prepare('UPDATE threads SET questions_allowed = 1 WHERE id = ?').bind(t.id).run();
     t.questions_allowed = 1;
@@ -579,9 +579,9 @@ app.post('/api/threads/:id/checkout', async (c) => {
   const pr = await chatPrices(c.env.DB, user.id);
   const url = await createCheckout(c, user, {
     kind, threadId: t.id,
-    credits: kind === 'topup' ? 1 : pr.chatPackQuestions,
-    cents: kind === 'topup' ? pr.extraQuestionCents : pr.chatPackCents,
-    name: kind === 'topup' ? `Kaalera — 1 more question for ${t.full_name}` : `Kaalera consultation for ${t.full_name}`,
+    credits: kind === 'topup' ? CHAT_RELOAD_QUESTIONS : pr.chatPackQuestions,
+    cents: kind === 'topup' ? pr.extraQuestionCents * CHAT_RELOAD_QUESTIONS : pr.chatPackCents,
+    name: kind === 'topup' ? `Kaalera — ${CHAT_RELOAD_QUESTIONS} more questions for ${t.full_name}` : `Kaalera consultation for ${t.full_name}`,
     returnPath: `/?t=${t.id}`,
   });
   return c.json({ checkoutUrl: url });
