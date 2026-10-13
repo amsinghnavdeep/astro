@@ -154,82 +154,71 @@ async function renderPrices(): Promise<void> {
   );
 }
 
-type SkyPlanet = { name: string; longitude: number; sign: string; degree: number; nakshatra: string; retrograde: boolean };
-const SVGNS = 'http://www.w3.org/2000/svg';
-const ABBR: Record<string, string> = { Sun: 'Su', Moon: 'Mo', Mars: 'Ma', Mercury: 'Me', Jupiter: 'Ju', Venus: 'Ve', Saturn: 'Sa', Rahu: 'Ra', Ketu: 'Ke' };
-const SIGN_GLYPHS = ['♈', '♉', '♊', '♋', '♌', '♍', '♎', '♏', '♐', '♑', '♒', '♓'];
-
-function svg(tag: string, attrs: Record<string, string | number>, text = ''): SVGElement {
-  const e = document.createElementNS(SVGNS, tag);
-  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
-  if (text) e.textContent = text;
-  return e;
-}
-
-/** Aries starts at 9 o'clock and signs run anticlockwise, like a Western wheel. */
-function polar(lon: number, r: number): [number, number] {
-  const a = ((180 + lon) * Math.PI) / 180;
-  return [150 + r * Math.cos(a), 150 - r * Math.sin(a)];
-}
-
-async function renderSky(): Promise<void> {
-  const { ok, data } = await api<{ at: string; planets: SkyPlanet[] }>('/api/sky');
-  if (!ok) return;
-  const wheel = $('sky-wheel');
-  const parts: SVGElement[] = [svg('circle', { class: 'ring', cx: 150, cy: 150, r: 142 }), svg('circle', { class: 'ring', cx: 150, cy: 150, r: 116 }), svg('circle', { class: 'ring', cx: 150, cy: 150, r: 48, 'stroke-dasharray': '2 4' })];
-  for (let i = 0; i < 12; i++) {
-    const [x1, y1] = polar(i * 30, 116), [x2, y2] = polar(i * 30, 142), [tx, ty] = polar(i * 30 + 15, 129);
-    parts.push(svg('line', { class: 'ring', x1, y1, x2, y2 }), svg('text', { class: 'sign', x: tx, y: ty, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, SIGN_GLYPHS[i]));
-  }
-  const sorted = [...data.planets].sort((a, b) => a.longitude - b.longitude);
-  let prev = -99, lane = 0;
-  for (const p of sorted) {
-    lane = p.longitude - prev < 9 ? (lane + 1) % 3 : 0;
-    prev = p.longitude;
-    const [x, y] = polar(p.longitude, 98 - lane * 20);
-    const g = svg('g', { class: `pl${p.name === 'Sun' || p.name === 'Moon' ? ' lum' : ''}${p.name === 'Moon' ? ' moon' : ''}` });
-    g.append(svg('circle', { cx: x, cy: y, r: 10 }), svg('text', { x, y, 'text-anchor': 'middle', 'dominant-baseline': 'central' }, ABBR[p.name] ?? p.name.slice(0, 2)));
-    g.append(svg('title', {}, `${p.name}: ${p.sign} ${p.degree}°, ${p.nakshatra}${p.retrograde ? ' (retrograde)' : ''}`));
-    parts.push(g);
-  }
-  wheel.replaceChildren(...parts);
-  $('sky-time').textContent = new Date(data.at).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-  $('sky-list').replaceChildren(...data.planets.map((p) => {
-    const li = el('li');
-    li.append(el('b', '', p.name), document.createTextNode(` ${p.sign} ${p.degree}° · ${p.nakshatra}`));
-    if (p.retrograde) li.append(el('span', 'r', ' ℞'));
-    return li;
-  }));
-}
+type SkyPlanet = { name: string; nakshatra: string; retrograde: boolean };
 
 const EXAMPLE: [string, string][] = [
-  ['b', 'Around mid-2021:'], ['', ' there are strong chances you changed jobs or cities. Did this happen?\n\n'],
-  ['b', 'Mar 2027 – Nov 2027:'], ['', ' your strongest window for a promotion or a better offer. Apply in this period.\n\n'],
-  ['b', 'Remedy:'], ['', ' chant "Om Gurave Namah" 108 times on Thursdays and wear yellow that day.\n\n'],
-  ['b', 'Kaal sees more:'], ['', ' a money rise linked to this job change. Ask and Kaal will date it.'],
+  ['b', 'Around mid-2021:'], ['', ' there are strong chances you changed jobs or cities. Did this happen?\n'],
+  ['b', 'Mar 2027 – Nov 2027:'], ['', ' your strongest window for a promotion or a better offer. Apply in this period.\n'],
+  ['b', 'Remedy:'], ['', ' chant "Om Gurave Namah" 108 times on Thursdays.\n'],
+  ['b', 'Kaal sees more:'], ['', ' a money rise linked to this job change.'],
 ];
 
-function typeExample(): void {
-  const box = $('ex-a');
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function liveSkyLine(): Promise<string> {
+  const { ok, data } = await api<{ planets: SkyPlanet[] }>('/api/sky');
+  if (!ok) return 'Today\'s planet positions loaded';
+  const moon = data.planets.find((p) => p.name === 'Moon');
+  const retro = data.planets.filter((p) => p.retrograde).map((p) => p.name);
+  return `Moon in ${moon?.nakshatra ?? '—'}${retro.length ? ` · ${retro.join(', ')} retrograde` : ''}`;
+}
+
+async function runConsole(): Promise<void> {
+  const steps = $('agent-steps'), out = $('agent-out');
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const run = () => {
-    box.replaceChildren();
-    let seg = 0, i = 0, node: HTMLElement | Text | null = null;
-    const step = () => {
-      if (seg >= EXAMPLE.length) return;
-      const [tag, text] = EXAMPLE[seg];
-      if (!node) { node = tag ? el('b') : document.createTextNode(''); box.append(node); }
-      i += reduce ? text.length : 2;
-      node.textContent = text.slice(0, i);
-      if (i >= text.length) { seg++; i = 0; node = null; }
-      if (reduce) step(); else setTimeout(step, 18);
-    };
-    step();
-  };
-  const io = new IntersectionObserver((entries) => {
-    if (entries.some((e) => e.isIntersecting)) { io.disconnect(); run(); }
-  });
-  io.observe(box);
+  const sky = liveSkyLine();
+  for (;;) {
+    const plan: [string, () => Promise<string> | string][] = [
+      ['Casting Kundli', () => 'Lagna, 9 grahas, 12 houses'],
+      ['Reading the live sky', () => sky],
+      ['Reading dasha periods', () => 'Jupiter mahadasha · Saturn antardasha'],
+      ['Scanning transits to 2028', () => 'Jupiter enters 10th house: Mar 2027'],
+      ['Checking past events', () => '3 strong matches'],
+      ['Writing prediction', () => 'Done'],
+    ];
+    steps.replaceChildren();
+    out.hidden = true;
+    out.replaceChildren();
+    $('agent-state').textContent = 'working';
+    $('agent').classList.remove('done');
+    const t0 = performance.now();
+    const tick = setInterval(() => { $('agent-time').textContent = `${((performance.now() - t0) / 1000).toFixed(1)}s`; }, 100);
+    for (let i = 0; i < plan.length; i++) {
+      const li = el('li', 'run');
+      li.append(el('span', 'st-ic'), el('span', 'st-name', plan[i][0]), el('span', 'st-detail'));
+      steps.append(li);
+      await sleep(reduce ? 0 : 650 + Math.random() * 450);
+      li.querySelector('.st-detail')!.textContent = await plan[i][1]();
+      li.className = 'ok';
+      $('agent-count').textContent = `${i + 1}/${plan.length} steps`;
+      $<HTMLElement>('agent-bar').style.width = `${((i + 1) / plan.length) * 100}%`;
+    }
+    out.hidden = false;
+    for (const [tag, text] of EXAMPLE) {
+      const node = tag ? el('b') : el('span');
+      out.append(node);
+      for (let i = 0; i <= text.length; i += reduce ? text.length : 3) {
+        node.textContent = text.slice(0, i);
+        if (!reduce) await sleep(16);
+      }
+      node.textContent = text;
+    }
+    clearInterval(tick);
+    $('agent-state').textContent = 'answered';
+    $('agent').classList.add('done');
+    if (reduce) return;
+    await sleep(9000);
+  }
 }
 
 document.querySelectorAll<HTMLButtonElement>('.topic').forEach((b) =>
@@ -852,8 +841,7 @@ async function boot(): Promise<void> {
     landingView.hidden = false;
     appView.hidden = true;
     renderPrices();
-    void renderSky();
-    typeExample();
+    void runConsole();
     if (params.get('login') === 'expired') {
       history.replaceState(null, '', '/');
       openSignin(true);

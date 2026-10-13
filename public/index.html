@@ -49,11 +49,15 @@
         </div>
         <div class="l-trust tiny muted"><span>✓ First question free</span><span>✓ No subscription</span><span>✓ Answers in your language</span></div>
       </div>
-      <aside class="sky-card" aria-label="The sky right now">
-        <div class="sky-head"><span class="live-dot"></span><b>The sky right now</b><span class="tiny muted" id="sky-time"></span></div>
-        <svg id="sky-wheel" viewBox="0 0 300 300" role="img" aria-label="Current planet positions"></svg>
-        <ul id="sky-list" class="sky-list"></ul>
-        <p class="tiny muted sky-note">Planet positions right now, calculated live. Kaal reads them against your birth details.</p>
+      <aside id="agent" class="agent" aria-label="Kaal at work (demo run)">
+        <div class="agent-head">
+          <span class="agent-dot"></span><b>Kaal</b><span class="agent-state" id="agent-state">working</span>
+          <span class="agent-tag">Demo run</span>
+        </div>
+        <div class="agent-q">When will my career grow?</div>
+        <ol class="agent-steps" id="agent-steps"></ol>
+        <div class="agent-out" id="agent-out" hidden></div>
+        <div class="agent-foot"><span id="agent-time">0.0s</span><span class="agent-bar"><i id="agent-bar"></i></span><span id="agent-count">0/6 steps</span></div>
       </aside>
     </main>
 
@@ -76,18 +80,6 @@
         <div class="l-card"><div class="step-n">1</div><h3>Ask in plain words</h3><p class="muted">Anything about your past or future.</p></div>
         <div class="l-card"><div class="step-n">2</div><h3>Add birth details</h3><p class="muted">Name, date, time and place of birth. That's all Kaal needs.</p></div>
         <div class="l-card"><div class="step-n">3</div><h3>Get dated answers</h3><p class="muted">Clear time windows from your dashas and transits, plus simple remedies.</p></div>
-      </div>
-    </section>
-
-    <section class="l-section l-example">
-      <div class="ex-copy">
-        <h2>An answer looks like this</h2>
-        <p class="muted">Short, dated and specific. No long astrology lessons.</p>
-      </div>
-      <div class="ex-card">
-        <div class="ex-q">When will my career grow?</div>
-        <div class="ex-a"><div class="kaal-av ex-av"></div><div id="ex-a" class="ex-text"></div></div>
-        <p class="tiny muted ex-note">Example only, not a real customer's reading.</p>
       </div>
     </section>
 
