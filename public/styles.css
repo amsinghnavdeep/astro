@@ -401,3 +401,5 @@ label.check input { width: auto; margin-top: 2px; flex: none; }
 .agent-av-wrap { position: relative; width: 30px; height: 30px; flex: none; }
 .agent-av { display: block; width: 30px; height: 30px; border-radius: 50%; background-size: cover !important; box-shadow: 0 0 0 1px rgba(245,158,11,.5); }
 .agent-av-wrap .agent-dot { position: absolute; right: -1px; bottom: -1px; margin: 0; box-shadow: 0 0 0 2px #09090b; }
+
+.topbar-brand { text-decoration: none; margin-right: 4px; }

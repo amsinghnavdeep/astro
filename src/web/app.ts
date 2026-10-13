@@ -134,6 +134,7 @@ document.addEventListener('click', (e) => {
   if (t.closest('[data-signin]')) openSignin();
   if (t.closest('[data-signup]')) openSignin(false, true);
   if (t.closest('[data-open-app]')) void enterApp();
+  if (t.closest('#app-view a.brand')) { e.preventDefault(); showHome(); }
   if (t.closest('[data-close]')) (t.closest('dialog') as HTMLDialogElement | null)?.close();
   const add = t.closest<HTMLButtonElement>('[data-addq]');
   if (add && current) goToCheckout(current.id, add, me!.pricing.extraQuestionCents);
@@ -1039,6 +1040,26 @@ const trackHome = (): void => {
 };
 
 let enteringApp = false;
+let consoleStarted = false;
+function startConsole(): void {
+  if (consoleStarted) return;
+  consoleStarted = true;
+  void runConsole();
+}
+
+function showHome(): void {
+  sessionStorage.removeItem(PENDING_Q);
+  enteringApp = false;
+  closeMenu();
+  history.replaceState(null, '', '/');
+  appView.hidden = true;
+  landingView.hidden = false;
+  document.querySelectorAll<HTMLElement>('[data-signin],[data-signup]').forEach((b) => { b.hidden = true; });
+  document.querySelectorAll<HTMLElement>('[data-open-app]').forEach((b) => { b.hidden = false; });
+  void renderPrices();
+  startConsole();
+  window.scrollTo(0, 0);
+}
 async function enterApp(): Promise<void> {
   enteringApp = true;
   await boot();
@@ -1054,7 +1075,7 @@ async function boot(): Promise<void> {
     appView.hidden = true;
     trackHome();
     renderPrices();
-    void runConsole();
+    startConsole();
     if (params.get('login') === 'expired') {
       history.replaceState(null, '', '/');
       openSignin(true);
@@ -1067,7 +1088,7 @@ async function boot(): Promise<void> {
     landingView.hidden = false;
     appView.hidden = true;
     renderPrices();
-    void runConsole();
+    startConsole();
     document.querySelectorAll<HTMLElement>('[data-signin],[data-signup]').forEach((b) => { b.hidden = true; });
     document.querySelectorAll<HTMLElement>('[data-open-app]').forEach((b) => { b.hidden = false; });
     return;
