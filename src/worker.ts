@@ -23,7 +23,7 @@ import {
 } from './chat.js';
 
 import { support } from './support.js';
-import { checkoutNote, DISCLAIMER } from './disclaimer.js';
+import { checkoutNote, disclaimer } from './disclaimer.js';
 import { API_START_CREDITS, apiActivated, apiPacks, getPrices, taxesAndFees } from './settings.js';
 
 const usdCents = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
@@ -126,13 +126,14 @@ const agreedIn = (body: unknown): boolean => !!body && typeof body === 'object' 
 async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadId?: string; credits: number; cents: number; name: string; returnPath: string }): Promise<string> {
   const area = o.kind === 'api_credits' ? 'api' : 'chat';
   const consentId = crypto.randomUUID();
+  const prices = await getPrices(c.env.DB);
+  const tax = prices.taxFeePercent;
   await c.env.DB.prepare(
     `INSERT INTO purchase_consents (id, user_id, kind, thread_id, disclaimer, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(consentId, user.id, o.kind, o.threadId ?? null, DISCLAIMER[area], c.req.header('cf-connecting-ip') ?? null,
+  ).bind(consentId, user.id, o.kind, o.threadId ?? null, disclaimer(area, prices), c.req.header('cf-connecting-ip') ?? null,
     (c.req.header('user-agent') ?? '').slice(0, 300) || null, new Date().toISOString()).run();
-  const tax = (await getPrices(c.env.DB)).taxFeePercent;
   const s = await stripe().checkout.sessions.create({
-    custom_text: { submit: { message: checkoutNote(area, tax) } },
+    custom_text: { submit: { message: checkoutNote(area, prices) } },
     mode: 'payment',
     customer: await ensureCustomer(c.env.DB, user),
     payment_intent_data: { setup_future_usage: 'off_session' },
@@ -481,6 +482,7 @@ app.post('/api/threads/:id/messages', async (c) => {
   }
   if (r.error) {
     const [status, error] = SEND_ERRORS[r.error];
+    if (autoCharged) return c.json({ error: 'Your question could not be delivered. The payment is kept as a question credit and will be used for your next message.' }, status);
     return c.json({ error }, status);
   }
   return c.json({ message: publicMessage(r.message!), autoCharged, thread: await pubT(c, (await getThreadById(c.env.DB, t.id))!) });

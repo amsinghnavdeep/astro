@@ -40,7 +40,7 @@ const CACHE_MS = 15_000;
 
 const defaults = (): Prices => ({
   chatPackCents: 1000,
-  extraQuestionCents: 500,
+  extraQuestionCents: 700,
   chatPackQuestions: 1,
   freeQuestions: env.chat.freeQuestions,
   apiCreditCents: 500,

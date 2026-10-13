@@ -1,19 +1,13 @@
 /** Purchase disclaimer: the customer must tick the box before any checkout opens. */
 
-const BASE = "Kaal's readings are astrological guidance for personal reflection only. They are not medical, legal, financial or other professional advice, and predictions are not guaranteed. All sales are final — no refunds.";
+import { disclaimer, type AutoPrices } from '../disclaimer.js';
 
-export const CONSENT = {
-  chat: {
-    text: `${BASE} Chat questions expire 3 months after purchase. Auto-charge is on: your card is saved and each extra question is charged automatically at $5 + 15% taxes & fees ($5.75), up to 10 a day. Turn it off any time in your account menu.`,
-    label: 'I agree to the Terms, no refunds, and auto-charge of $5.75 per extra question (I can turn it off any time).',
-  },
-  api: {
-    text: `${BASE} API credits expire 6 months after purchase. Auto-recharge is on: your card is saved and when your balance drops below 2 credits we buy 10 credits ($57.50 incl. 15% taxes & fees), up to $500 a month. Change or turn it off on the Developers page.`,
-    label: 'I agree to the Terms, no refunds, and auto-recharge (I can change or turn it off any time).',
-  },
+const LABEL = {
+  chat: 'I agree to the Terms, no refunds, and auto-charge of extra questions (I can turn it off any time).',
+  api: 'I agree to the Terms, no refunds, and auto-recharge (I can change or turn it off any time).',
 } as const;
 
-export function confirmPurchase(area: keyof typeof CONSENT, price: string): Promise<boolean> {
+export function confirmPurchase(area: keyof typeof LABEL, price: string, prices: AutoPrices): Promise<boolean> {
   return new Promise((resolve) => {
     const d = document.createElement('dialog');
     d.className = 'consent-dialog';
@@ -27,8 +21,8 @@ export function confirmPurchase(area: keyof typeof CONSENT, price: string): Prom
         <button type="submit" class="consent-pay" disabled></button>
       </div>
     </form>`;
-    d.querySelector('.consent-text')!.textContent = CONSENT[area].text;
-    d.querySelector('.consent-check span')!.textContent = CONSENT[area].label;
+    d.querySelector('.consent-text')!.textContent = disclaimer(area, prices);
+    d.querySelector('.consent-check span')!.textContent = LABEL[area];
     const box = d.querySelector<HTMLInputElement>('.consent-check input')!;
     const pay = d.querySelector<HTMLButtonElement>('.consent-pay')!;
     pay.textContent = `Agree and pay ${price}`;

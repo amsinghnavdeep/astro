@@ -115,7 +115,7 @@ function fillLanguages(select: HTMLSelectElement, langs: string[], value = 'Engl
 const credTotal = (): number => (me?.chatCredits ?? []).reduce((n, l) => n + l.credits, 0);
 
 async function goToCheckout(threadId: string, btn?: HTMLButtonElement, cents = me!.pricing.packCents): Promise<void> {
-  if (!(await confirmPurchase('chat', money(cents, me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent)))) return;
+  if (!(await confirmPurchase('chat', money(cents, me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
@@ -451,7 +451,7 @@ profileForm.addEventListener('submit', async (e) => {
     return;
   }
   if (!me!.freeAvailable && credTotal() < 1) {
-    if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent)))) return;
+    if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
     (body as Record<string, unknown>).agreed = true;
   }
   const label = submit.textContent;
@@ -893,6 +893,8 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   renderAutoToggle();
   await maybeAutoNotice();
 }
+
+const chatPrices = () => ({ extraQuestionCents: me!.pricing.extraQuestionCents, taxFeePercent: me!.pricing.taxFeePercent, apiCreditCents: 0 });
 
 const autoPrice = (): string => {
   const p = me!.pricing;

@@ -239,7 +239,7 @@ function renderBilling(): void {
 $('packs').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pack]');
   if (!btn) return;
-  if (!(await confirmPurchase('api', (btn.textContent ?? '').replace(/^Buy\s*/, '') + taxFeeNote(state?.taxFeePercent ?? 0)))) return;
+  if (!(await confirmPurchase('api', (btn.textContent ?? '').replace(/^Buy\s*/, '') + taxFeeNote(state?.taxFeePercent ?? 0), { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0 }))) return;
   $('buy-error').textContent = '';
   btn.disabled = true;
   btn.textContent = 'Opening secure checkout…';
