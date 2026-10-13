@@ -23,3 +23,10 @@
     apply(t);
   });
 })();
+
+/* Busy state for plain forms: disable the submit button and show its data-busy label. */
+document.addEventListener('submit', function (e) {
+  var b = e.target && e.target.querySelector && e.target.querySelector('button[data-busy]');
+  if (!b || !e.target.checkValidity()) return;
+  setTimeout(function () { b.disabled = true; b.classList.add('is-busy'); b.textContent = b.getAttribute('data-busy'); }, 0);
+}, true);

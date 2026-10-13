@@ -30,3 +30,27 @@ export async function sendSupportEmail(o: { to: string; subject: string; title: 
   await sendEmail(o.to, o.subject, layout(o.title,
     `<p style="white-space:pre-wrap">${escapeHtml(o.body)}</p>${o.link ? button(o.link, 'View ticket') : ''}`), o.replyTo);
 }
+
+const usd = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
+
+export async function sendReceiptEmail(o: {
+  to: string; item: string; baseCents: number; feeCents: number; feePercent: number; totalCents: number;
+  last4: string | null; auto: boolean; ref: string; manageUrl: string;
+}): Promise<void> {
+  const row = (k: string, v: string, b = false) =>
+    `<tr><td style="padding:4px 0;color:#555">${escapeHtml(k)}</td><td style="padding:4px 0;text-align:right${b ? ';font-weight:600' : ''}">${escapeHtml(v)}</td></tr>`;
+  await sendEmail(o.to, `Kaalera receipt — ${usd(o.totalCents)}`, layout('Payment received',
+    `<p>Thank you. ${o.auto ? 'This was charged automatically to your saved card.' : 'Your payment went through.'}</p>
+    <table style="width:100%;border-collapse:collapse">${row(o.item, usd(o.baseCents))}${o.feeCents ? row(`Taxes & fees (${o.feePercent}%)`, usd(o.feeCents)) : ''}
+    ${row('Total (USD)', usd(o.totalCents), true)}${o.last4 ? row('Card', `•••• ${o.last4}`) : ''}${row('Date', new Date().toUTCString().slice(5, 16))}${row('Reference', o.ref)}</table>
+    <p style="color:#666;font-size:13px">All sales are final — no refunds. Auto-charge is ${o.auto ? 'on' : 'on by default'} for future questions; you can turn it off any time.</p>`
+    + button(o.manageUrl, 'Manage auto-charge')));
+}
+
+export async function sendContactEmails(o: { owner: string; name: string; email: string; topic: string; message: string }): Promise<void> {
+  await sendEmail(o.owner, `[Kaalera contact] ${o.topic} — ${o.name}`, layout(`Contact form: ${o.topic}`,
+    `<p><strong>${escapeHtml(o.name)}</strong> &lt;${escapeHtml(o.email)}&gt;</p><p style="white-space:pre-wrap">${escapeHtml(o.message)}</p>`), o.email);
+  await sendEmail(o.email, 'We got your message — Kaalera', layout('Thanks for contacting Kaalera',
+    `<p>Hi ${escapeHtml(o.name)}, we received your message and will reply to this email, usually within 2 working days.</p>
+    <p style="color:#666;font-size:13px">For help with a consultation or payment, you can also raise a ticket at kaalera.com/support.</p>`));
+}

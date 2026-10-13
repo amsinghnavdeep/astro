@@ -2,6 +2,7 @@ import { confirmPurchase } from './consent.js';
 import { taxFeeNote } from '../disclaimer.js';
 import { renderMarkdown } from '../markdown.js';
 import { isPdfRequest, openReport, parseAnswer } from './extras.js';
+import { autoChargeNotice, saveBilling, type BillingInfo } from './billing.js';
 
 type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
 type Thread = {
@@ -11,7 +12,7 @@ type Thread = {
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
 type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number };
-type Me = { user: { name: string; email: string }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number };
+type Me = { user: { name: string; email: string }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
 
@@ -846,6 +847,7 @@ async function ask(text: string): Promise<void> {
   sending = false;
   renderedKey = '';
   if (ok) {
+    if ((data as { autoCharged?: boolean }).autoCharged) showBanner(`Auto-charged ${autoPrice()} to card •••• ${me!.billing?.card?.last4 ?? ''} for this question. Receipt emailed.`, 7000);
     pending = Math.max(pending, 1);
     upsertThread(data.thread);
   } else {
@@ -886,7 +888,47 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   if (!ok || !data.paid) showBanner(data.error ?? "We couldn't confirm the payment yet. If you were charged, it will appear shortly.");
   else if (data.kind === 'topup') showBanner('Payment received — question added.', 6000);
   else showBanner('Payment received — Kaal is starting your consultation.', 6000);
+  const fresh = await api<Me>('/api/me');
+  if (fresh.ok) me = fresh.data;
+  renderAutoToggle();
+  await maybeAutoNotice();
 }
+
+const autoPrice = (): string => {
+  const p = me!.pricing;
+  return money(p.extraQuestionCents + Math.round((p.extraQuestionCents * p.taxFeePercent) / 100), p.currency);
+};
+
+function renderAutoToggle(): void {
+  const b = me?.billing;
+  const btn = $<HTMLButtonElement>('autocharge-toggle');
+  if (!btn) return;
+  btn.hidden = !b?.card;
+  btn.textContent = `Auto-charge: ${b?.chatAutoCharge ? 'On' : 'Off'}`;
+  btn.title = b?.chatAutoCharge ? `Extra questions are charged ${autoPrice()} to card •••• ${b.card?.last4 ?? ''}. Click to turn off.` : 'Click to turn auto-charge on.';
+}
+
+async function maybeAutoNotice(): Promise<void> {
+  const b = me?.billing;
+  if (!b?.card || b.chatAutoChargeAcked) return;
+  const r = await autoChargeNotice('chat', b, `When your questions run out, each extra question is charged automatically at ${autoPrice()} (${money(me!.pricing.extraQuestionCents)} + ${me!.pricing.taxFeePercent}% taxes & fees), up to ${b.chatAutoDailyMax} a day. You can turn it off any time in the menu.`);
+  if (r) me!.billing = r;
+  renderAutoToggle();
+}
+
+$('autocharge-toggle')?.addEventListener('click', async () => {
+  const btn = $<HTMLButtonElement>('autocharge-toggle');
+  const on = !me?.billing?.chatAutoCharge;
+  btn.disabled = true;
+  btn.classList.add('is-busy');
+  btn.textContent = 'Saving…';
+  const r = await saveBilling({ chatAutoCharge: on, ack: 'chat' });
+  btn.disabled = false;
+  btn.classList.remove('is-busy');
+  if (r && me) me.billing = r;
+  renderAutoToggle();
+  showBanner(r ? (on ? `Auto-charge on: extra questions are charged ${autoPrice()} automatically.` : 'Auto-charge off: you will be asked to pay for each extra question.') : 'Could not save. Please try again.', 5000);
+});
 
 async function boot(): Promise<void> {
   setupTimezones();
@@ -922,6 +964,10 @@ async function boot(): Promise<void> {
   const wantedId = params.get('t');
   const confirming = checkout?.startsWith('cs_') ? confirmCheckout(checkout) : null;
   if (confirming) await confirming;
+  else {
+    renderAutoToggle();
+    void maybeAutoNotice();
+  }
   const { data } = await api<{ threads: Thread[] }>('/api/threads');
   threads = data.threads ?? [];
   const keepBanner = !banner.hidden ? banner.textContent : null;

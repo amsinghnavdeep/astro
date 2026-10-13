@@ -119,7 +119,7 @@ ${more.length ? `<section class="w-more"><h2>More from the blog</h2><div class="
 
 /* ---------- crawler files ---------- */
 
-const STATIC_PAGES = ['/', '/blog', '/developers', '/docs', '/docs/quickstart', '/docs/authentication', '/docs/consultations-create',
+const STATIC_PAGES = ['/', '/blog', '/contact', '/terms', '/privacy', '/developers', '/docs', '/docs/quickstart', '/docs/authentication', '/docs/consultations-create',
   '/docs/consultations-get', '/docs/questions-create', '/docs/balance', '/docs/languages', '/docs/errors', '/docs/pricing', '/support'];
 
 export function sitemapXml(site: string, posts: Post[]): string {

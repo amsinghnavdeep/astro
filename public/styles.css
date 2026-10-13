@@ -373,3 +373,7 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .k-chip { border: 1px solid rgba(232,137,43,.5); background: rgba(232,137,43,.08); color: inherit; border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .k-chip:hover { background: rgba(232,137,43,.18); }
 .k-pdf { margin-top: 8px; }
+.is-busy { pointer-events: none; opacity: .8; }
+.is-busy::before { content: ""; display: inline-block; width: 1em; height: 1em; margin-right: .5em; vertical-align: -.15em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: k-spin .7s linear infinite; }
+@keyframes k-spin { to { transform: rotate(360deg); } }
+.consent-links { font-size: 13px; margin: 6px 0 0; }

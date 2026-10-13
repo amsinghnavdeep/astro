@@ -10,7 +10,7 @@ import { deleteKundli, getKundli, kundliInput, listKundlis, MAX_KUNDLIS, publicK
 import { LANGUAGES } from './languages.js';
 import { computeChart, computeSky, chartToChatContext } from './kundli/chart.js';
 import { createLoginToken, destroySession, redeemLoginToken, userForSession, type User } from './auth.js';
-import { sendLoginEmail } from './email.js';
+import { sendContactEmails, sendLoginEmail } from './email.js';
 import { cryptoProvider, stripe } from './stripe.js';
 import {
   apiBalance, authenticateApiKey, createApiKey, grantApiCredits, listApiKeys, listApiLedger,
@@ -28,6 +28,8 @@ import { API_START_CREDITS, apiActivated, apiPacks, getPrices, taxesAndFees } fr
 
 const usdCents = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 import { admin } from './admin.js';
+import { autoChargeQuestion, autoRechargeApi, ensureCustomer, getBilling, publicBilling, RECEIPT_ITEM, saveCardFromCheckout, sendReceipt } from './autocharge.js';
+import { CONTACT_TOPICS, contactPage, privacyPage, termsPage } from './legal.js';
 import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
 import { layout } from './seo/layout.js';
 import { TOPICS, topicPage } from './seo/topics.js';
@@ -132,7 +134,8 @@ async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadI
   const s = await stripe().checkout.sessions.create({
     custom_text: { submit: { message: checkoutNote(area, tax) } },
     mode: 'payment',
-    customer_email: user.email,
+    customer: await ensureCustomer(c.env.DB, user),
+    payment_intent_data: { setup_future_usage: 'off_session' },
     line_items: [
       { quantity: 1, price_data: { currency: env.stripe.currency, unit_amount: o.cents, product_data: { name: o.name } } },
       ...(tax > 0 ? [{
@@ -140,7 +143,7 @@ async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadI
         price_data: { currency: env.stripe.currency, unit_amount: taxesAndFees(o.cents, tax), product_data: { name: `Taxes & fees (${tax}%)` } },
       }] : []),
     ],
-    metadata: { kind: o.kind, userId: user.id, threadId: o.threadId ?? '', credits: String(o.credits), consentId },
+    metadata: { kind: o.kind, userId: user.id, threadId: o.threadId ?? '', credits: String(o.credits), consentId, baseCents: String(o.cents) },
     success_url: `${env.siteUrl}${o.returnPath}${o.returnPath.includes('?') ? '&' : '?'}checkout={CHECKOUT_SESSION_ID}`,
     cancel_url: `${env.siteUrl}${o.returnPath}`,
   });
@@ -155,18 +158,22 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
   const m = s.metadata ?? {};
   const kind = m.kind as CheckoutKind | undefined;
   if (!kind || !m.userId) return null;
+  await saveCardFromCheckout(db, s).catch((err) => console.error('Saving card failed:', err));
+  const receipt = { totalCents: s.amount_total ?? 0, baseCents: Number(m.baseCents) || undefined, auto: false, ref: s.id };
   if (kind === 'api_credits') {
     await grantApiCredits(db, m.userId, Number(m.credits), `stripe:${s.id}`);
-    await db.prepare(
+    const ins = await db.prepare(
       `INSERT INTO payments (stripe_session_id, user_id, thread_id, kind, amount_cents, currency, created_at)
        VALUES (?, ?, NULL, 'api_credits', ?, ?, ?) ON CONFLICT(stripe_session_id) DO NOTHING`,
     ).bind(s.id, m.userId, s.amount_total ?? 0, s.currency ?? env.stripe.currency, new Date().toISOString()).run();
+    if (ins.meta?.changes) await sendReceipt(db, m.userId, { ...receipt, item: `${m.credits} API credits`, api: true });
     return { kind, threadId: null };
   }
   const t = await applyPayment(db, {
     stripeSessionId: s.id, userId: m.userId, threadId: m.threadId, kind, credits: Number(m.credits) || 1,
     amountCents: s.amount_total ?? 0, currency: s.currency ?? env.stripe.currency,
   });
+  if (t) await sendReceipt(db, m.userId, { ...receipt, item: RECEIPT_ITEM[kind] });
   const current = t ?? (await getThreadById(db, m.threadId));
   if (current && !current.devin_session_id && current.status !== 'starting') {
     try {
@@ -176,6 +183,16 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
     }
   }
   return { kind, threadId: m.threadId };
+}
+
+/** Run work after the response is sent (falls back to awaiting-free fire-and-forget outside Workers). */
+function background(c: C, p: Promise<unknown>): void {
+  const safe = p.catch((err) => console.error('Background task failed:', err));
+  try {
+    c.executionCtx.waitUntil(safe);
+  } catch {
+    void safe;
+  }
 }
 
 /* ---------- security headers + rate limits ---------- */
@@ -281,6 +298,7 @@ app.get('/api/me', async (c) => {
     user: { name: user.name, email: user.email }, freeAvailable: !user.free_used,
     chatCredits: await creditLots(c.env.DB, 'chat', user.id),
     pricing: await pricing(c.env.DB), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
+    billing: publicBilling(await getBilling(c.env.DB, user.id)),
   });
 });
 
@@ -455,12 +473,17 @@ app.post('/api/threads/:id/messages', async (c) => {
     context = (await chartContext(k, t.full_name)) ?? undefined;
     if (!context) return c.json({ error: 'Could not compute that chart. Check its birth details.' }, 400);
   }
-  const r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context);
+  let r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context);
+  let autoCharged = false;
+  if (r.error === 'no_questions' && t.source === 'web' && (await autoChargeQuestion(c.env.DB, t, t.questions_used))) {
+    autoCharged = true;
+    r = await sendCustomerMessage(c.env.DB, (await getThreadById(c.env.DB, t.id))!, p.data.text, p.data.language, context);
+  }
   if (r.error) {
     const [status, error] = SEND_ERRORS[r.error];
     return c.json({ error }, status);
   }
-  return c.json({ message: publicMessage(r.message!), thread: await pubT(c, (await getThreadById(c.env.DB, t.id))!) });
+  return c.json({ message: publicMessage(r.message!), autoCharged, thread: await pubT(c, (await getThreadById(c.env.DB, t.id))!) });
 });
 
 app.get('/api/checkout/confirm', async (c) => {
@@ -498,7 +521,8 @@ app.get('/api/developer', async (c) => {
   const pr = await getPrices(db);
   const [keys, balance, ledger] = await Promise.all([listApiKeys(db, user.id), apiBalance(db, user.id), listApiLedger(db, user.id)]);
   return c.json({ keys, balance, ledger, packs: apiPacks(pr), creditCents: pr.apiCreditCents, taxFeePercent: pr.taxFeePercent,
-    activated: await apiActivated(db, user.id, pr), minRechargeCents: pr.apiMinRechargeCents, creditLots: await creditLots(db, 'api', user.id) });
+    activated: await apiActivated(db, user.id, pr), minRechargeCents: pr.apiMinRechargeCents, creditLots: await creditLots(db, 'api', user.id),
+    billing: publicBilling(await getBilling(db, user.id)) });
 });
 
 app.post('/api/developer/keys', async (c) => {
@@ -579,6 +603,7 @@ app.post('/v1/consultations', async (c) => {
   const chart = await chartText(p.data);
   if (!chart) return apiError(c, 400, 'chart_failed', 'Could not compute the chart. Check date, time, place and timezone.');
   const t = newThread(userId, p.data, chart, p.data.question, { source: 'api', api_key_id: keyId });
+  if ((await apiBalance(db, userId)) < API_START_CREDITS) await autoRechargeApi(db, userId, API_START_CREDITS);
   const ref = `consultation:${t.id}`;
   const refs = Array.from({ length: API_START_CREDITS }, (_, i) => (i ? `${ref}:${i + 1}` : ref));
   const spent: string[] = [];
@@ -630,12 +655,59 @@ app.post('/v1/consultations/:id/questions', async (c) => {
   if (!t) return apiError(c, 404, 'not_found', 'Consultation not found.');
   const p = z.object({ question: questionText(), language: z.enum(LANGUAGES).optional() }).safeParse(await c.req.json().catch(() => null));
   if (!p.success) return apiError(c, 400, 'invalid_request', `question is required (2–${env.chat.maxMessageChars} characters).`);
+  if ((await apiBalance(c.env.DB, t.user_id)) < 1) await autoRechargeApi(c.env.DB, t.user_id, 1);
   const r = await sendCustomerMessage(c.env.DB, t, p.data.question, p.data.language);
+  if (!r.error) background(c, autoRechargeApi(c.env.DB, t.user_id));
   if (r.error) {
     const [status, code, message] = API_SEND_ERRORS[r.error];
     return apiError(c, status, code, message);
   }
   return c.json({ question_id: r.message!.id, status: 'answering', credits_remaining: await apiBalance(c.env.DB, t.user_id) }, 202);
+});
+
+app.put('/api/billing', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  const p = z.object({
+    chatAutoCharge: z.boolean().optional(), apiAutoRecharge: z.boolean().optional(), ack: z.enum(['chat', 'api']).optional(),
+    apiAutoRechargeCredits: z.number().int().min(2).max(200).optional(), apiAutoRechargeCapCents: z.number().int().min(0).max(1_000_000).optional(),
+  }).safeParse(await c.req.json().catch(() => null));
+  if (!p.success) return c.json({ error: 'Invalid settings.' }, 400);
+  const d = p.data;
+  const now = new Date().toISOString();
+  await c.env.DB.prepare(`UPDATE users SET
+      chat_autocharge = COALESCE(?, chat_autocharge), api_autorecharge = COALESCE(?, api_autorecharge),
+      api_autorecharge_credits = COALESCE(?, api_autorecharge_credits), api_autorecharge_cap_cents = COALESCE(?, api_autorecharge_cap_cents),
+      chat_autocharge_ack_at = CASE WHEN ? = 'chat' THEN ? ELSE chat_autocharge_ack_at END,
+      api_autorecharge_ack_at = CASE WHEN ? = 'api' THEN ? ELSE api_autorecharge_ack_at END
+    WHERE id = ?`).bind(
+    d.chatAutoCharge === undefined ? null : Number(d.chatAutoCharge), d.apiAutoRecharge === undefined ? null : Number(d.apiAutoRecharge),
+    d.apiAutoRechargeCredits ?? null, d.apiAutoRechargeCapCents ?? null, d.ack ?? null, now, d.ack ?? null, now, user.id).run();
+  return c.json({ billing: publicBilling(await getBilling(c.env.DB, user.id)) });
+});
+
+app.post('/api/contact', async (c) => {
+  const back = (q: string) => c.redirect(`/contact?${q}`, 303);
+  const f = await c.req.parseBody().catch(() => ({} as Record<string, unknown>));
+  const str = (k: string) => (typeof f[k] === 'string' ? (f[k] as string).trim() : '');
+  if (str('website')) return back('sent=1');
+  const p = z.object({
+    name: z.string().min(1).max(100), email: z.string().email().max(200), topic: z.enum(CONTACT_TOPICS), message: z.string().min(10).max(4000),
+  }).safeParse({ name: str('name'), email: str('email').toLowerCase(), topic: str('topic') || 'General', message: str('message') });
+  if (!p.success || isDisposable(p.data.email)) return back('error=1');
+  const db = c.env.DB;
+  const since = new Date(Date.now() - 3_600_000).toISOString();
+  const n = await db.prepare('SELECT COUNT(*) AS n FROM contact_messages WHERE ip = ? AND created_at >= ?').bind(ip(c), since).first<{ n: number }>();
+  if ((n?.n ?? 0) >= 3) return back('error=1');
+  await db.prepare('INSERT INTO contact_messages (id, ip, email, topic, created_at) VALUES (?, ?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), ip(c), p.data.email, p.data.topic, new Date().toISOString()).run();
+  try {
+    await sendContactEmails({ owner: env.support.email ?? env.adminEmails[0], ...p.data });
+  } catch (err) {
+    console.error('Contact email failed:', err);
+    return back('error=1');
+  }
+  return back('sent=1');
 });
 
 app.route('/api/support', support);
@@ -678,6 +750,13 @@ app.get('/blog/:slug', (c) => publicPage(c, 'html', async () => {
   if (!p) return null;
   return blogPostPage(env.siteUrl, p, (await published(c)).filter((x) => x.slug !== p.slug).slice(0, 3));
 }));
+app.get('/terms', (c) => publicPage(c, 'html', async () => termsPage(env.siteUrl)));
+app.get('/privacy', (c) => publicPage(c, 'html', async () => privacyPage(env.siteUrl)));
+app.get('/contact', (c) => {
+  const q = c.req.query();
+  if (q.sent || q.error) return c.html(contactPage(env.siteUrl, q.sent ? 'sent' : 'error'), 200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+  return publicPage(c, 'html', async () => contactPage(env.siteUrl));
+});
 for (const t of TOPICS) app.get(`/${t.slug}`, (c) => publicPage(c, 'html', async () => topicPage(env.siteUrl, t, await published(c))));
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));

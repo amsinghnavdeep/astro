@@ -59,3 +59,19 @@ h3 { font-size: 18px; margin: 24px 0 8px; }
 .w-foot a { color: var(--muted); text-decoration: none; }
 .w-foot p { margin: 0; }
 @media (max-width: 640px) { .w-nav a:not(.w-cta) { display: none; } .w-nav a[href="/blog"] { display: inline; } }
+
+/* legal + contact */
+.w-legal h2 { margin-top: 1.6em; font-size: 1.15rem; }
+.w-legal li { margin: .3em 0; }
+.w-form { display: grid; gap: 14px; max-width: 560px; margin: 1.2em 0; }
+.w-form label { display: grid; gap: 6px; font-weight: 500; }
+.w-form input, .w-form select, .w-form textarea { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line, #d6d3cf); background: var(--card, transparent); color: inherit; }
+.w-form button { justify-self: start; }
+.w-hp { position: absolute !important; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.w-notice { padding: 14px 16px; border-radius: 12px; background: rgba(245, 158, 11, .12); border: 1px solid rgba(245, 158, 11, .4); }
+.w-error { color: #c2410c; font-weight: 500; }
+/* loaders */
+.is-busy { position: relative; pointer-events: none; opacity: .8; }
+.is-busy::before { content: ""; display: inline-block; width: 1em; height: 1em; margin-right: .5em; vertical-align: -.15em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: k-spin .7s linear infinite; }
+@keyframes k-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .is-busy::before { animation-duration: 2s; } }

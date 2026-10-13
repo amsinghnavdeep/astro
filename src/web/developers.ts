@@ -1,9 +1,10 @@
 import { confirmPurchase } from './consent.js';
 import { taxFeeNote } from '../disclaimer.js';
+import { autoChargeNotice, saveBilling, type BillingInfo } from './billing.js';
 type Key = { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
 type Entry = { id: string; delta: number; reason: string; ref: string; api_key_id: string | null; thread_id: string | null; created_at: string };
 type Pack = { id: string; credits: number; cents: number };
-type Developer = { keys: Key[]; balance: number; ledger: Entry[]; packs: Pack[]; creditCents: number; taxFeePercent: number };
+type Developer = { keys: Key[]; balance: number; ledger: Entry[]; packs: Pack[]; creditCents: number; taxFeePercent: number; billing?: BillingInfo };
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const TABS = ['keys', 'billing', 'usage'] as const;
@@ -116,6 +117,7 @@ async function load(): Promise<void> {
   renderKeys();
   renderBilling();
   renderUsage();
+  void maybeApiNotice();
 }
 
 async function confirmCheckout(): Promise<void> {
@@ -224,6 +226,7 @@ function renderBilling(): void {
   $('balance-sub').textContent = `${plural(balance, 'credit')} = ${plural(balance, 'question')}`
     + (lots.length ? ` · ${plural(lots[0].credits, 'credit')} expire on ${new Date(lots[0].expiresAt).toLocaleDateString()}` : '');
   $('per-credit').textContent = `${usd(creditCents)} per credit`;
+  renderAutoRecharge();
   $('packs').innerHTML = packs.map((p) => `
     <div class="d-pack">
       <div class="d-pack-credits">${plural(p.credits, 'credit')}</div>
@@ -250,6 +253,49 @@ $('packs').addEventListener('click', async (e) => {
   $('buy-error').textContent = r.data.error ?? 'Could not start checkout.';
   renderBilling();
 });
+
+/* ---------- auto-recharge ---------- */
+
+const withFee = (cents: number) => cents + Math.round((cents * (state?.taxFeePercent ?? 0)) / 100);
+
+function renderAutoRecharge(): void {
+  const b = state?.billing;
+  if (!b || !state) return;
+  $('ar-card').textContent = b.card ? `Card •••• ${b.card.last4} saved` : 'Your card is saved with your first purchase.';
+  $<HTMLInputElement>('ar-on').checked = b.apiAutoRecharge;
+  $<HTMLInputElement>('ar-credits').value = String(b.apiAutoRechargeCredits);
+  $<HTMLInputElement>('ar-cap').value = String(Math.round(b.apiAutoRechargeCapCents / 100));
+  const pack = b.apiAutoRechargeCredits * state.creditCents;
+  $('ar-sub').textContent = `When your balance drops below ${b.apiLowCredits} credits, we buy ${plural(b.apiAutoRechargeCredits, 'credit')} for ${usd(withFee(pack))} (${usd(pack)}${taxFeeNote(state.taxFeePercent)}), up to ${usd(b.apiAutoRechargeCapCents)} a month.`;
+}
+
+$('ar-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $<HTMLButtonElement>('ar-save');
+  btn.disabled = true;
+  btn.classList.add('is-busy');
+  btn.textContent = 'Saving…';
+  const r = await saveBilling({
+    apiAutoRecharge: $<HTMLInputElement>('ar-on').checked, ack: 'api',
+    apiAutoRechargeCredits: Math.max(2, Math.min(200, Math.round(Number($<HTMLInputElement>('ar-credits').value) || 10))),
+    apiAutoRechargeCapCents: Math.max(0, Math.min(10000, Math.round(Number($<HTMLInputElement>('ar-cap').value) || 0))) * 100,
+  });
+  btn.disabled = false;
+  btn.classList.remove('is-busy');
+  btn.textContent = 'Save';
+  if (r && state) state.billing = r;
+  renderAutoRecharge();
+  showBanner(r ? 'Auto-recharge settings saved.' : 'Could not save. Please try again.');
+});
+
+async function maybeApiNotice(): Promise<void> {
+  const b = state?.billing;
+  if (!b?.card || b.apiAutoRechargeAcked || !state) return;
+  const pack = b.apiAutoRechargeCredits * state.creditCents;
+  const r = await autoChargeNotice('api', b, `When your balance drops below ${b.apiLowCredits} credits, we automatically buy ${plural(b.apiAutoRechargeCredits, 'credit')} for ${usd(withFee(pack))} (${usd(pack)}${taxFeeNote(state.taxFeePercent)}), up to ${usd(b.apiAutoRechargeCapCents)} a month. Change or turn it off under Credits & billing.`);
+  if (r && state) state.billing = r;
+  renderAutoRecharge();
+}
 
 /* ---------- usage ---------- */
 

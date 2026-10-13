@@ -4,12 +4,12 @@ const BASE = "Kaal's readings are astrological guidance for personal reflection 
 
 export const CONSENT = {
   chat: {
-    text: `${BASE} Chat questions expire 3 months after purchase.`,
-    label: 'I understand: guidance only, no refunds, and questions expire 3 months after purchase.',
+    text: `${BASE} Chat questions expire 3 months after purchase. Auto-charge is on: your card is saved and each extra question is charged automatically at $5 + 15% taxes & fees ($5.75), up to 10 a day. Turn it off any time in your account menu.`,
+    label: 'I agree to the Terms, no refunds, and auto-charge of $5.75 per extra question (I can turn it off any time).',
   },
   api: {
-    text: `${BASE} API credits expire 6 months after purchase.`,
-    label: 'I understand: guidance only, no refunds, and credits expire 6 months after purchase.',
+    text: `${BASE} API credits expire 6 months after purchase. Auto-recharge is on: your card is saved and when your balance drops below 2 credits we buy 10 credits ($57.50 incl. 15% taxes & fees), up to $500 a month. Change or turn it off on the Developers page.`,
+    label: 'I agree to the Terms, no refunds, and auto-recharge (I can change or turn it off any time).',
   },
 } as const;
 
@@ -20,6 +20,7 @@ export function confirmPurchase(area: keyof typeof CONSENT, price: string): Prom
     d.innerHTML = `<form method="dialog">
       <h2>Before you pay</h2>
       <p class="consent-text"></p>
+      <p class="consent-links"><a href="/terms" target="_blank" rel="noopener">Terms &amp; Conditions</a> · <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a></p>
       <label class="consent-check"><input type="checkbox"> <span></span></label>
       <div class="consent-actions">
         <button type="button" class="consent-cancel">Cancel</button>

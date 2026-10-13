@@ -115,6 +115,16 @@
             If a question can't be delivered, its credit is returned automatically.</p>
           <p class="buy-note">Guidance only, not professional advice. All sales are final — no refunds. API credits expire 6 months after purchase.</p>
         </div>
+        <div class="d-card">
+          <div class="d-card-head"><h2>Auto-recharge</h2><span id="ar-card" class="d-small d-muted"></span></div>
+          <p id="ar-sub" class="d-muted d-small"></p>
+          <form id="ar-form" class="d-ar">
+            <label class="d-check"><input id="ar-on" type="checkbox"> Auto-recharge on</label>
+            <label>Credits per top-up <input id="ar-credits" type="number" min="2" max="200" step="1" inputmode="numeric"></label>
+            <label>Monthly limit (USD) <input id="ar-cap" type="number" min="0" max="10000" step="10" inputmode="numeric"></label>
+            <button id="ar-save" class="d-btn primary" type="submit">Save</button>
+          </form>
+        </div>
       </section>
 
       <!-- Usage -->
