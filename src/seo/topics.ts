@@ -1,6 +1,6 @@
 /** Keyword landing pages: one main search term per page, server-rendered with FAQ data. */
 import { renderMarkdown } from '../markdown.js';
-import type { Post } from '../blog.js';
+import { askKaalCard, coverArt, postCard, type Post } from '../blog.js';
 import { breadcrumbLd, ctaBlock, esc, faqLd, layout, organizationLd, TOPIC_LINKS } from './layout.js';
 
 export interface Topic {
@@ -249,18 +249,25 @@ export function topicPage(site: string, t: Topic, published: Post[]): string {
   const related = t.posts.map((s) => published.find((p) => p.slug === s)).filter((p): p is Post => !!p);
   const others = TOPIC_LINKS.filter(([href]) => href !== `/${t.slug}`);
   const main = `
-<section class="w-hero">
-  <p class="w-kicker">${esc(t.kicker)}</p>
-  <h1>${esc(t.h1)}</h1>
-  <p class="w-lead">${esc(t.description)}</p>
-  <a class="w-cta big" href="${esc(t.cta?.[0] ?? '/?ask=1')}">${esc(t.cta?.[1] ?? 'Ask Kaal — first question free')}</a>
+<section class="b-hero">
+  <div class="b-hero-text">
+    <p class="w-kicker">${esc(t.kicker)}</p>
+    <h1>${esc(t.h1)}</h1>
+    <p class="w-lead">${esc(t.description)}</p>
+    <a class="w-cta big" href="${esc(t.cta?.[0] ?? '/?ask=1')}">${esc(t.cta?.[1] ?? 'Ask Kaal — first question free')}</a>
+  </div>
+  <div class="b-hero-media">${coverArt(t.slug)}</div>
 </section>
-<article class="w-prose">${renderMarkdown(t.body)}</article>
-<section class="w-faq"><h2>Frequently asked questions</h2>
+<div class="b-layout">
+  <div class="b-body">
+    <article class="w-prose">${renderMarkdown(t.body, 0)}</article>
+    <section class="w-faq"><h2>Frequently asked questions</h2>
 ${t.faqs.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('\n')}
-</section>
-${related.length ? `<section class="w-more"><h2>Read more</h2><div class="w-grid">${related.map((p) => `
-  <div class="w-card"><h2><a href="/blog/${esc(p.slug)}">${esc(p.title)}</a></h2><p>${esc(p.summary)}</p></div>`).join('')}</div></section>` : ''}
+    </section>
+  </div>
+  <aside class="b-side">${askKaalCard()}</aside>
+</div>
+${related.length ? `<section class="b-next"><h2>Read more</h2><div class="b-grid">${related.map((p) => postCard(p)).join('')}</div></section>` : ''}
 <section class="w-more"><h2>More from Kaalera</h2><ul class="w-links">${others.map(([href, label]) => `<li><a href="${href}">${esc(label)}</a></li>`).join('')}<li><a href="/blog">Blog</a></li><li><a href="/developers">Astrology API</a></li></ul></section>
 ${ctaBlock()}`;
   return layout({

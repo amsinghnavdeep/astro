@@ -69,6 +69,9 @@ ${article && m.published ? `<meta property="article:published_time" content="${e
 ${article && m.modified ? `<meta property="article:modified_time" content="${esc(m.modified)}">` : ''}
 <link rel="alternate" type="application/rss+xml" title="Kaalera blog" href="${m.site}/blog/rss.xml">
 <link rel="icon" href="/kaal-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/site.css">
 <script src="/theme.js"></script>
 ${(m.jsonLd ?? []).map((o) => `<script type="application/ld+json">${ldJson(o)}</script>`).join('\n')}
