@@ -48,8 +48,8 @@ export async function authenticateApiKey(db: D1Database, raw: string): Promise<{
 export const apiBalance = (db: D1Database, userId: string): Promise<number> => creditBalance(db, 'api', userId);
 
 export const spendApiCredit = (
-  db: D1Database, userId: string, ref: string, keyId: string | null, threadId: string | null,
-): Promise<boolean> => spendCredit(db, 'api', userId, ref, { keyId, threadId });
+  db: D1Database, userId: string, ref: string, keyId: string | null, threadId: string | null, cents: number,
+): Promise<boolean> => spendCredit(db, 'api', userId, ref, { keyId, threadId, amount: cents });
 
 export const refundApiCredit = (db: D1Database, userId: string, ref: string): Promise<void> => refundCredit(db, 'api', userId, ref);
 

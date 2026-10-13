@@ -5,3 +5,4 @@ public/app.js
 data/
 *.log
 public/developers.js
+.astro/

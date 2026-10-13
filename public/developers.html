@@ -8,14 +8,15 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/developers.css" />
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "f7e133eb76b54c81ab5181bb69473560"}'></script>
 </head>
 <body>
   <!-- Signed out -->
   <div id="signin-view" class="d-signin" hidden>
     <form id="signin-form" class="d-card d-signin-card">
-      <div class="d-brand"><span class="d-logo">ॐ</span> Kaalera <span class="d-tag">Developers</span></div>
+      <a class="d-brand" href="/"><span class="d-logo">ॐ</span> Kaalera <span class="d-tag">Developers</span></a>
       <h1>Sign in to the developer dashboard</h1>
-      <p class="d-muted">Create API keys and buy question credits for the Kaalera API. We'll email you a sign-in link.</p>
+      <p class="d-muted">Create API keys and top up your Kaalera API wallet. We'll email you a sign-in link.</p>
       <label>Email
         <input id="signin-email" type="email" required autocomplete="email" placeholder="you@company.com" />
       </label>
@@ -86,7 +87,7 @@
             <h2>Quickstart</h2>
             <a class="d-small" href="/docs/quickstart">Full quickstart →</a>
           </div>
-          <p class="d-muted">Start a consultation (uses 1 credit), then poll it until Kaal's answer arrives.</p>
+          <p class="d-muted">Start a consultation, then poll it until Kaal's answer arrives.</p>
           <div class="d-code">
             <button class="d-copy" type="button" data-copy="quickstart-code">Copy</button>
             <pre id="quickstart-code"></pre>
@@ -99,21 +100,31 @@
         <header class="d-head">
           <div>
             <h1>Credits &amp; billing</h1>
-            <p class="d-muted">The API is prepaid. 1 credit = 1 question, including the first question of a new consultation.</p>
+            <p class="d-muted">Business &amp; API pricing is 10% below standard rates: starting a consultation costs $9 and each follow-up $6.30, paid from a prepaid USD wallet. No free or test API: keys activate after your first recharge of $100 or more.</p>
           </div>
         </header>
         <div class="d-card">
           <div class="d-muted d-small">Current balance</div>
-          <div class="d-big"><span id="balance">–</span> <span class="d-big-unit">credits</span></div>
+          <div class="d-big"><span id="balance">–</span> <span class="d-big-unit">USD</span></div>
           <div id="balance-sub" class="d-muted"></div>
         </div>
         <div class="d-card">
-          <div class="d-card-head"><h2>Buy credits</h2><span id="per-credit" class="d-small d-muted"></span></div>
+          <div class="d-card-head"><h2>Top up wallet</h2><span id="per-credit" class="d-small d-muted"></span></div>
           <div id="packs" class="d-packs"></div>
           <p id="buy-error" class="d-error" role="alert"></p>
           <p class="d-small d-muted">Payments go through a secure card checkout. Credits are added as soon as the payment completes.
-            If a question can't be delivered, its credit is returned automatically.</p>
-          <p class="buy-note">Guidance only, not professional advice. All sales are final — no refunds. API credits expire 6 months after purchase.</p>
+            If a question can't be delivered, its charge is returned to your wallet automatically.</p>
+          <p class="buy-note">Guidance only, not professional advice. All sales are final — no refunds. API wallet balance expires 6 months after purchase.</p>
+        </div>
+        <div class="d-card">
+          <div class="d-card-head"><h2>Auto-recharge</h2><span id="ar-card" class="d-small d-muted"></span></div>
+          <p id="ar-sub" class="d-muted d-small"></p>
+          <form id="ar-form" class="d-ar">
+            <label class="d-check"><input id="ar-on" type="checkbox"> Auto-recharge on</label>
+            <label>Top-up amount (USD) <input id="ar-credits" type="number" min="10" max="1000" step="10" inputmode="numeric"></label>
+            <label>Monthly limit (USD) <input id="ar-cap" type="number" min="0" max="10000" step="10" inputmode="numeric"></label>
+            <button id="ar-save" class="d-btn primary" type="submit">Save</button>
+          </form>
         </div>
       </section>
 
@@ -122,7 +133,7 @@
         <header class="d-head">
           <div>
             <h1>Usage</h1>
-            <p class="d-muted">Every credit purchase, question and refund on your account (latest 50).</p>
+            <p class="d-muted">Every top-up, question and refund on your account (latest 50).</p>
           </div>
           <button id="refresh-usage" class="d-btn" type="button">Refresh</button>
         </header>
@@ -163,6 +174,26 @@
     <div class="d-modal-actions">
       <button class="d-btn primary" type="button" data-close>Done</button>
     </div>
+  </dialog>
+
+  <!-- Switch to Business -->
+  <dialog id="biz-modal" class="d-modal">
+    <form id="biz-form" method="dialog">
+      <h2>Switch to a Business account</h2>
+      <p>The API is for Business accounts. Your first API wallet payment of <strong id="biz-amount">$100</strong> switches your account to Business, and the full amount goes into your wallet for API calls. Business accounts also pay 10% less for chat.</p>
+      <label>Business name
+        <input id="biz-name" maxlength="120" required placeholder="e.g. Sharma Jyotish Kendra" />
+      </label>
+      <label>Business or tax number
+        <input id="biz-tax" maxlength="40" minlength="3" required placeholder="GST, VAT or business number" />
+      </label>
+      <p class="d-muted d-small">Shown on your receipts.</p>
+      <p id="biz-error" class="d-error" role="alert"></p>
+      <div class="d-modal-actions">
+        <button class="d-btn" type="button" data-close>Cancel</button>
+        <button id="biz-submit" class="d-btn primary" type="submit">Continue to payment</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Confirm revoke -->

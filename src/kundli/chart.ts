@@ -535,3 +535,35 @@ export async function chartToChatContext(c: ChartData): Promise<string> {
   }
   return lines.join('\n');
 }
+
+export interface SkyPlanet {
+  name: PlanetName;
+  longitude: number;
+  sign: string;
+  degree: number;
+  nakshatra: string;
+  retrograde: boolean;
+}
+
+/** Sidereal (Lahiri) positions of the nine grahas at a moment, for the live sky panel. */
+export async function computeSky(ms = Date.now()): Promise<SkyPlanet[]> {
+  const swe = await getEphemeris();
+  swe.set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
+  const flags = swe.SEFLG_MOSEPH | swe.SEFLG_SIDEREAL | swe.SEFLG_SPEED;
+  const d = new Date(ms);
+  const jd = swe.julday(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCHours() + d.getUTCMinutes() / 60);
+  const at = (name: PlanetName, lon: number, retrograde: boolean): SkyPlanet => ({
+    name, longitude: Math.round(lon * 100) / 100, sign: SIGNS[Math.floor(lon / 30)], degree: Math.floor(lon % 30),
+    nakshatra: NAKSHATRAS[Math.floor(lon / (360 / 27))], retrograde,
+  });
+  const bodies: [PlanetName, number][] = [
+    ['Sun', swe.SE_SUN], ['Moon', swe.SE_MOON], ['Mars', swe.SE_MARS], ['Mercury', swe.SE_MERCURY],
+    ['Jupiter', swe.SE_JUPITER], ['Venus', swe.SE_VENUS], ['Saturn', swe.SE_SATURN], ['Rahu', swe.SE_MEAN_NODE],
+  ];
+  const out = bodies.map(([name, id]) => {
+    const p = swe.calc_ut(jd, id, flags);
+    return at(name, norm360(p[0]), name !== 'Rahu' && p[3] < 0);
+  });
+  out.push(at('Ketu', norm360(out[7].longitude + 180), false));
+  return out;
+}

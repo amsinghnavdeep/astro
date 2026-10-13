@@ -1,8 +1,10 @@
 import { confirmPurchase } from './consent.js';
+import { taxFeeNote } from '../disclaimer.js';
+import { autoChargeNotice, saveBilling, type BillingInfo } from './billing.js';
 type Key = { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
 type Entry = { id: string; delta: number; reason: string; ref: string; api_key_id: string | null; thread_id: string | null; created_at: string };
 type Pack = { id: string; credits: number; cents: number };
-type Developer = { keys: Key[]; balance: number; ledger: Entry[]; packs: Pack[]; creditCents: number };
+type Developer = { keys: Key[]; balance: number; ledger: Entry[]; packs: Pack[]; creditCents: number; taxFeePercent: number; billing?: BillingInfo; apiPrice?: { startCents: number; questionCents: number }; apiDiscountPercent?: number };
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const TABS = ['keys', 'billing', 'usage'] as const;
@@ -12,6 +14,7 @@ let state: Developer | null = null;
 let revokeTarget: Key | null = null;
 let signinPoll: number | undefined;
 
+const usd2 = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const usd = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 const plural = (n: number, word: string) => `${n} ${word}${Math.abs(n) === 1 ? '' : 's'}`;
 const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
@@ -115,6 +118,7 @@ async function load(): Promise<void> {
   renderKeys();
   renderBilling();
   renderUsage();
+  void maybeApiNotice();
 }
 
 async function confirmCheckout(): Promise<void> {
@@ -159,7 +163,41 @@ function renderKeys(): void {
     </tr>`).join('');
 }
 
+type Biz = { business?: boolean; businessName?: string | null; minRechargeCents?: number };
+const biz = (): Biz => (state ?? {}) as Biz;
+let bizPack = '';
+
+function openBiz(packId?: string): void {
+  const min = biz().minRechargeCents ?? 10000;
+  const pack = (state?.packs ?? []).filter((p) => p.cents >= min).sort((a, b) => a.cents - b.cents)[0];
+  bizPack = packId || pack?.id || '';
+  const chosen = (state?.packs ?? []).find((p) => p.id === bizPack);
+  $('biz-amount').textContent = usd(chosen?.cents ?? min);
+  $<HTMLInputElement>('biz-name').value = biz().businessName ?? '';
+  $('biz-error').textContent = '';
+  $<HTMLDialogElement>('biz-modal').showModal();
+}
+
+$<HTMLFormElement>('biz-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $<HTMLButtonElement>('biz-submit');
+  btn.disabled = true;
+  const businessName = $<HTMLInputElement>('biz-name').value.trim();
+  const taxId = $<HTMLInputElement>('biz-tax').value.trim();
+  const r = await api('/api/account/business', { method: 'POST', body: JSON.stringify({ businessName, taxId }) });
+  btn.disabled = false;
+  if (!r.ok) {
+    $('biz-error').textContent = r.data.error ?? 'Could not save your business details.';
+    return;
+  }
+  (state as Biz).businessName = businessName;
+  $<HTMLDialogElement>('biz-modal').close();
+  location.hash = 'billing';
+  document.querySelector<HTMLButtonElement>(`#packs [data-pack="${CSS.escape(bizPack)}"]`)?.click();
+});
+
 $('new-key').addEventListener('click', () => {
+  if (!biz().business || !(state as { activated?: boolean }).activated) return openBiz();
   $<HTMLInputElement>('create-name').value = '';
   $('create-error').textContent = '';
   $<HTMLDialogElement>('create-modal').showModal();
@@ -216,26 +254,29 @@ $('revoke-confirm').addEventListener('click', async () => {
 
 function renderBilling(): void {
   if (!state) return;
-  const { balance, packs, creditCents } = state;
+  const { balance, packs } = state;
   const lots = (state as { creditLots?: { credits: number; expiresAt: string }[] }).creditLots ?? [];
-  $('balance').textContent = String(balance);
-  $('side-balance').textContent = plural(balance, 'credit');
-  $('balance-sub').textContent = `${plural(balance, 'credit')} = ${plural(balance, 'question')}`
-    + (lots.length ? ` · ${plural(lots[0].credits, 'credit')} expire on ${new Date(lots[0].expiresAt).toLocaleDateString()}` : '');
-  $('per-credit').textContent = `${usd(creditCents)} per credit`;
+  const ap = state.apiPrice ?? { startCents: 900, questionCents: 630 };
+  $('balance').textContent = usd2(balance);
+  $('side-balance').textContent = usd2(balance);
+  $('balance-sub').textContent = `About ${plural(Math.floor(balance / ap.questionCents), 'follow-up question')} at ${usd2(ap.questionCents)} each`
+    + (lots.length ? ` · ${usd2(lots[0].credits)} expires on ${new Date(lots[0].expiresAt).toLocaleDateString()}` : '');
+  $('per-credit').textContent = `Start ${usd2(ap.startCents)} · follow-up ${usd2(ap.questionCents)} (${state.apiDiscountPercent ?? 10}% below standard)`;
   $('packs').innerHTML = packs.map((p) => `
     <div class="d-pack">
-      <div class="d-pack-credits">${plural(p.credits, 'credit')}</div>
-      <div class="d-muted d-small">${plural(p.credits, 'question')}</div>
-      <div class="d-pack-price">${usd(p.cents)}</div>
-      <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Buy ${usd(p.cents)}</button>
+      <div class="d-pack-credits">${usd(p.cents)}</div>
+      <div class="d-muted d-small">about ${plural(Math.floor(p.cents / ap.questionCents), 'question')}</div>
+      <div class="d-pack-price">${usd(withFee(p.cents))}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
+      <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Add ${usd(p.cents)}</button>
     </div>`).join('');
+  renderAutoRecharge();
 }
 
 $('packs').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pack]');
   if (!btn) return;
-  if (!(await confirmPurchase('api', (btn.textContent ?? '').replace(/^Buy\s*/, '')))) return;
+  if (!biz().businessName) return openBiz(btn.dataset.pack);
+  if (!(await confirmPurchase('api', `${usd(withFee((state?.packs ?? []).find((p) => p.id === btn.dataset.pack)?.cents ?? 0))}${taxFeeNote(state?.taxFeePercent ?? 0)}`, { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0 }))) return;
   $('buy-error').textContent = '';
   btn.disabled = true;
   btn.textContent = 'Opening secure checkout…';
@@ -249,6 +290,50 @@ $('packs').addEventListener('click', async (e) => {
   $('buy-error').textContent = r.data.error ?? 'Could not start checkout.';
   renderBilling();
 });
+
+/* ---------- auto-recharge ---------- */
+
+const withFee = (cents: number) => cents + Math.round((cents * (state?.taxFeePercent ?? 0)) / 100);
+
+function renderAutoRecharge(): void {
+  const b = state?.billing;
+  if (!b || !state) return;
+  $('ar-card').textContent = b.card ? `Card •••• ${b.card.last4} saved` : 'Your card is saved with your first purchase.';
+  $<HTMLInputElement>('ar-on').checked = b.apiAutoRecharge;
+  $<HTMLInputElement>('ar-credits').value = String(Math.round(b.apiAutoRechargeCents / 100));
+  $<HTMLInputElement>('ar-cap').value = String(Math.round(b.apiAutoRechargeCapCents / 100));
+  $('ar-sub').textContent = arText(b);
+}
+
+const arText = (b: BillingInfo): string =>
+  `When your wallet drops below ${usd(b.apiLowCents)}, we add ${usd(b.apiAutoRechargeCents)} to your wallet for ${usd(withFee(b.apiAutoRechargeCents))}${taxFeeNote(state?.taxFeePercent ?? 0)}, up to ${usd(b.apiAutoRechargeCapCents)} a month.`;
+
+$('ar-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = $<HTMLButtonElement>('ar-save');
+  btn.disabled = true;
+  btn.classList.add('is-busy');
+  btn.textContent = 'Saving…';
+  const r = await saveBilling({
+    apiAutoRecharge: $<HTMLInputElement>('ar-on').checked, ack: 'api',
+    apiAutoRechargeCents: Math.max(10, Math.min(1000, Math.round(Number($<HTMLInputElement>('ar-credits').value) || 100))) * 100,
+    apiAutoRechargeCapCents: Math.max(0, Math.min(10000, Math.round(Number($<HTMLInputElement>('ar-cap').value) || 0))) * 100,
+  });
+  btn.disabled = false;
+  btn.classList.remove('is-busy');
+  btn.textContent = 'Save';
+  if (r && state) state.billing = r;
+  renderAutoRecharge();
+  showBanner(r ? 'Auto-recharge settings saved.' : 'Could not save. Please try again.');
+});
+
+async function maybeApiNotice(): Promise<void> {
+  const b = state?.billing;
+  if (!b?.card || b.apiAutoRechargeAcked || !state) return;
+  const r = await autoChargeNotice('api', b, `${arText(b)} Change or turn it off under Credits & billing.`);
+  if (r && state) state.billing = r;
+  renderAutoRecharge();
+}
 
 /* ---------- usage ---------- */
 
@@ -272,7 +357,7 @@ function renderUsage(): void {
       <tr>
         <td>${fmtDate(e.created_at, true)}</td>
         <td>${esc(REASONS[e.reason] ?? e.reason)}</td>
-        <td class="d-num ${e.delta > 0 ? 'd-pos' : ''}">${e.delta > 0 ? '+' : '−'}${Math.abs(e.delta)}</td>
+        <td class="d-num ${e.delta > 0 ? 'd-pos' : ''}">${e.delta > 0 ? '+' : '−'}${usd2(Math.abs(e.delta))}</td>
         <td class="d-mono">${thread ? `<span title="${esc(thread)}">${esc(thread)}</span>` : '—'}</td>
         <td>${esc(key)}</td>
       </tr>`;
@@ -287,7 +372,7 @@ function renderQuickstart(): void {
   const base = location.origin;
   $('quickstart-code').textContent = `export KAALERA_API_KEY=kal_live_...
 
-# 1. Start a consultation (1 credit)
+# 1. Start a consultation (2 credits)
 curl -s ${base}/v1/consultations \\
   -H "Authorization: Bearer $KAALERA_API_KEY" \\
   -H "Content-Type: application/json" \\
@@ -298,7 +383,7 @@ curl -s ${base}/v1/consultations \\
     "timeOfBirth": "5:24 PM",
     "placeOfBirth": "Etobicoke, Ontario, Canada",
     "timezone": "America/Toronto",
-    "question": "What does her chart say about her studies?"
+    "question": "What do her stars say about her studies?"
   }'
 
 # 2. Poll until a message with "role": "kaal" arrives
