@@ -3,7 +3,7 @@
 import { disclaimer, type AutoPrices } from '../disclaimer.js';
 
 const LABEL = {
-  chat: 'I agree to the Terms, no refunds, and auto-reload of 2 questions when I run out.',
+  chat: 'I agree to the Terms & Conditions.',
   api: 'I agree to the Terms, no refunds, and auto-recharge (I can change or turn it off any time).',
 } as const;
 
