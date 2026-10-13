@@ -122,7 +122,7 @@ export const postCard = (p: Post, featured = false): string => `
 
 export const askKaalCard = (): string => `
 <div class="b-ask">
-  <div class="b-ask-head"><img src="/kaal-mark.svg" alt="" width="44" height="44" style="background:#fff;border-radius:50%;padding:6px;box-sizing:border-box"><div><strong>Kaal</strong><span>AI astrologer</span></div></div>
+  <div class="b-ask-head"><img class="b-ask-av" src="/kaal-mark.svg" alt="" width="44" height="44"><div><strong>Kaal</strong><span>AI astrologer</span></div></div>
   <p>Ask about your career, marriage, money or health. Kaal reads your own Kundli and gives dates and remedies. Your first question is free.</p>
   <a class="w-cta big" href="/">Ask Kaal free</a>
   <ul><li><a href="/">When will my career grow?</a></li><li><a href="/">When will I get married?</a></li><li><a href="/">Why was last year so hard?</a></li></ul>

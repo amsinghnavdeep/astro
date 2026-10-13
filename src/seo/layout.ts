@@ -79,7 +79,7 @@ ${(m.jsonLd ?? []).map((o) => `<script type="application/ld+json">${ldJson(o)}</
 </head>
 <body>
 <header class="w-top">
-  <a class="w-brand" href="/"><img src="/kaal-mark.svg" alt="" width="26" height="26"> Kaalera</a>
+  <a class="w-brand" href="/"><img class="w-brand-mark" src="/kaal-mark.svg" alt="" width="26" height="26"> Kaalera</a>
   <nav class="w-nav" aria-label="Main">
     <a href="/kundli">Kundli</a><a href="/blog">Blog</a><a href="/developers">Developers</a><a href="/docs">API docs</a><a href="/affiliates">Affiliates</a><a href="/influencers">Influencers</a><a href="/contact">Contact</a>
     <button class="theme-toggle" type="button" aria-label="Switch dark or light mode"></button>

@@ -941,7 +941,7 @@ app.route('/api/admin', admin);
 /* ---------- public SEO pages: server-rendered, edge-cached, refreshed on every blog change ---------- */
 
 /** Bump when public page HTML or headers change so cached copies are replaced. */
-const PUBLIC_CACHE_REV = '2026-10-no-vedic-1';
+const PUBLIC_CACHE_REV = '2026-10-no-vedic-1-logo2';
 const PUBLIC_CSP = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
 const CONTENT_TYPE = { html: 'text/html; charset=utf-8', xml: 'application/xml; charset=utf-8', rss: 'application/rss+xml; charset=utf-8', text: 'text/plain; charset=utf-8' } as const;
 const edgeCache = (): Cache | undefined => (typeof caches === 'undefined' ? undefined : (caches as unknown as { default: Cache }).default);
