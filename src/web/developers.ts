@@ -4,7 +4,7 @@ import { autoChargeNotice, saveBilling, type BillingInfo } from './billing.js';
 type Key = { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
 type Entry = { id: string; delta: number; reason: string; ref: string; api_key_id: string | null; thread_id: string | null; created_at: string };
 type Pack = { id: string; credits: number; cents: number };
-type Developer = { keys: Key[]; balance: number; ledger: Entry[]; packs: Pack[]; creditCents: number; taxFeePercent: number; billing?: BillingInfo };
+type Developer = { keys: Key[]; balance: number; ledger: Entry[]; packs: Pack[]; creditCents: number; taxFeePercent: number; billing?: BillingInfo; apiPrice?: { startCents: number; questionCents: number }; apiDiscountPercent?: number };
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const TABS = ['keys', 'billing', 'usage'] as const;
@@ -14,6 +14,7 @@ let state: Developer | null = null;
 let revokeTarget: Key | null = null;
 let signinPoll: number | undefined;
 
+const usd2 = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const usd = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 const plural = (n: number, word: string) => `${n} ${word}${Math.abs(n) === 1 ? '' : 's'}`;
 const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
@@ -219,13 +220,21 @@ $('revoke-confirm').addEventListener('click', async () => {
 
 function renderBilling(): void {
   if (!state) return;
-  const { balance, packs, creditCents } = state;
+  const { balance, packs } = state;
   const lots = (state as { creditLots?: { credits: number; expiresAt: string }[] }).creditLots ?? [];
-  $('balance').textContent = String(balance);
-  $('side-balance').textContent = plural(balance, 'credit');
-  $('balance-sub').textContent = `${plural(balance, 'credit')} = ${plural(balance, 'question')}`
-    + (lots.length ? ` · ${plural(lots[0].credits, 'credit')} expire on ${new Date(lots[0].expiresAt).toLocaleDateString()}` : '');
-  $('per-credit').textContent = `${usd(creditCents)} per credit`;
+  const ap = state.apiPrice ?? { startCents: 900, questionCents: 630 };
+  $('balance').textContent = usd2(balance);
+  $('side-balance').textContent = usd2(balance);
+  $('balance-sub').textContent = `About ${plural(Math.floor(balance / ap.questionCents), 'follow-up question')} at ${usd2(ap.questionCents)} each`
+    + (lots.length ? ` · ${usd2(lots[0].credits)} expires on ${new Date(lots[0].expiresAt).toLocaleDateString()}` : '');
+  $('per-credit').textContent = `Start ${usd2(ap.startCents)} · follow-up ${usd2(ap.questionCents)} (${state.apiDiscountPercent ?? 10}% below standard)`;
+  $('packs').innerHTML = packs.map((p) => `
+    <div class="d-pack">
+      <div class="d-pack-credits">${usd(p.cents)}</div>
+      <div class="d-muted d-small">about ${plural(Math.floor(p.cents / ap.questionCents), 'question')}</div>
+      <div class="d-pack-price">${usd(p.cents)}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
+      <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Add ${usd(p.cents)}</button>
+    </div>`).join('');
   renderAutoRecharge();
   $('packs').innerHTML = packs.map((p) => `
     <div class="d-pack">
@@ -263,11 +272,13 @@ function renderAutoRecharge(): void {
   if (!b || !state) return;
   $('ar-card').textContent = b.card ? `Card •••• ${b.card.last4} saved` : 'Your card is saved with your first purchase.';
   $<HTMLInputElement>('ar-on').checked = b.apiAutoRecharge;
-  $<HTMLInputElement>('ar-credits').value = String(b.apiAutoRechargeCredits);
+  $<HTMLInputElement>('ar-credits').value = String(Math.round(b.apiAutoRechargeCents / 100));
   $<HTMLInputElement>('ar-cap').value = String(Math.round(b.apiAutoRechargeCapCents / 100));
-  const pack = b.apiAutoRechargeCredits * state.creditCents;
-  $('ar-sub').textContent = `When your balance drops below ${b.apiLowCredits} credits, we buy ${plural(b.apiAutoRechargeCredits, 'credit')} for ${usd(withFee(pack))} (${usd(pack)}${taxFeeNote(state.taxFeePercent)}), up to ${usd(b.apiAutoRechargeCapCents)} a month.`;
+  $('ar-sub').textContent = arText(b);
 }
+
+const arText = (b: BillingInfo): string =>
+  `When your wallet drops below ${usd(b.apiLowCents)}, we add ${usd(b.apiAutoRechargeCents)} for ${usd(withFee(b.apiAutoRechargeCents))} (${usd(b.apiAutoRechargeCents)}${taxFeeNote(state?.taxFeePercent ?? 0)}), up to ${usd(b.apiAutoRechargeCapCents)} a month.`;
 
 $('ar-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -277,7 +288,7 @@ $('ar-form').addEventListener('submit', async (e) => {
   btn.textContent = 'Saving…';
   const r = await saveBilling({
     apiAutoRecharge: $<HTMLInputElement>('ar-on').checked, ack: 'api',
-    apiAutoRechargeCredits: Math.max(2, Math.min(200, Math.round(Number($<HTMLInputElement>('ar-credits').value) || 10))),
+    apiAutoRechargeCents: Math.max(10, Math.min(1000, Math.round(Number($<HTMLInputElement>('ar-credits').value) || 100))) * 100,
     apiAutoRechargeCapCents: Math.max(0, Math.min(10000, Math.round(Number($<HTMLInputElement>('ar-cap').value) || 0))) * 100,
   });
   btn.disabled = false;
@@ -291,8 +302,7 @@ $('ar-form').addEventListener('submit', async (e) => {
 async function maybeApiNotice(): Promise<void> {
   const b = state?.billing;
   if (!b?.card || b.apiAutoRechargeAcked || !state) return;
-  const pack = b.apiAutoRechargeCredits * state.creditCents;
-  const r = await autoChargeNotice('api', b, `When your balance drops below ${b.apiLowCredits} credits, we automatically buy ${plural(b.apiAutoRechargeCredits, 'credit')} for ${usd(withFee(pack))} (${usd(pack)}${taxFeeNote(state.taxFeePercent)}), up to ${usd(b.apiAutoRechargeCapCents)} a month. Change or turn it off under Credits & billing.`);
+  const r = await autoChargeNotice('api', b, `${arText(b)} Change or turn it off under Credits & billing.`);
   if (r && state) state.billing = r;
   renderAutoRecharge();
 }
@@ -319,7 +329,7 @@ function renderUsage(): void {
       <tr>
         <td>${fmtDate(e.created_at, true)}</td>
         <td>${esc(REASONS[e.reason] ?? e.reason)}</td>
-        <td class="d-num ${e.delta > 0 ? 'd-pos' : ''}">${e.delta > 0 ? '+' : '−'}${Math.abs(e.delta)}</td>
+        <td class="d-num ${e.delta > 0 ? 'd-pos' : ''}">${e.delta > 0 ? '+' : '−'}${usd2(Math.abs(e.delta))}</td>
         <td class="d-mono">${thread ? `<span title="${esc(thread)}">${esc(thread)}</span>` : '—'}</td>
         <td>${esc(key)}</td>
       </tr>`;

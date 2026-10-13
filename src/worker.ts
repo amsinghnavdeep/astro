@@ -24,7 +24,7 @@ import {
 
 import { support } from './support.js';
 import { checkoutNote, disclaimer } from './disclaimer.js';
-import { API_START_CREDITS, apiActivated, apiPacks, getPrices, taxesAndFees } from './settings.js';
+import { API_DISCOUNT_PERCENT, apiActivated, apiPrice, apiPacks, getPrices, taxesAndFees } from './settings.js';
 
 const usdCents = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 import { admin } from './admin.js';
@@ -167,7 +167,7 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
       `INSERT INTO payments (stripe_session_id, user_id, thread_id, kind, amount_cents, currency, created_at)
        VALUES (?, ?, NULL, 'api_credits', ?, ?, ?) ON CONFLICT(stripe_session_id) DO NOTHING`,
     ).bind(s.id, m.userId, s.amount_total ?? 0, s.currency ?? env.stripe.currency, new Date().toISOString()).run();
-    if (ins.meta?.changes) await sendReceipt(db, m.userId, { ...receipt, item: `${m.credits} API credits`, api: true });
+    if (ins.meta?.changes) await sendReceipt(db, m.userId, { ...receipt, item: `API wallet top-up ${usdCents(Number(m.credits))}`, api: true });
     return { kind, threadId: null };
   }
   const t = await applyPayment(db, {
@@ -522,7 +522,7 @@ app.get('/api/developer', async (c) => {
   const db = c.env.DB;
   const pr = await getPrices(db);
   const [keys, balance, ledger] = await Promise.all([listApiKeys(db, user.id), apiBalance(db, user.id), listApiLedger(db, user.id)]);
-  return c.json({ keys, balance, ledger, packs: apiPacks(pr), creditCents: pr.apiCreditCents, taxFeePercent: pr.taxFeePercent,
+  return c.json({ keys, balance, ledger, packs: apiPacks(pr), creditCents: pr.apiCreditCents, taxFeePercent: pr.taxFeePercent, apiPrice: apiPrice(pr), apiDiscountPercent: API_DISCOUNT_PERCENT,
     activated: await apiActivated(db, user.id, pr), minRechargeCents: pr.apiMinRechargeCents, creditLots: await creditLots(db, 'api', user.id),
     billing: publicBilling(await getBilling(db, user.id)) });
 });
@@ -555,7 +555,7 @@ app.post('/api/developer/checkout', async (c) => {
   if (!agreedIn(body)) return c.json(CONSENT_REQUIRED, 400);
   const url = await createCheckout(c, user, {
     kind: 'api_credits', credits: pack.credits, cents: pack.cents,
-    name: `Kaalera API — ${pack.credits} question credits`, returnPath: '/developers',
+    name: `Kaalera API wallet — ${usdCents(pack.cents)}`, returnPath: '/developers',
   });
   return c.json({ checkoutUrl: url });
 });
@@ -593,7 +593,10 @@ const apiConsultation = (t: Thread, messages?: Awaited<ReturnType<typeof listMes
   ...(messages ? { messages: messages.map((m) => ({ id: m.id, role: m.role === 'pandit' ? 'kaal' : 'user', content: m.body, created_at: m.created_at })) } : {}),
 });
 
-app.get('/v1/balance', async (c) => c.json({ credits: await apiBalance(c.env.DB, c.get('api').userId) }));
+app.get('/v1/balance', async (c) => {
+  const cents = await apiBalance(c.env.DB, c.get('api').userId);
+  return c.json({ balance_cents: cents, balance_usd: (cents / 100).toFixed(2), currency: 'usd' });
+});
 
 app.post('/v1/consultations', async (c) => {
   const { userId, keyId } = c.get('api');
@@ -605,25 +608,19 @@ app.post('/v1/consultations', async (c) => {
   const chart = await chartText(p.data);
   if (!chart) return apiError(c, 400, 'chart_failed', 'Could not compute the chart. Check date, time, place and timezone.');
   const t = newThread(userId, p.data, chart, p.data.question, { source: 'api', api_key_id: keyId });
-  if ((await apiBalance(db, userId)) < API_START_CREDITS) await autoRechargeApi(db, userId, API_START_CREDITS);
+  const price = apiPrice(await getPrices(db));
+  if ((await apiBalance(db, userId)) < price.startCents) await autoRechargeApi(db, userId, price.startCents);
   const ref = `consultation:${t.id}`;
-  const refs = Array.from({ length: API_START_CREDITS }, (_, i) => (i ? `${ref}:${i + 1}` : ref));
-  const spent: string[] = [];
-  for (const r of refs) {
-    if (!(await spendApiCredit(db, userId, r, keyId, t.id))) break;
-    spent.push(r);
-  }
-  if (spent.length < refs.length) {
-    for (const r of spent) await refundApiCredit(db, userId, r);
-    return apiError(c, 402, 'insufficient_credits', `Starting a consultation needs ${API_START_CREDITS} API credits. Buy more at /developers.`);
+  if (!(await spendApiCredit(db, userId, ref, keyId, t.id, price.startCents))) {
+    return apiError(c, 402, 'insufficient_credits', `Starting a consultation costs ${usdCents(price.startCents)}. Recharge your wallet at /developers.`);
   }
   await createThreadWithQuestion(db, t, p.data.question);
   try {
     const started = await startThreadSession(db, t);
-    return c.json({ consultation: apiConsultation(started, await listMessages(db, started.id)), credits_remaining: await apiBalance(db, userId) }, 201);
+    return c.json({ consultation: apiConsultation(started, await listMessages(db, started.id)), balance_cents: await apiBalance(db, userId) }, 201);
   } catch (err) {
     console.error('API session start failed:', err);
-    for (const r of refs) await refundApiCredit(db, userId, r);
+    await refundApiCredit(db, userId, ref);
     return apiError(c, 503, 'unavailable', 'Kaal is unavailable right now. You were not charged.');
   }
 });
@@ -645,7 +642,7 @@ app.get('/v1/consultations/:id', async (c) => {
 });
 
 const API_SEND_ERRORS: Record<SendError, [402 | 409 | 429 | 503, string, string]> = {
-  no_questions: [402, 'insufficient_credits', 'Not enough API credits.'],
+  no_questions: [402, 'insufficient_credits', 'Not enough balance in your API wallet. Recharge at /developers.'],
   expired: [409, 'consultation_closed', 'Consultations close 7 days after they start. Create a new one.'],
   too_many_pending: [429, 'answer_pending', 'Wait for the current answer before asking again.'],
   thread_unavailable: [409, 'consultation_not_ready', 'The consultation is not ready yet.'],
@@ -657,14 +654,15 @@ app.post('/v1/consultations/:id/questions', async (c) => {
   if (!t) return apiError(c, 404, 'not_found', 'Consultation not found.');
   const p = z.object({ question: questionText(), language: z.enum(LANGUAGES).optional() }).safeParse(await c.req.json().catch(() => null));
   if (!p.success) return apiError(c, 400, 'invalid_request', `question is required (2–${env.chat.maxMessageChars} characters).`);
-  if ((await apiBalance(c.env.DB, t.user_id)) < 1) await autoRechargeApi(c.env.DB, t.user_id, 1);
+  const qCents = apiPrice(await getPrices(c.env.DB)).questionCents;
+  if ((await apiBalance(c.env.DB, t.user_id)) < qCents) await autoRechargeApi(c.env.DB, t.user_id, qCents);
   const r = await sendCustomerMessage(c.env.DB, t, p.data.question, p.data.language);
   if (!r.error) background(c, autoRechargeApi(c.env.DB, t.user_id));
   if (r.error) {
     const [status, code, message] = API_SEND_ERRORS[r.error];
     return apiError(c, status, code, message);
   }
-  return c.json({ question_id: r.message!.id, status: 'answering', credits_remaining: await apiBalance(c.env.DB, t.user_id) }, 202);
+  return c.json({ question_id: r.message!.id, status: 'answering', balance_cents: await apiBalance(c.env.DB, t.user_id) }, 202);
 });
 
 app.put('/api/billing', async (c) => {
@@ -672,19 +670,19 @@ app.put('/api/billing', async (c) => {
   if (!user) return unauth(c);
   const p = z.object({
     chatAutoCharge: z.boolean().optional(), apiAutoRecharge: z.boolean().optional(), ack: z.enum(['chat', 'api']).optional(),
-    apiAutoRechargeCredits: z.number().int().min(2).max(200).optional(), apiAutoRechargeCapCents: z.number().int().min(0).max(1_000_000).optional(),
+    apiAutoRechargeCents: z.number().int().min(1000).max(100_000).optional(), apiAutoRechargeCapCents: z.number().int().min(0).max(1_000_000).optional(),
   }).safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: 'Invalid settings.' }, 400);
   const d = p.data;
   const now = new Date().toISOString();
   await c.env.DB.prepare(`UPDATE users SET
       chat_autocharge = COALESCE(?, chat_autocharge), api_autorecharge = COALESCE(?, api_autorecharge),
-      api_autorecharge_credits = COALESCE(?, api_autorecharge_credits), api_autorecharge_cap_cents = COALESCE(?, api_autorecharge_cap_cents),
+      api_autorecharge_cents = COALESCE(?, api_autorecharge_cents), api_autorecharge_cap_cents = COALESCE(?, api_autorecharge_cap_cents),
       chat_autocharge_ack_at = CASE WHEN ? = 'chat' THEN ? ELSE chat_autocharge_ack_at END,
       api_autorecharge_ack_at = CASE WHEN ? = 'api' THEN ? ELSE api_autorecharge_ack_at END
     WHERE id = ?`).bind(
     d.chatAutoCharge === undefined ? null : Number(d.chatAutoCharge), d.apiAutoRecharge === undefined ? null : Number(d.apiAutoRecharge),
-    d.apiAutoRechargeCredits ?? null, d.apiAutoRechargeCapCents ?? null, d.ack ?? null, now, d.ack ?? null, now, user.id).run();
+    d.apiAutoRechargeCents ?? null, d.apiAutoRechargeCapCents ?? null, d.ack ?? null, now, d.ack ?? null, now, user.id).run();
   return c.json({ billing: publicBilling(await getBilling(c.env.DB, user.id)) });
 });
 

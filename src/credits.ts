@@ -38,22 +38,23 @@ export const creditBalance = async (db: D1Database, pool: Pool, userId: string):
   (await creditLots(db, pool, userId)).reduce((n, l) => n + l.credits, 0);
 
 export async function spendCredit(
-  db: D1Database, pool: Pool, userId: string, ref: string, o: { keyId?: string | null; threadId?: string | null } = {},
+  db: D1Database, pool: Pool, userId: string, ref: string, o: { keyId?: string | null; threadId?: string | null; amount?: number } = {},
 ): Promise<boolean> {
-  if ((await creditBalance(db, pool, userId)) < 1) return false;
+  const amount = o.amount ?? 1;
+  if ((await creditBalance(db, pool, userId)) < amount) return false;
   const r = await db.prepare(
     `INSERT INTO ${TABLE[pool]} (id, user_id, delta, reason, ref, api_key_id, thread_id, created_at)
-     SELECT ?, ?, -1, 'question', ?, ?, ?, ?
-     WHERE (SELECT COALESCE(SUM(delta), 0) FROM ${TABLE[pool]} WHERE user_id = ?) >= 1
+     SELECT ?, ?, ?, 'question', ?, ?, ?, ?
+     WHERE (SELECT COALESCE(SUM(delta), 0) FROM ${TABLE[pool]} WHERE user_id = ?) >= ?
      ON CONFLICT(ref) DO NOTHING`,
-  ).bind(crypto.randomUUID(), userId, ref, o.keyId ?? null, o.threadId ?? null, nowIso(), userId).run();
+  ).bind(crypto.randomUUID(), userId, -amount, ref, o.keyId ?? null, o.threadId ?? null, nowIso(), userId, amount).run();
   return (r.meta?.changes ?? 0) > 0;
 }
 
 export async function refundCredit(db: D1Database, pool: Pool, userId: string, ref: string): Promise<void> {
   await db.prepare(
     `INSERT INTO ${TABLE[pool]} (id, user_id, delta, reason, ref, created_at)
-     SELECT ?, ?, 1, 'refund', ?, ? WHERE EXISTS (SELECT 1 FROM ${TABLE[pool]} WHERE ref = ? AND user_id = ?)
+     SELECT ?, ?, -delta, 'refund', ?, ? FROM ${TABLE[pool]} WHERE ref = ? AND user_id = ? AND delta < 0
      ON CONFLICT(ref) DO NOTHING`,
   ).bind(crypto.randomUUID(), userId, `refund:${ref}`, nowIso(), ref, userId).run();
 }

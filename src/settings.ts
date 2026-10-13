@@ -33,9 +33,14 @@ const DB_KEY: Record<PriceKey, string> = {
   taxFeePercent: 'tax_fee_percent',
 };
 const FIELDS = Object.keys(DB_KEY) as PriceKey[];
-const API_PACK_SIZES = [10, 20, 100];
+/** Business & API pay this much less than website prices; the API wallet is in USD cents. */
+export const API_DISCOUNT_PERCENT = 10;
+const API_PACK_CENTS = [10_000, 25_000, 50_000];
+export const apiPrice = (p: Prices) => ({
+  startCents: Math.round((p.chatPackCents * (100 - API_DISCOUNT_PERCENT)) / 100),
+  questionCents: Math.round((p.extraQuestionCents * (100 - API_DISCOUNT_PERCENT)) / 100),
+});
 /** Starting an API consultation (with its first question) uses this many credits; each follow-up uses 1. */
-export const API_START_CREDITS = 2;
 const CACHE_MS = 15_000;
 
 const defaults = (): Prices => ({
@@ -44,7 +49,7 @@ const defaults = (): Prices => ({
   chatPackQuestions: 1,
   freeQuestions: env.chat.freeQuestions,
   apiCreditCents: 500,
-  apiMinRechargeCents: 5000,
+  apiMinRechargeCents: 10000,
   taxFeePercent: TAX_FEE_PERCENT_DEFAULT,
 });
 
@@ -83,8 +88,8 @@ export const priceHistory = async (db: D1Database) =>
   (await db.prepare('SELECT key, old_value, new_value, changed_by, changed_at FROM settings_audit ORDER BY id DESC LIMIT 50')
     .all<{ key: string; old_value: string | null; new_value: string; changed_by: string; changed_at: string }>()).results;
 
-export const apiPacks = (p: Prices) =>
-  API_PACK_SIZES.map((credits) => ({ id: `api${credits}`, credits, cents: credits * p.apiCreditCents }));
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export const apiPacks = (_p: Prices) => API_PACK_CENTS.map((cents) => ({ id: `usd${cents / 100}`, credits: cents, cents }));
 
 /** API keys only work once the account has paid at least this much for API credits in total. */
 export async function apiActivated(db: D1Database, userId: string, p: Prices): Promise<boolean> {

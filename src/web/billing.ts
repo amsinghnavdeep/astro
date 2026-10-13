@@ -1,9 +1,9 @@
 /** Saved-card auto-charge (chat) / auto-recharge (API): one-time notice after the first payment and settings calls. */
 export type BillingInfo = {
   card: { last4: string } | null; chatAutoCharge: boolean; chatAutoChargeAcked: boolean; chatAutoDailyMax: number;
-  apiAutoRecharge: boolean; apiAutoRechargeAcked: boolean; apiAutoRechargeCredits: number; apiAutoRechargeCapCents: number; apiLowCredits: number;
+  apiAutoRecharge: boolean; apiAutoRechargeAcked: boolean; apiAutoRechargeCents: number; apiAutoRechargeCapCents: number; apiLowCents: number;
 };
-export type BillingPatch = Partial<Pick<BillingInfo, 'chatAutoCharge' | 'apiAutoRecharge' | 'apiAutoRechargeCredits' | 'apiAutoRechargeCapCents'>> & { ack?: 'chat' | 'api' };
+export type BillingPatch = Partial<Pick<BillingInfo, 'chatAutoCharge' | 'apiAutoRecharge' | 'apiAutoRechargeCents' | 'apiAutoRechargeCapCents'>> & { ack?: 'chat' | 'api' };
 
 export async function saveBilling(patch: BillingPatch): Promise<BillingInfo | null> {
   const res = await fetch('/api/billing', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(patch) });

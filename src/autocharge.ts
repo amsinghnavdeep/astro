@@ -1,7 +1,7 @@
 /**
  * Saved-card billing, on by default:
  *  - chat: when a consultation is out of questions, the next question is charged off-session (extra question + fee).
- *  - API: when the balance drops below API_LOW_CREDITS, a pack is bought off-session, capped per calendar month.
+ *  - API: when the balance drops below API_LOW_CENTS, a pack is bought off-session, capped per calendar month.
  * Any failure (no card, bank verification needed, decline, cap) returns null and the caller falls back to Checkout / 402.
  */
 import type Stripe from 'stripe';
@@ -14,19 +14,19 @@ import { applyPayment, type Thread } from './chat.js';
 import { sendReceiptEmail } from './email.js';
 
 export const CHAT_AUTO_DAILY_MAX = 10;
-export const API_LOW_CREDITS = 2;
+export const API_LOW_CENTS = 1000;
 
 export interface Billing {
   stripe_customer_id: string | null; stripe_pm_id: string | null; card_last4: string | null;
   chat_autocharge: number; chat_autocharge_ack_at: string | null;
-  api_autorecharge: number; api_autorecharge_credits: number; api_autorecharge_cap_cents: number; api_autorecharge_ack_at: string | null;
+  api_autorecharge: number; api_autorecharge_cents: number; api_autorecharge_cap_cents: number; api_autorecharge_ack_at: string | null;
 }
 
 const nowIso = (): string => new Date().toISOString();
 
 export const getBilling = async (db: D1Database, userId: string): Promise<Billing | null> =>
   db.prepare(`SELECT stripe_customer_id, stripe_pm_id, card_last4, chat_autocharge, chat_autocharge_ack_at, api_autorecharge,
-      api_autorecharge_credits, api_autorecharge_cap_cents, api_autorecharge_ack_at FROM users WHERE id = ?`).bind(userId).first<Billing>();
+      api_autorecharge_cents, api_autorecharge_cap_cents, api_autorecharge_ack_at FROM users WHERE id = ?`).bind(userId).first<Billing>();
 
 export async function ensureCustomer(db: D1Database, user: { id: string; email: string; name: string }): Promise<string> {
   const b = await getBilling(db, user.id);
@@ -86,27 +86,26 @@ export async function autoChargeQuestion(db: D1Database, t: Thread, used: number
 }
 
 /** Top up API credits from the saved card when the balance is low. Returns true when credits were added. */
-export async function autoRechargeApi(db: D1Database, userId: string, need = API_LOW_CREDITS): Promise<boolean> {
+export async function autoRechargeApi(db: D1Database, userId: string, need = API_LOW_CENTS): Promise<boolean> {
   const b = await getBilling(db, userId);
   if (!b || !b.api_autorecharge || !b.stripe_pm_id) return false;
   if ((await apiBalance(db, userId)) >= need) return false;
   const p = await getPrices(db);
-  const credits = Math.max(b.api_autorecharge_credits, need);
-  const base = credits * p.apiCreditCents;
+  const base = Math.max(b.api_autorecharge_cents, need);
   const cents = base + taxesAndFees(base, p.taxFeePercent);
   const month = new Date();
   month.setUTCDate(1);
   month.setUTCHours(0, 0, 0, 0);
   if ((await autoSpendSince(db, userId, "'api_credits'", month.toISOString())).cents + cents > b.api_autorecharge_cap_cents) return false;
-  const pi = await chargeSaved(b, cents, `Kaalera API — ${credits} credits (auto-recharge)`, { kind: 'api_credits', userId, credits: String(credits), auto: '1' },
+  const pi = await chargeSaved(b, cents, `Kaalera API wallet — $${(base / 100).toFixed(2)} (auto-recharge)`, { kind: 'api_credits', userId, credits: String(base), auto: '1' },
     `auto-api:${userId}:${Math.floor(Date.now() / 60_000)}`);
   if (!pi) return false;
-  await grantApiCredits(db, userId, credits, `stripe:${pi.id}`);
+  await grantApiCredits(db, userId, base, `stripe:${pi.id}`);
   await db.prepare(
     `INSERT INTO payments (stripe_session_id, user_id, thread_id, kind, amount_cents, currency, created_at, auto)
      VALUES (?, ?, NULL, 'api_credits', ?, ?, ?, 1) ON CONFLICT(stripe_session_id) DO NOTHING`,
   ).bind(pi.id, userId, pi.amount, pi.currency, nowIso()).run();
-  await sendReceipt(db, userId, { item: `${credits} API credits (auto-recharge)`, totalCents: pi.amount, baseCents: base, auto: true, ref: pi.id, api: true });
+  await sendReceipt(db, userId, { item: `API wallet top-up $${(base / 100).toFixed(2)} (auto-recharge)`, totalCents: pi.amount, baseCents: base, auto: true, ref: pi.id, api: true });
   return true;
 }
 
@@ -114,8 +113,8 @@ export const publicBilling = (b: Billing | null) => ({
   card: b?.card_last4 ? { last4: b.card_last4 } : null,
   chatAutoCharge: !!b?.chat_autocharge, chatAutoChargeAcked: !!b?.chat_autocharge_ack_at, chatAutoDailyMax: CHAT_AUTO_DAILY_MAX,
   apiAutoRecharge: !!b?.api_autorecharge, apiAutoRechargeAcked: !!b?.api_autorecharge_ack_at,
-  apiAutoRechargeCredits: b?.api_autorecharge_credits ?? 10, apiAutoRechargeCapCents: b?.api_autorecharge_cap_cents ?? 50000,
-  apiLowCredits: API_LOW_CREDITS,
+  apiAutoRechargeCents: b?.api_autorecharge_cents ?? 10000, apiAutoRechargeCapCents: b?.api_autorecharge_cap_cents ?? 50000,
+  apiLowCents: API_LOW_CENTS,
 });
 
 export const RECEIPT_ITEM = { consultation: 'Kaal consultation (opening question)', topup: 'Extra question' } as const;

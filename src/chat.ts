@@ -6,6 +6,7 @@ import {
   type ChatPersona,
 } from './devin.js';
 import { refundApiCredit, spendApiCredit } from './api.js';
+import { apiPrice, getPrices } from './settings.js';
 import { grantCredits, refundCredit, spendCredit } from './credits.js';
 
 export interface Thread {
@@ -117,7 +118,7 @@ export async function sendCustomerMessage(
   const ref = `question:${id}`;
   let fromCredits = false;
   let spent = t.source === 'api'
-    ? await spendApiCredit(db, t.user_id, ref, t.api_key_id, t.id)
+    ? await spendApiCredit(db, t.user_id, ref, t.api_key_id, t.id, apiPrice(await getPrices(db)).questionCents)
     : ((await db.prepare(
         "UPDATE threads SET questions_used = questions_used + 1 WHERE id = ? AND status = 'active' AND questions_used < questions_allowed AND (expires_at IS NULL OR expires_at > ?)",
       ).bind(t.id, Date.now()).run()).meta?.changes ?? 0) > 0;
