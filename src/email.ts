@@ -54,3 +54,10 @@ export async function sendContactEmails(o: { owner: string; name: string; email:
     `<p>Hi ${escapeHtml(o.name)}, we received your message and will reply to this email, usually within 2 working days.</p>
     <p style="color:#666;font-size:13px">For help with a consultation or payment, you can also raise a ticket at kaalera.com/support.</p>`));
 }
+
+export async function sendReminderEmail(o: { to: string; name: string; area: string; when: string; link: string }): Promise<void> {
+  await sendEmail(o.to, `Your ${o.area.toLowerCase()} window opens now — Kaalera`, layout(`${o.area}: your window is open`,
+    `<p>Kaal predicted <b>${escapeHtml(o.area)}</b> for ${escapeHtml(o.name)} in <b>${escapeHtml(o.when)}</b>. That window starts this month.</p>
+    <p>Ask Kaal what to do now to make the most of it.</p>` + button(o.link, 'Ask Kaal')
+    + '<p style="color:#666;font-size:13px">You asked for this reminder. Astrological guidance only, not professional advice.</p>'));
+}

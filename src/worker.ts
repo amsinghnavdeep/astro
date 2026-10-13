@@ -32,6 +32,7 @@ import { autoChargeQuestion, autoRechargeApi, ensureCustomer, getBilling, public
 import { CONTACT_TOPICS, contactPage, privacyPage, termsPage } from './legal.js';
 import { affiliatesPage, influencersPage } from './programs.js';
 import { isAdmin } from './admin.js';
+import { addReminder, listReminders, sendDueReminders } from './reminders.js';
 import { attributeSignup, captureReferral, connectLink, createInfluencer, grantFriendBonus, partnerState, payoutsCsv, runPayouts, validateCode } from './partners.js';
 import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
 import { layout } from './seo/layout.js';
@@ -504,6 +505,21 @@ app.patch('/api/threads/:id', async (c) => {
   return c.json({ thread: await pubT(c, { ...t, language: p.data.language }) });
 });
 
+app.get('/api/threads/:id/reminders', async (c) => {
+  const t = await ownThread(c);
+  if (!t) return c.json({ error: 'Not found' }, 404);
+  return c.json({ reminders: await listReminders(c.env.DB, t.id) });
+});
+
+app.post('/api/threads/:id/reminders', async (c) => {
+  const t = await ownThread(c);
+  if (!t) return c.json({ error: 'Not found' }, 404);
+  const p = z.object({ area: z.string().trim().min(1).max(80), when: z.string().trim().min(4).max(60) }).safeParse(await c.req.json().catch(() => null));
+  if (!p.success) return c.json({ error: 'Bad reminder.' }, 400);
+  const r = await addReminder(c.env.DB, t.user_id, t.id, p.data.area, p.data.when);
+  return 'error' in r ? c.json(r, 409) : c.json(r);
+});
+
 app.get('/api/threads/:id/card', async (c) => {
   const t = await ownThread(c);
   if (!t) return c.json({ error: 'Not found' }, 404);
@@ -855,9 +871,12 @@ app.onError((err, c) => {
   return c.json({ error: 'Something went wrong.' }, 500);
 });
 
+const PAYOUT_CRON = '0 6 1 * *';
+
 export default {
   fetch: app.fetch,
-  async scheduled(_event: unknown, bindings: { DB: D1Database }, ctx: { waitUntil(p: Promise<unknown>): void }) {
-    ctx.waitUntil(runPayouts(bindings.DB).then((done) => console.log('Influencer payouts:', JSON.stringify(done))));
+  async scheduled(event: { cron: string }, bindings: { DB: D1Database }, ctx: { waitUntil(p: Promise<unknown>): void }) {
+    if (event.cron === PAYOUT_CRON) ctx.waitUntil(runPayouts(bindings.DB).then((done) => console.log('Influencer payouts:', JSON.stringify(done))));
+    else ctx.waitUntil(sendDueReminders(bindings.DB).then((n) => console.log('Reminders sent:', n)));
   },
 };

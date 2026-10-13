@@ -387,3 +387,7 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .k-card-value { font-size: 16px; font-weight: 600; }
 .k-card-sub { font-size: 12px; opacity: .7; }
 .k-card-note { font-size: 12px; opacity: .7; margin-top: 10px; }
+
+.k-tl-remind { margin-top: 6px; font: inherit; font-size: 11px; padding: 3px 8px; border-radius: 999px; border: 1px solid color-mix(in srgb, #e8590c 45%, transparent); background: transparent; color: inherit; cursor: pointer; white-space: nowrap; }
+.k-tl-remind:hover:not(:disabled) { background: color-mix(in srgb, #e8590c 10%, transparent); }
+.k-tl-remind.on { opacity: .75; cursor: default; }

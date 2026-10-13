@@ -35,5 +35,5 @@
     "DEV_LOGIN_LINKS": "false",
     "SUPPORT_EMAIL": "amsinghnavdeep@gmail.com"
   },
-  "triggers": { "crons": ["0 6 1 * *"] }
+  "triggers": { "crons": ["0 6 1 * *", "0 13 * * *"] }
 }

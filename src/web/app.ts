@@ -624,6 +624,7 @@ function openThread(t: Thread): void {
   pending = 0;
   renderedKey = '';
   loadCard(t);
+  loadReminders(t);
   renderThreads();
   closeMenu();
   profileView.hidden = true;
@@ -661,7 +662,7 @@ function messageNode(m: Msg): HTMLElement {
     tl.setAttribute('aria-label', 'Prediction timeline');
     for (const p of parsed.timeline) {
       const item = el('div', 'k-tl-item');
-      item.append(el('span', 'k-tl-dot', TL_GLYPH[p.kind] ?? '✦'), el('span', 'k-tl-area', p.area), el('span', 'k-tl-when', p.when));
+      item.append(el('span', 'k-tl-dot', TL_GLYPH[p.kind] ?? '✦'), el('span', 'k-tl-area', p.area), el('span', 'k-tl-when', p.when), remindButton(p.area, p.when));
       tl.append(item);
     }
     div.append(who, tl);
@@ -684,6 +685,47 @@ function messageNode(m: Msg): HTMLElement {
     div.append(next);
   }
   return div;
+}
+
+let reminders: { threadId: string; keys: Set<string> } | null = null;
+const remKey = (area: string, when: string) => `${area}|${when}`;
+
+function loadReminders(t: Thread): void {
+  if (reminders?.threadId === t.id) return;
+  reminders = { threadId: t.id, keys: new Set() };
+  void api<{ reminders: { area: string; when: string }[] }>(`/api/threads/${encodeURIComponent(t.id)}/reminders`).then(({ ok, data }) => {
+    if (!ok || reminders?.threadId !== t.id) return;
+    reminders.keys = new Set(data.reminders.map((r) => remKey(r.area, r.when)));
+    renderedKey = '';
+    renderMessages(lastMsgs);
+  });
+}
+
+function remindButton(area: string, when: string): HTMLElement {
+  const set = reminders?.keys.has(remKey(area, when));
+  const b = el('button', `k-tl-remind${set ? ' on' : ''}`, set ? '🔔 Reminder set' : '🔔 Remind me') as HTMLButtonElement;
+  b.type = 'button';
+  b.disabled = !!set;
+  b.title = 'Email me when this window starts';
+  b.addEventListener('click', async () => {
+    if (!current) return;
+    b.disabled = true;
+    b.textContent = 'Saving…';
+    const { ok, data } = await api<{ remindOn?: string; error?: string }>(`/api/threads/${encodeURIComponent(current.id)}/reminders`, {
+      method: 'POST', body: JSON.stringify({ area, when }),
+    });
+    if (ok && data.remindOn) {
+      reminders?.keys.add(remKey(area, when));
+      b.classList.add('on');
+      b.textContent = '🔔 Reminder set';
+      showBanner(`We'll email you on ${fmtDate(data.remindOn)} when this window starts.`, 4000);
+    } else {
+      b.disabled = false;
+      b.textContent = '🔔 Remind me';
+      showBanner(data.error ?? 'Could not set the reminder.', 4000);
+    }
+  });
+  return b;
 }
 
 const TL_GLYPH: Record<string, string> = { career: '▲', love: '♥', money: '◆', health: '✚', travel: '✈', family: '●', star: '✦' };
