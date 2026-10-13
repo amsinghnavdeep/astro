@@ -112,9 +112,10 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .msg.kaal { align-self: stretch; }
 .msg.kaal.enter { animation: msg-in .35s ease-out; }
 @keyframes msg-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.msg.kaal.typing .k-next, .msg.kaal.typing .k-timeline .k-tl-remind { visibility: hidden; }
+.msg.kaal.typing .k-next { display: none; }
+.msg.kaal.typing .k-timeline .k-tl-remind { visibility: hidden; }
 .msg.kaal.enter .k-next { animation: msg-in .4s ease-out; }
-.msg.kaal.typing .body > :last-child::after { content: '▍'; color: #e8871e; animation: caret 1s steps(1) infinite; margin-left: 1px; }
+.msg.kaal.typing .k-caret::after { content: '▍'; color: #e8871e; animation: caret 1s steps(1) infinite; margin-left: 1px; }
 @keyframes caret { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .msg.kaal.enter, .msg.kaal.enter .k-next { animation: none; } }
 .who { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 6px; }

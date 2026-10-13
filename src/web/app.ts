@@ -919,12 +919,15 @@ function typeOut(div: HTMLElement): void {
   const body = div.querySelector<HTMLElement>('.body');
   if (!body || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
-  const parts: { node: Text; words: string[] }[] = [];
+  const parts: { node: Text; words: string[]; block: HTMLElement }[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const node = n as Text;
-    parts.push({ node, words: node.data.match(/\S+\s*|\s+/g) ?? [] });
+    const block: HTMLElement = node.parentElement?.closest<HTMLElement>('p, li, h1, h2, h3, h4, blockquote, tr') ?? body;
+    if (block !== body) block.style.display = 'none';
+    parts.push({ node, words: node.data.match(/\S+\s*|\s+/g) ?? [], block });
     node.data = '';
   }
+  let caretAt: HTMLElement | null = null;
   div.classList.add('enter', 'typing');
   let i = 0;
   let w = 0;
@@ -933,12 +936,15 @@ function typeOut(div: HTMLElement): void {
     const stick = nearBottom();
     for (let k = 0; k < 1 && i < parts.length; k++) {
       const p = parts[i];
+      if (p.block.style.display === 'none') p.block.style.display = '';
+      if (caretAt !== p.block && p.block !== body) { caretAt?.classList.remove('k-caret'); caretAt = p.block; caretAt.classList.add('k-caret'); }
       if (w < p.words.length) p.node.data += p.words[w++];
       if (w >= p.words.length) { i++; w = 0; }
     }
     if (stick) scroller.scrollTop = scroller.scrollHeight;
     if (i >= parts.length) {
       clearInterval(typingTimer);
+      caretAt?.classList.remove('k-caret');
       div.classList.remove('typing');
       if (nearBottom()) scroller.scrollTop = scroller.scrollHeight;
     }
