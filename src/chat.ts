@@ -8,6 +8,7 @@ import {
 import { refundApiCredit, spendApiCredit } from './api.js';
 import { apiPrice, getPrices } from './settings.js';
 import { grantCredits, refundCredit, spendCredit } from './credits.js';
+import { onChatPayment } from './partners.js';
 
 export interface Thread {
   id: string; user_id: string; full_name: string; gender: string; date_of_birth: string;
@@ -196,6 +197,7 @@ export async function applyPayment(db: D1Database, p: PaymentInfo): Promise<Thre
   ).bind(p.stripeSessionId, p.userId, p.threadId, p.kind, p.amountCents, p.currency, nowIso()).run();
   if ((ins.meta?.changes ?? 0) === 0) return null;
   await grantCredits(db, 'chat', p.userId, p.credits, `stripe:${p.stripeSessionId}`);
+  await onChatPayment(db, p, (await getPrices(db)).taxFeePercent).catch((err) => console.error('Partner attribution failed:', err));
   if (p.kind === 'consultation' && t.questions_allowed < 1
     && (await spendCredit(db, 'chat', p.userId, `first:${t.id}`, { threadId: t.id }))) {
     await db.prepare('UPDATE threads SET questions_allowed = 1 WHERE id = ?').bind(t.id).run();

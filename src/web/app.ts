@@ -982,3 +982,9 @@ async function boot(): Promise<void> {
 }
 
 boot();
+
+{
+  const q = new URLSearchParams(location.search);
+  const ref = q.get('ref'), code = q.get('code');
+  if (ref || code) void fetch('/api/ref', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ref, code }) });
+}

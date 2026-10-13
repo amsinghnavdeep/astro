@@ -31,6 +31,8 @@ import { admin } from './admin.js';
 import { autoChargeQuestion, autoRechargeApi, ensureCustomer, getBilling, publicBilling, RECEIPT_ITEM, saveCardFromCheckout, sendReceipt } from './autocharge.js';
 import { CONTACT_TOPICS, contactPage, privacyPage, termsPage } from './legal.js';
 import { affiliatesPage, influencersPage } from './programs.js';
+import { isAdmin } from './admin.js';
+import { attributeSignup, captureReferral, connectLink, createInfluencer, grantFriendBonus, partnerState, payoutsCsv, runPayouts, validateCode } from './partners.js';
 import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
 import { layout } from './seo/layout.js';
 import { TOPICS, topicPage } from './seo/topics.js';
@@ -273,10 +275,69 @@ app.post('/api/login', async (c) => {
 app.get('/auth/verify', async (c) => {
   const session = await redeemLoginToken(c.env.DB, c.req.query('token') ?? '');
   if (!session) return c.redirect('/?login=expired');
+  const fresh = await userForSession(c.env.DB, session);
+  if (fresh) await attributeSignup(c, c.env.DB, fresh, await freeKeys(c)).catch((err) => console.error('Referral attribution failed:', err));
   setCookie(c, COOKIE, session, {
     httpOnly: true, sameSite: 'Lax', path: '/', secure: env.siteUrl.startsWith('https'), maxAge: 60 * 60 * 24 * 30,
   });
   return c.redirect('/');
+});
+
+app.post('/api/ref', async (c) => {
+  const b = (await c.req.json().catch(() => ({}))) as { ref?: unknown; code?: unknown };
+  const str = (v: unknown) => (typeof v === 'string' ? v.slice(0, 40) : undefined);
+  await captureReferral(c, c.env.DB, { ref: str(b.ref), code: str(b.code) }, env.siteUrl.startsWith('https'));
+  return c.json({ ok: true });
+});
+
+app.get('/api/partner', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  c.header('Cache-Control', 'no-store');
+  return c.json(await partnerState(c.env.DB, user, env.siteUrl));
+});
+
+app.post('/api/partner/code', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  const b = (await c.req.json().catch(() => ({}))) as { code?: unknown };
+  const v = validateCode(typeof b.code === 'string' ? b.code : '');
+  if ('error' in v) return c.json({ error: v.error }, 400);
+  const r = await createInfluencer(c.env.DB, user.id, v.code);
+  if (r === 'taken') return c.json({ error: 'That code is taken. Try another.' }, 409);
+  if (r === 'exists') return c.json({ error: 'You already have a code.' }, 409);
+  return c.json({ ok: true, code: v.code });
+});
+
+app.post('/api/partner/connect', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  try {
+    const url = await connectLink(c.env.DB, user, env.siteUrl);
+    return url ? c.json({ url }) : c.json({ error: 'Create your code first.' }, 400);
+  } catch (err) {
+    console.error('Stripe Connect link failed:', err);
+    return c.json({ error: 'Payout setup is not available right now.' }, 503);
+  }
+});
+
+app.get('/api/partner/payouts.csv', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  const csv = await payoutsCsv(c.env.DB, user.id);
+  if (csv === null) return c.json({ error: 'Not found' }, 404);
+  return c.body(csv, 200, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="kaalera-payouts.csv"' });
+});
+
+app.put('/api/admin/influencers/:code', async (c) => {
+  const user = c.get('user');
+  if (!user || !isAdmin(user.email)) return c.json({ error: 'Not found' }, 404);
+  const b = (await c.req.json().catch(() => ({}))) as { status?: unknown; percent?: unknown };
+  const status = b.status === 'paused' || b.status === 'active' ? b.status : null;
+  const percent = typeof b.percent === 'number' && Number.isInteger(b.percent) && b.percent >= 0 && b.percent <= 50 ? b.percent : null;
+  const r = await c.env.DB.prepare('UPDATE influencers SET status = COALESCE(?, status), percent = COALESCE(?, percent) WHERE code = ?')
+    .bind(status, percent, c.req.param('code').toUpperCase()).run();
+  return r.meta?.changes ? c.json({ ok: true }) : c.json({ error: 'Not found' }, 404);
 });
 
 app.post('/api/logout', async (c) => {
@@ -373,7 +434,10 @@ app.post('/api/threads', async (c) => {
   if (!chart) return c.json({ error: 'Could not compute this chart. Check the date, time and birthplace.' }, 400);
 
   const free = !blocked && (await claimFreeConsultation(db, user.id));
-  if (free) await recordFreeClaims(db, user.id, keys);
+  if (free) {
+    await recordFreeClaims(db, user.id, keys);
+    await grantFriendBonus(db, user);
+  }
   const t = newThread(user.id, p.data, chart, p.data.question, free ? { is_free: 1, questions_allowed: pr.freeQuestions } : {});
   await createThreadWithQuestion(db, t, p.data.question);
   t.kundli_id = k.id;
@@ -768,4 +832,9 @@ app.onError((err, c) => {
   return c.json({ error: 'Something went wrong.' }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(_event: unknown, bindings: { DB: D1Database }, ctx: { waitUntil(p: Promise<unknown>): void }) {
+    ctx.waitUntil(runPayouts(bindings.DB).then((done) => console.log('Influencer payouts:', JSON.stringify(done))));
+  },
+};

@@ -22,7 +22,9 @@ export const affiliatesPage = (site: string): string => page(site, '/affiliates'
 <li>You can't refer yourself. One free offer per person, device and connection; temporary email addresses are not accepted.</li>
 <li>Rewards are free questions, not cash. For cash rewards, see the <a href="/influencers">Influencer program</a>.</li>
 </ul>
-<p><a class="w-cta" href="/">Sign in to get your link</a></p>`);
+<div id="partner-app" data-kind="affiliates"></div>
+<p class="p-signed-out"><a class="w-cta" href="/">Sign in to get your link</a></p>
+<script type="module" src="/partner.js"></script>`);
 
 export const influencersPage = (site: string): string => page(site, '/influencers', 'Influencer program: earn 10% with your own code',
   'Create your own Kaalera code. Your followers get 2 free questions with Kaal, and you earn 10% of their first paid consultation, paid monthly through Stripe.', `
@@ -46,4 +48,6 @@ export const influencersPage = (site: string): string => page(site, '/influencer
 <li>Free consultations, later consultations and API purchases do not earn commission.</li>
 <li>We may pause a code that breaks our <a href="/terms">Terms</a>.</li>
 </ul>
-<p><a class="w-cta" href="/">Sign in to create your code</a></p>`);
+<div id="partner-app" data-kind="influencers"></div>
+<p class="p-signed-out"><a class="w-cta" href="/">Sign in to create your code</a></p>
+<script type="module" src="/partner.js"></script>`);

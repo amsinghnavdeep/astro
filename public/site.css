@@ -75,3 +75,19 @@ h3 { font-size: 18px; margin: 24px 0 8px; }
 .is-busy::before { content: ""; display: inline-block; width: 1em; height: 1em; margin-right: .5em; vertical-align: -.15em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: k-spin .7s linear infinite; }
 @keyframes k-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .is-busy::before { animation-duration: 2s; } }
+
+/* affiliates / influencers dashboard */
+.p-card{border:1px solid var(--line,#e5e5e5);border-radius:14px;padding:20px;margin:24px 0}
+.p-card h2{margin-top:0}
+.p-link{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.p-link input{flex:1 1 240px;min-width:0;padding:10px 12px;border:1px solid var(--line,#ddd);border-radius:10px;font:inherit;background:transparent;color:inherit}
+.p-btn{display:inline-flex;align-items:center;padding:10px 14px;border-radius:10px;border:1px solid var(--line,#ddd);background:transparent;color:inherit;font:inherit;cursor:pointer;text-decoration:none}
+.p-btn.primary{background:#e8590c;border-color:#e8590c;color:#fff}
+.p-btn:disabled{opacity:.6;cursor:progress}
+.p-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
+.p-stat{border:1px solid var(--line,#eee);border-radius:10px;padding:12px;text-align:center}
+.p-num{font-size:22px;font-weight:700}
+.p-label,.p-muted{color:var(--muted,#6b6b6b);font-size:14px}
+.p-err{color:#c92a2a}.p-ok{color:#2b8a3e}
+.p-table{width:100%;border-collapse:collapse}.p-table td,.p-table th{text-align:left;padding:6px;border-bottom:1px solid var(--line,#eee)}
+@media (max-width:560px){.p-stats{grid-template-columns:1fr 1fr}}
