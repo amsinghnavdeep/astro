@@ -43,11 +43,11 @@ print(res.status_code, res.json())</code></pre></div>
   <li>A key is <strong>shown once</strong>, when you create it. Copy it then; it cannot be shown again.</li>
   <li>Kaalera stores only a <strong>hash</strong> of the key, never the key itself. The dashboard shows its first characters so you can tell keys apart.</li>
   <li><strong>Revoke</strong> a key at any time from the dashboard. It stops working immediately.</li>
-  <li>All keys on your account share the same credit balance.</li>
+  <li>All keys on your account share the same USD wallet.</li>
 </ul>
 
 <h2>Keep keys secret</h2>
-<div class="callout warn"><span class="ic">!</span><p>Never use API keys in browser code, mobile apps or public repositories. Anyone with the key can spend your credits. Call the API from your backend and keep the key in an environment variable or secret manager.</p></div>
+<div class="callout warn"><span class="ic">!</span><p>Never use API keys in browser code, mobile apps or public repositories. Anyone with the key can spend your wallet balance. Call the API from your backend and keep the key in an environment variable or secret manager.</p></div>
 <p>If a key leaks, revoke it in the dashboard and create a new one.</p>
 </article>
 </body>

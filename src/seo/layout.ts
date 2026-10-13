@@ -75,7 +75,7 @@ ${(m.jsonLd ?? []).map((o) => `<script type="application/ld+json">${ldJson(o)}</
 <header class="w-top">
   <a class="w-brand" href="/"><img src="/kaal-mark.svg" alt="" width="26" height="26"> Kaalera</a>
   <nav class="w-nav" aria-label="Main">
-    <a href="/kundli">Kundli</a><a href="/blog">Blog</a><a href="/developers">Developers</a><a href="/docs">API docs</a><a href="/contact">Contact</a>
+    <a href="/kundli">Kundli</a><a href="/blog">Blog</a><a href="/developers">Developers</a><a href="/docs">API docs</a><a href="/affiliates">Affiliates</a><a href="/influencers">Influencers</a><a href="/contact">Contact</a>
     <button class="theme-toggle" type="button" aria-label="Switch dark or light mode"></button>
     <a class="w-cta" href="/">Ask Kaal</a>
   </nav>
@@ -85,7 +85,7 @@ ${main}
 </main>
 <footer class="w-foot">
   <nav aria-label="Topics">${TOPIC_LINKS.map(([href, label]) => `<a href="${href}">${esc(label)}</a>`).join('')}</nav>
-  <nav aria-label="Site"><a href="/">Ask Kaal</a><a href="/blog">Blog</a><a href="/developers">Astrology API</a><a href="/docs">API docs</a><a href="/support">Support</a><a href="/contact">Contact</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>
+  <nav aria-label="Site"><a href="/">Ask Kaal</a><a href="/blog">Blog</a><a href="/developers">Astrology API</a><a href="/docs">API docs</a><a href="/support">Support</a><a href="/affiliates">Affiliates</a><a href="/influencers">Influencers</a><a href="/contact">Contact</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>
   <p>Kaalera — AI Vedic astrology. Guidance for reflection only, not professional advice.</p>
 </footer>
 </body>

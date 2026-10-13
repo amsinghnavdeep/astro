@@ -7,7 +7,7 @@ const page = (site: string, path: string, title: string, description: string, bo
     `<article class="w-article w-legal"><h1>${esc(title)}</h1><p class="w-meta">Last updated ${UPDATED}</p>${body}</article>`);
 
 export const termsPage = (site: string): string => page(site, '/terms', 'Terms & Conditions',
-  'Kaalera terms: astrology guidance only, USD prices plus 15% taxes & fees, auto-charge, credit expiry, no refunds, API rules.', `
+  'Kaalera terms: astrology guidance only, USD prices plus 15% taxes & fees, auto-charge, expiry, no refunds, Business &amp; API rules.', `
 <p>These terms apply to kaalera.com, the Kaal chat and the Kaalera API. By creating an account or paying, you agree to them.</p>
 <h2>1. Guidance only</h2>
 <p>Kaal gives astrological readings for personal reflection and entertainment. Readings are not medical, legal, financial, psychological or other professional advice, and predictions are not guaranteed. Do not make important decisions on a reading alone; consult a qualified professional. Kaal only answers astrology questions and declines other tasks, political and religious debate, and predictions of death.</p>
@@ -18,11 +18,11 @@ export const termsPage = (site: string): string => page(site, '/terms', 'Terms &
 <h2>4. Auto-charge (chat) — on by default</h2>
 <p>When you pay, your card is saved with Stripe. When a consultation runs out of questions and you send another, that question is charged automatically to the saved card at the extra-question price plus taxes &amp; fees, as shown before you pay, up to 10 automatic charges per day. You can turn auto-charge off at any time in your account menu; it stops future charges immediately. Every charge is emailed to you.</p>
 <h2>5. API and auto-recharge — on by default</h2>
-<p>The API is prepaid; there is no free or test API. API keys activate after your API credit purchases total at least the published minimum (currently $50). Starting a consultation uses 2 credits and each follow-up uses 1 credit. After your first recharge your card is saved, and when your balance falls below 2 credits we buy your chosen pack automatically (default 10 credits, $50 + taxes &amp; fees), up to your monthly limit (default $500). You can change or turn this off on the Developers page. You must not resell access to Kaal as a general AI service or try to extract our instructions.</p>
+<p>The API is prepaid from a USD wallet; there is no free or test API. Business &amp; API prices are 10% below the standard website prices (currently $9 to start a consultation and $6.30 per follow-up). API keys activate after your API wallet recharges total at least the published minimum (currently $100). After your first recharge your card is saved, and when your wallet drops below $10 we add your chosen top-up automatically (default $100 + taxes &amp; fees), up to your monthly limit (default $500). You can change or turn off auto-recharge on the Developers page at any time. If a top-up fails, API requests return an insufficient-balance error until you recharge.</p>
 <h2>6. Expiry</h2>
-<p>Chat questions expire 3 months after purchase and API credits 6 months after purchase. A consultation closes 7 days after it starts and then stays readable.</p>
+<p>Chat questions expire 3 months after purchase and API wallet balance 6 months after purchase. A consultation closes 7 days after it starts and then stays readable.</p>
 <h2>7. No refunds</h2>
-<p>All sales are final. We do not refund purchases, automatic charges, unused or expired questions or credits, except where the law requires it. If a question cannot be delivered, its credit is returned automatically.</p>
+<p>All sales are final. We do not refund purchases, automatic charges, unused or expired questions or wallet balance, except where the law requires it. If a question cannot be delivered, its charge is returned automatically as a question or to your API wallet.</p>
 <h2>8. Acceptable use</h2>
 <p>No abuse, scraping, automated sign-ups, attempts to get free questions by evasion, harassment, or unlawful content. We may suspend accounts that break these terms.</p>
 <h2>9. Liability</h2>

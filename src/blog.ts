@@ -119,7 +119,7 @@ ${more.length ? `<section class="w-more"><h2>More from the blog</h2><div class="
 
 /* ---------- crawler files ---------- */
 
-const STATIC_PAGES = ['/', '/blog', '/contact', '/terms', '/privacy', '/developers', '/docs', '/docs/quickstart', '/docs/authentication', '/docs/consultations-create',
+const STATIC_PAGES = ['/', '/blog', '/contact', '/affiliates', '/influencers', '/terms', '/privacy', '/developers', '/docs', '/docs/quickstart', '/docs/authentication', '/docs/consultations-create',
   '/docs/consultations-get', '/docs/questions-create', '/docs/balance', '/docs/languages', '/docs/errors', '/docs/pricing', '/support'];
 
 export function sitemapXml(site: string, posts: Post[]): string {
@@ -156,10 +156,10 @@ export function llmsTxt(site: string, posts: Post[]): string {
 ${TOPIC_LINKS.map(([h, l]) => `- [${l}](${site}${h})`).join('\n')}
 
 ## For developers (AI astrology agent API)
-- [Developers](${site}/developers): create API keys, buy prepaid credits, try the API.
+- [Developers](${site}/developers): create API keys, top up a prepaid USD wallet, try the API.
 - [API quickstart](${site}/docs/quickstart): create a consultation and ask questions over HTTPS with a Bearer key.
 - [Full API reference for AI assistants](${site}/llms-full.txt)
-- Base URL: ${site}/v1 · Auth: \`Authorization: Bearer kal_live_...\` · 1 credit = 1 question.
+- Base URL: ${site}/v1 · Auth: \`Authorization: Bearer kal_live_...\` · Business & API pricing 10% below standard: $9 to start a consultation, $6.30 per follow-up, $100 minimum first recharge.
 
 ## Blog
 ${posts.map((p) => `- [${p.title}](${site}/blog/${p.slug}): ${p.summary}`).join('\n')}

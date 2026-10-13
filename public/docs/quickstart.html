@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quickstart — Kaalera API</title>
-<meta name="description" content="Create an API key, buy credits and get your first answer from Kaal.">
+<meta name="description" content="Create an API key, top up your wallet and get your first answer from Kaal.">
 <link rel="stylesheet" href="/docs/docs.css">
 <script src="/docs/docs.js" defer></script>
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
@@ -12,7 +12,7 @@
 <body data-page="quickstart">
 <article class="d-article">
 <h1>Quickstart</h1>
-<p class="lead">Go from zero to your first answer from Kaal: create a key, add credits, start a consultation, read the answer and ask a follow-up.</p>
+<p class="lead">Go from zero to your first answer from Kaal: create a key, top up your wallet, start a consultation, read the answer and ask a follow-up.</p>
 
 <ol class="steps">
 <li>
@@ -22,8 +22,8 @@
 <div class="code"><pre data-lang="Terminal"><code>export KAALERA_API_KEY=&quot;kal_live_...&quot;</code></pre></div>
 </li>
 <li>
-<h2>Buy credits</h2>
-<p>On the same dashboard, buy a credit pack (10, 20 or 100 credits; your first recharge must be at least $50, which activates your keys). 1 credit = $5: starting a consultation uses 2 credits and each follow-up uses 1. There is no free or test API. Check your balance at any time:</p>
+<h2>Top up your wallet</h2>
+<p>On the same dashboard, add $100, $250 or $500 to your USD wallet (your first recharge must be at least $100, which activates your keys). Business &amp; API pricing is 10% below standard: starting a consultation costs $9 and each follow-up $6.30. There is no free or test API. Check your balance at any time:</p>
 <div class="code"><pre data-lang="cURL"><code>curl {BASE}/v1/balance \
   -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/balance&quot;, {
   headers: { Authorization: `Bearer ${process.env.KAALERA_API_KEY}` },
@@ -37,7 +37,9 @@ res = requests.get(
 )
 print(res.status_code, res.json())</code></pre></div>
 <div class="code"><pre data-lang="Response"><code>{
-  &quot;credits&quot;: 3
+  &quot;balance_cents&quot;: 4370,
+  &quot;balance_usd&quot;: &quot;43.70&quot;,
+  &quot;currency&quot;: &quot;usd&quot;
 }</code></pre></div>
 </li>
 <li>
@@ -105,7 +107,7 @@ print(res.status_code, res.json())</code></pre></div>
     &quot;created_at&quot;: &quot;2026-10-12T02:21:34.792Z&quot;,
     &quot;expires_at&quot;: &quot;2026-10-19T02:21:35.278Z&quot;
   },
-  &quot;credits_remaining&quot;: 2
+  &quot;balance_cents&quot;: 9100
 }</code></pre></div>
 <p>Save <code>consultation.id</code>. The answer is written in the background.</p>
 </li>
@@ -204,7 +206,7 @@ print(res.status_code, res.json())</code></pre></div>
 <div class="code"><pre data-lang="202 Accepted"><code>{
   &quot;question_id&quot;: &quot;52feaba7-c23a-4afb-bf6d-f39ec0b88005&quot;,
   &quot;status&quot;: &quot;answering&quot;,
-  &quot;credits_remaining&quot;: 1
+  &quot;balance_cents&quot;: 8470
 }</code></pre></div>
 <p>Then poll the consultation again, exactly like step 4.</p>
 </li>

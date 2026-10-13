@@ -3,30 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pricing &amp; credits — Kaalera API</title>
-<meta name="description" content="Kaalera API pricing: 1 credit = $5. Starting a consultation costs 2 credits ($10); each follow-up costs 1 credit ($5). No free or test API.">
+<title>Business &amp; API pricing — Kaalera API</title>
+<meta name="description" content="Kaalera Business &amp; API pricing: 10% below standard rates. $9 to start a consultation, $6.30 per follow-up, prepaid USD wallet, $100 minimum first recharge. No free or test API.">
 <link rel="stylesheet" href="/docs/docs.css">
 <script src="/docs/docs.js" defer></script>
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
 </head>
 <body data-page="pricing">
 <article class="d-article">
-<h1>Pricing &amp; credits</h1>
-<p class="lead">Prepaid credits. 1 credit = $5. Starting a consultation costs 2 credits ($10); each follow-up costs 1 credit ($5). No free or test API.</p>
+<h1>Business &amp; API pricing</h1>
+<p class="lead">Business &amp; API pricing is always 10% below standard website rates, paid from a prepaid USD wallet. Starting a consultation costs $9 ($10 on the website); each follow-up costs $6.30 ($7 on the website). No free or test API.</p>
 
-<h2>What costs a credit</h2>
-<div class="table-wrap"><table><thead><tr><th>Request</th><th>Cost</th></tr></thead><tbody><tr><td><a href="/docs/consultations-create"><code>POST /v1/consultations</code></a> (Kundli + opening reading + first answer)</td><td>2 credits ($10)</td></tr><tr><td><a href="/docs/questions-create"><code>POST /v1/consultations/:id/questions</code></a></td><td>1 credit ($5)</td></tr><tr><td><a href="/docs/consultations-get"><code>GET /v1/consultations/:id</code></a></td><td>Free</td></tr><tr><td><a href="/docs/balance"><code>GET /v1/balance</code></a></td><td>Free</td></tr></tbody></table></div>
+<h2>What it costs</h2>
+<div class="table-wrap"><table><thead><tr><th>Request</th><th>Cost</th></tr></thead><tbody><tr><td><a href="/docs/consultations-create"><code>POST /v1/consultations</code></a> (Kundli + opening reading + first answer)</td><td>$9.00</td></tr><tr><td><a href="/docs/questions-create"><code>POST /v1/consultations/:id/questions</code></a></td><td>$6.30</td></tr><tr><td><a href="/docs/consultations-get"><code>GET /v1/consultations/:id</code></a></td><td>Free</td></tr><tr><td><a href="/docs/balance"><code>GET /v1/balance</code></a></td><td>Free</td></tr></tbody></table></div>
 
-<h2>Credit packs</h2>
-<div class="table-wrap"><table><thead><tr><th>Pack</th><th>Price</th></tr></thead><tbody><tr><td>10 credits</td><td>$50 (minimum first recharge)</td></tr><tr><td>20 credits</td><td>$100</td></tr><tr><td>100 credits</td><td>$500</td></tr></tbody></table></div>
-<p>A flat 15% taxes &amp; fees is added to every purchase at checkout. For example, $20 of credits costs $23 in total.</p>
+<h2>Wallet top-ups</h2>
+<div class="table-wrap"><table><thead><tr><th>Top-up</th><th>Note</th></tr></thead><tbody><tr><td>$100</td><td>Minimum first recharge; activates your keys</td></tr><tr><td>$250</td><td></td></tr><tr><td>$500</td><td></td></tr></tbody></table></div>
+<p>A flat 15% taxes &amp; fees is added to every purchase at checkout. For example, a $100 top-up costs $115 in total.</p>
 <p>Buy packs in the <a href="/developers">developer dashboard</a>. Payment is by card through a secure checkout.</p>
 
 <h2>Good to know</h2>
 <ul>
-  <li><strong>Credits expire 6 months after purchase.</strong> The oldest credits are used first; the Developers page shows the next expiry date.</li>
+  <li><strong>Wallet balance expires 6 months after purchase.</strong> The oldest balance is used first; the Developers page shows the next expiry date.</li>
   <li><strong>All sales are final — no refunds.</strong> Kaal's answers are astrological guidance for personal reflection only, not medical, legal, financial or other professional advice, and predictions are not guaranteed.</li>
-  <li><strong>Failed deliveries are not charged.</strong> If Kaal cannot start or a question cannot be delivered (<code>503 unavailable</code>), the credit is not taken or is returned to your balance automatically.</li>
+  <li><strong>Failed deliveries are not charged.</strong> If Kaal cannot start or a question cannot be delivered (<code>503 unavailable</code>), the charge is not taken or is returned to your wallet automatically.</li>
   <li>Requests rejected with a 4xx error (for example <code>invalid_request</code> or <code>answer_pending</code>) cost nothing.</li>
   <li>All keys on an account share one balance. Check it with <a href="/docs/balance"><code>GET /v1/balance</code></a>.</li>
 </ul>

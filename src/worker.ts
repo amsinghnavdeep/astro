@@ -30,6 +30,7 @@ const usdCents = (cents: number): string => `$${(cents / 100).toFixed(cents % 10
 import { admin } from './admin.js';
 import { autoChargeQuestion, autoRechargeApi, ensureCustomer, getBilling, publicBilling, RECEIPT_ITEM, saveCardFromCheckout, sendReceipt } from './autocharge.js';
 import { CONTACT_TOPICS, contactPage, privacyPage, termsPage } from './legal.js';
+import { affiliatesPage, influencersPage } from './programs.js';
 import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
 import { layout } from './seo/layout.js';
 import { TOPICS, topicPage } from './seo/topics.js';
@@ -752,6 +753,8 @@ app.get('/blog/:slug', (c) => publicPage(c, 'html', async () => {
 }));
 app.get('/terms', (c) => publicPage(c, 'html', async () => termsPage(env.siteUrl)));
 app.get('/privacy', (c) => publicPage(c, 'html', async () => privacyPage(env.siteUrl)));
+app.get('/affiliates', (c) => publicPage(c, 'html', async () => affiliatesPage(env.siteUrl)));
+app.get('/influencers', (c) => publicPage(c, 'html', async () => influencersPage(env.siteUrl)));
 app.get('/contact', (c) => {
   const q = c.req.query();
   if (q.sent || q.error) return c.html(contactPage(env.siteUrl, q.sent ? 'sent' : 'error'), 200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
