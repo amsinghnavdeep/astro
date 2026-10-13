@@ -298,7 +298,7 @@ curl -s ${base}/v1/consultations \\
     "timeOfBirth": "5:24 PM",
     "placeOfBirth": "Etobicoke, Ontario, Canada",
     "timezone": "America/Toronto",
-    "question": "What does her chart say about her studies?"
+    "question": "What do her stars say about her studies?"
   }'
 
 # 2. Poll until a message with "role": "kaal" arrives

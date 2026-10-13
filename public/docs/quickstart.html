@@ -42,7 +42,7 @@ print(res.status_code, res.json())</code></pre></div>
 </li>
 <li>
 <h2>Create a consultation</h2>
-<p>Send the birth details and the first question. Kaalera computes the chart and starts Kaal on it.</p>
+<p>Send the birth details and the first question. Kaalera computes the Kundli and starts Kaal on it.</p>
 <div class="code"><pre data-lang="cURL"><code>curl -X POST {BASE}/v1/consultations \
   -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot; \
   -H &quot;Content-Type: application/json&quot; \
@@ -161,13 +161,13 @@ while True:
       {
         &quot;id&quot;: &quot;e72af372-ed54-4b5e-919c-a31f24f87f06&quot;,
         &quot;role&quot;: &quot;kaal&quot;,
-        &quot;content&quot;: &quot;**Namaste Asha ji, I am Kaal, Kaalera&#x27;s Vedic astrologer.** I have studied your chart, and here is a short overview before I answer your question.\n\n**Who you are**\n- **Lagna (Ascendant): Capricorn, Moon in Capricorn, Shravana nakshatra.** …&quot;,
+        &quot;content&quot;: &quot;**Namaste Asha ji, I am Kaal, Kaalera&#x27;s Vedic astrologer.** I have studied your Kundli, and here is a short overview before I answer your question.\n\n**Who you are**\n- **Lagna (Ascendant): Capricorn, Moon in Capricorn, Shravana nakshatra.** …&quot;,
         &quot;created_at&quot;: &quot;2026-10-12T02:22:52.000Z&quot;
       }
     ]
   }
 }</code></pre></div>
-<p>The first <code>kaal</code> message contains a short opening reading of the chart followed by the answer to the question. <code>content</code> is Markdown.</p>
+<p>The first <code>kaal</code> message contains a short opening reading followed by the answer to the question. <code>content</code> is Markdown.</p>
 </li>
 <li>
 <h2>Ask a follow-up</h2>

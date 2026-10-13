@@ -32,7 +32,7 @@ const statePanel = $('state-panel');
 const banner = $('banner');
 const langSelect = $<HTMLSelectElement>('lang-select');
 const PENDING_Q = 'kaalera:pendingQuestion';
-const STEPS = ['Casting your chart…', 'Reading the planets and houses…', 'Checking your dashas and transits…', "Writing Kaal's answer…"];
+const STEPS = ['Casting your Kundli…', 'Reading the planets and houses…', 'Checking your dashas and transits…', "Writing Kaal's answer…"];
 
 let me: Me | null = null;
 let threads: Thread[] = [];
@@ -159,6 +159,7 @@ type SkyPlanet = { name: string; nakshatra: string; retrograde: boolean };
 const EXAMPLE: [string, string][] = [
   ['b', 'Around mid-2021:'], ['', ' there are strong chances you changed jobs or cities. Did this happen?\n'],
   ['b', 'Mar 2027 – Nov 2027:'], ['', ' your strongest window for a promotion or a better offer. Apply in this period.\n'],
+  ['b', 'Issue:'], ['', ' Saturn is slowing your 10th house until early 2027.\n'],
   ['b', 'Remedy:'], ['', ' chant "Om Gurave Namah" 108 times on Thursdays.\n'],
   ['b', 'Kaal sees more:'], ['', ' a money rise linked to this job change.'],
 ];
@@ -452,7 +453,7 @@ profileForm.addEventListener('submit', async (e) => {
   }
   const label = submit.textContent;
   submit.disabled = true;
-  submit.textContent = me!.freeAvailable ? 'Casting the chart…' : 'Opening checkout…';
+  submit.textContent = me!.freeAvailable ? 'Casting your Kundli…' : 'Opening checkout…';
   const { ok, status, data } = await api<{ thread?: Thread; checkoutUrl?: string }>('/api/threads', { method: 'POST', body: JSON.stringify(body) });
   if (data.checkoutUrl) {
     sessionStorage.removeItem(PENDING_Q);

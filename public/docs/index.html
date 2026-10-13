@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Introduction — Kaalera API</title>
-<meta name="description" content="Kaalera API: ask Kaal, an AI Vedic astrologer, questions about a birth chart over HTTP.">
+<meta name="description" content="Kaalera API: ask Kaal, an AI Vedic astrologer, questions about the future over HTTP.">
 <link rel="stylesheet" href="/docs/docs.css">
 <script src="/docs/docs.js" defer></script>
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
@@ -12,10 +12,10 @@
 <body data-page="index">
 <article class="d-article">
 <h1>Introduction</h1>
-<p class="lead">The Kaalera API lets your product ask Kaal, Kaalera's AI Vedic astrologer, questions about a person's birth chart and get back a written, explained answer.</p>
+<p class="lead">The Kaalera API lets your product ask Kaal, Kaalera's AI Vedic astrologer, questions about a person's future and get back a written, explained answer.</p>
 
 <h2>What Kaal does</h2>
-<p>When you create a consultation, Kaalera computes the birth chart from the date, time and place of birth, then Kaal reads it and answers the question. Every answer shows its working: the planets, houses, dashas and transits behind it, plus the timing windows that matter.</p>
+<p>When you create a consultation, Kaalera computes the Kundli from the date, time and place of birth, then Kaal reads it and answers the question. Every answer shows its working: the planets, houses, dashas and transits behind it, plus the timing windows that matter.</p>
 <ul>
   <li><strong>AI trained by a 7,000-year-old lineage of Kashmiri Himalayan monks</strong>, reading classical Vedic (sidereal) Jyotish.</li>
   <li>Planet positions cast to the arc-second for the exact birth time and place.</li>
@@ -28,7 +28,7 @@
 <ol class="steps">
   <li><h3>Create a consultation</h3><p>Send the birth details and a first question to <a href="/docs/consultations-create"><code>POST /v1/consultations</code></a>. This costs 1 credit.</p></li>
   <li><h3>Poll for the answer</h3><p>Kaal usually answers within a few minutes. Poll <a href="/docs/consultations-get"><code>GET /v1/consultations/:id</code></a> until a message with <code>role: "kaal"</code> appears.</p></li>
-  <li><h3>Ask follow-ups</h3><p>Ask more questions in the same consultation with <a href="/docs/questions-create"><code>POST /v1/consultations/:id/questions</code></a> for 1 credit each. Kaal remembers the chart and the earlier answers. Consultations stay open for 7 days.</p></li>
+  <li><h3>Ask follow-ups</h3><p>Ask more questions in the same consultation with <a href="/docs/questions-create"><code>POST /v1/consultations/:id/questions</code></a> for 1 credit each. Kaal remembers the Kundli and the earlier answers. Consultations stay open for 7 days.</p></li>
 </ol>
 
 <h2>Base URL</h2>
