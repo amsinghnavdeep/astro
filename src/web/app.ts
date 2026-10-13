@@ -1060,6 +1060,8 @@ async function ask(text: string): Promise<void> {
   sending = false;
   renderedKey = '';
   if (ok) {
+    reloadFailed = false;
+    if ((data as { autoCharged?: boolean }).autoCharged && me?.user.accountType === 'business') me.walletCents = (me.walletCents ?? 0) - me.pricing.extraQuestionCents * RELOAD;
     if ((data as { autoCharged?: boolean }).autoCharged) showBanner(me!.user.accountType === 'business' ? `${RELOAD} more questions added from your Business wallet.` : `${RELOAD} more questions added: ${autoPrice()} charged to card •••• ${me!.billing?.card?.last4 ?? ''}. Receipt emailed.`, 7000);
     pending = Math.max(pending, 1);
     upsertThread(data.thread);
@@ -1105,6 +1107,7 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   else showBanner('Payment received — Kaal is starting your consultation.', 6000);
   const fresh = await api<Me>('/api/me');
   if (fresh.ok) me = fresh.data;
+  if (ok && data.paid) reloadFailed = false;
   renderBiz();
 }
 
