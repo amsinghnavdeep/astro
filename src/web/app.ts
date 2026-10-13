@@ -923,41 +923,60 @@ function cardNode(t: Thread, d: KundliCard): HTMLElement {
 const typed = new Set<string>();
 let seen: { threadId: string; ids: Set<string> } | null = null;
 let typingTimer = 0;
+let typingQueue: string[] = [];
+let typing: { id: string; done: number } | null = null;
 
-/** Reveals an answer word by word at reading pace, keeping the view pinned to the bottom. */
-function typeOut(div: HTMLElement): void {
+/**
+ * Reveals an answer word by word at reading pace, keeping the view pinned to the bottom.
+ * Progress lives in `typing`, so a re-render resumes where it left off instead of jumping to the end.
+ */
+function typeOut(div: HTMLElement, state: { id: string; done: number }): void {
   const body = div.querySelector<HTMLElement>('.body');
-  if (!body || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (!body) return;
+  type Step = { node: Text | null; words: string[]; block: HTMLElement };
+  const steps: Step[] = [];
+  for (const item of div.querySelectorAll<HTMLElement>('.k-tl-item')) {
+    item.style.display = 'none';
+    steps.push({ node: null, words: Array(6).fill(''), block: item });
+  }
   const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
-  const parts: { node: Text; words: string[]; block: HTMLElement }[] = [];
   for (let n = walker.nextNode(); n; n = walker.nextNode()) {
     const node = n as Text;
     const block: HTMLElement = node.parentElement?.closest<HTMLElement>('p, li, h1, h2, h3, h4, blockquote, tr') ?? body;
     if (block !== body) block.style.display = 'none';
-    parts.push({ node, words: node.data.match(/\S+\s*|\s+/g) ?? [], block });
+    steps.push({ node, words: node.data.match(/\S+\s*|\s+/g) ?? [], block });
     node.data = '';
   }
   let caretAt: HTMLElement | null = null;
-  div.classList.add('enter', 'typing');
   let i = 0;
   let w = 0;
+  const advance = (): void => {
+    const p = steps[i];
+    if (p.block.style.display === 'none') p.block.style.display = '';
+    if (p.node && caretAt !== p.block && p.block !== body) { caretAt?.classList.remove('k-caret'); caretAt = p.block; caretAt.classList.add('k-caret'); }
+    if (w < p.words.length) { if (p.node) p.node.data += p.words[w]; w++; }
+    if (w >= p.words.length) { i++; w = 0; }
+  };
+  for (let k = 0; k < state.done && i < steps.length; k++) advance();
+  div.classList.add('typing');
+  if (state.done === 0) div.classList.add('enter');
+  const finish = (): void => {
+    clearInterval(typingTimer);
+    caretAt?.classList.remove('k-caret');
+    div.classList.remove('typing');
+    typed.add(state.id);
+    typing = null;
+    if (typingQueue.length) { renderedKey = ''; renderMessages(lastMsgs); }
+    else if (nearBottom()) scroller.scrollTop = scroller.scrollHeight;
+  };
   clearInterval(typingTimer);
+  if (i >= steps.length) { finish(); return; }
   typingTimer = window.setInterval(() => {
     const stick = nearBottom();
-    for (let k = 0; k < 1 && i < parts.length; k++) {
-      const p = parts[i];
-      if (p.block.style.display === 'none') p.block.style.display = '';
-      if (caretAt !== p.block && p.block !== body) { caretAt?.classList.remove('k-caret'); caretAt = p.block; caretAt.classList.add('k-caret'); }
-      if (w < p.words.length) p.node.data += p.words[w++];
-      if (w >= p.words.length) { i++; w = 0; }
-    }
+    advance();
+    state.done++;
     if (stick) scroller.scrollTop = scroller.scrollHeight;
-    if (i >= parts.length) {
-      clearInterval(typingTimer);
-      caretAt?.classList.remove('k-caret');
-      div.classList.remove('typing');
-      if (nearBottom()) scroller.scrollTop = scroller.scrollHeight;
-    }
+    if (i >= steps.length) finish();
   }, 38);
 }
 
@@ -969,19 +988,25 @@ function renderMessages(msgs: Msg[]): void {
   const stick = nearBottom() || !renderedKey || msgs.at(-1)?.role === 'user';
   renderedKey = key;
   const tid = current?.id ?? '';
+  if (seen?.threadId !== tid) { typingQueue = []; typing = null; }
   const fresh = seen?.threadId === tid
     ? msgs.filter((m) => m.role !== 'user' && !seen!.ids.has(m.id) && !typed.has(m.id))
     : [];
   seen = { threadId: tid, ids: new Set(msgs.map((m) => m.id)) };
+  typingQueue.push(...fresh.map((m) => m.id));
   clearInterval(typingTimer);
   const nodes = msgs.map(messageNode);
-  const toType = fresh.at(-1);
-  if (toType) {
-    typed.add(toType.id);
-    typeOut(nodes[msgs.indexOf(toType)]);
-  }
+  if (!typing && typingQueue.length) typing = { id: typingQueue.shift()!, done: 0 };
+  const typingAt = typing ? msgs.findIndex((m) => m.id === typing!.id) : -1;
+  if (typing && typingAt < 0) typing = null;
+  msgs.forEach((m, i) => { if (typingQueue.includes(m.id)) nodes[i].hidden = true; });
   const firstKaal = msgs.findIndex((m) => m.role !== 'user');
-  if (current && card?.threadId === current.id && firstKaal >= 0) nodes.splice(firstKaal, 0, cardNode(current, card.data));
+  if (typing && typingAt >= 0) typeOut(nodes[typingAt], typing);
+  if (current && card?.threadId === current.id && firstKaal >= 0) {
+    const c = cardNode(current, card.data);
+    if (typingAt === firstKaal) c.classList.add('enter');
+    nodes.splice(firstKaal, 0, c);
+  }
   messagesEl.replaceChildren(...nodes);
   if (stick) scroller.scrollTop = scroller.scrollHeight;
 }

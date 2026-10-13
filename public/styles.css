@@ -389,6 +389,8 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 
 /* exact Kundli card above the first answer */
 .k-card { border: 1px solid color-mix(in srgb, #e8590c 35%, transparent); background: color-mix(in srgb, #e8590c 6%, transparent); border-radius: 14px; padding: 14px 16px; margin: 4px 0 14px; }
+.k-card.enter { animation: msg-in .35s ease-out; }
+@media (prefers-reduced-motion: reduce) { .k-card.enter { animation: none; } }
 .k-card-title { font-weight: 700; margin-bottom: 10px; }
 .k-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .k-card-cell { display: flex; flex-direction: column; gap: 2px; }
