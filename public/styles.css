@@ -377,3 +377,13 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .is-busy::before { content: ""; display: inline-block; width: 1em; height: 1em; margin-right: .5em; vertical-align: -.15em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: k-spin .7s linear infinite; }
 @keyframes k-spin { to { transform: rotate(360deg); } }
 .consent-links { font-size: 13px; margin: 6px 0 0; }
+
+/* exact Kundli card above the first answer */
+.k-card { border: 1px solid color-mix(in srgb, #e8590c 35%, transparent); background: color-mix(in srgb, #e8590c 6%, transparent); border-radius: 14px; padding: 14px 16px; margin: 4px 0 14px; }
+.k-card-title { font-weight: 700; margin-bottom: 10px; }
+.k-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.k-card-cell { display: flex; flex-direction: column; gap: 2px; }
+.k-card-label { font-size: 12px; opacity: .7; }
+.k-card-value { font-size: 16px; font-weight: 600; }
+.k-card-sub { font-size: 12px; opacity: .7; }
+.k-card-note { font-size: 12px; opacity: .7; margin-top: 10px; }

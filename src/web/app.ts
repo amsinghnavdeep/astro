@@ -623,6 +623,7 @@ function openThread(t: Thread): void {
   current = t;
   pending = 0;
   renderedKey = '';
+  loadCard(t);
   renderThreads();
   closeMenu();
   profileView.hidden = true;
@@ -705,6 +706,48 @@ function pdfReply(t: Thread): HTMLElement {
 
 const nearBottom = () => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140;
 
+type KundliCard = {
+  ascendant: { sign: string; degree: number }; moonSign: string; sunSign: string;
+  birthStar: { name: string; pada: number } | null;
+  period: { maha: string; mahaEnd: string; sub: string | null; subEnd: string | null } | null;
+};
+let card: { threadId: string; data: KundliCard } | null = null;
+const monthYear = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+function loadCard(t: Thread): void {
+  if (card?.threadId === t.id) return;
+  card = null;
+  void api<KundliCard>(`/api/threads/${encodeURIComponent(t.id)}/card`).then(({ ok, data }) => {
+    if (!ok || current?.id !== t.id) return;
+    card = { threadId: t.id, data };
+    renderedKey = '';
+    renderMessages(lastMsgs);
+  });
+}
+
+function cardNode(t: Thread, d: KundliCard): HTMLElement {
+  const box = el('div', 'k-card');
+  box.setAttribute('aria-label', 'Your exact Kundli');
+  box.append(el('div', 'k-card-title', `${t.fullName}'s exact Kundli`));
+  const grid = el('div', 'k-card-grid');
+  const cell = (label: string, value: string, sub?: string) => {
+    const c = el('div', 'k-card-cell');
+    c.append(el('span', 'k-card-label', label), el('span', 'k-card-value', value));
+    if (sub) c.append(el('span', 'k-card-sub', sub));
+    grid.append(c);
+  };
+  cell('Ascendant (Lagna)', d.ascendant.sign, `${d.ascendant.degree}°`);
+  cell('Moon sign (Rashi)', d.moonSign);
+  if (d.birthStar) cell('Birth star (Nakshatra)', d.birthStar.name, `Pada ${d.birthStar.pada}`);
+  cell('Sun sign', d.sunSign);
+  if (d.period) {
+    const p = d.period;
+    cell('Current period (Dasha)', p.sub ? `${p.maha} – ${p.sub}` : p.maha, `until ${monthYear(p.subEnd ?? p.mahaEnd)}`);
+  }
+  box.append(grid, el('div', 'k-card-note', 'Calculated exactly for this birth date, time and place. Compare it with your family Kundli.'));
+  return box;
+}
+
 let lastMsgs: Msg[] = [];
 function renderMessages(msgs: Msg[]): void {
   lastMsgs = msgs;
@@ -712,7 +755,10 @@ function renderMessages(msgs: Msg[]): void {
   if (key === renderedKey) return;
   const stick = nearBottom() || !renderedKey || msgs.at(-1)?.role === 'user';
   renderedKey = key;
-  messagesEl.replaceChildren(...msgs.map(messageNode));
+  const nodes = msgs.map(messageNode);
+  const firstKaal = msgs.findIndex((m) => m.role !== 'user');
+  if (current && card?.threadId === current.id && firstKaal >= 0) nodes.splice(firstKaal, 0, cardNode(current, card.data));
+  messagesEl.replaceChildren(...nodes);
   if (stick) scroller.scrollTop = scroller.scrollHeight;
 }
 

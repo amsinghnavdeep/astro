@@ -504,6 +504,29 @@ app.patch('/api/threads/:id', async (c) => {
   return c.json({ thread: await pubT(c, { ...t, language: p.data.language }) });
 });
 
+app.get('/api/threads/:id/card', async (c) => {
+  const t = await ownThread(c);
+  if (!t) return c.json({ error: 'Not found' }, 404);
+  const k = t.kundli_id ? await getKundli(c.env.DB, t.user_id, t.kundli_id) : null;
+  const input = k ? kundliInput(k) : { dateOfBirth: t.date_of_birth, timeOfBirth: t.time_of_birth, placeOfBirth: t.place_of_birth, timezone: t.timezone };
+  try {
+    const ch = await computeChart(input);
+    const moon = ch.planets.find((p) => p.name === 'Moon');
+    const cur = ch.dasha.current;
+    c.header('Cache-Control', 'private, max-age=86400');
+    return c.json({
+      ascendant: { sign: ch.lagna.sign, degree: Math.floor(ch.lagna.degreeInSign) },
+      moonSign: ch.moonSign,
+      sunSign: ch.sunSign,
+      birthStar: moon ? { name: moon.nakshatra, pada: moon.pada } : null,
+      period: cur ? { maha: cur.maha.lord, mahaEnd: cur.maha.end, sub: cur.antardasha?.lord ?? null, subEnd: cur.antardasha?.end ?? null } : null,
+    });
+  } catch (err) {
+    console.error('Kundli card failed:', err);
+    return c.json({ error: 'Unavailable' }, 503);
+  }
+});
+
 app.get('/api/threads/:id/messages', async (c) => {
   const t = await ownThread(c);
   if (!t) return c.json({ error: 'Not found' }, 404);
