@@ -148,7 +148,7 @@ async function renderPrices(): Promise<void> {
   if (!ok) return;
   const p = data;
   $('l-prices').replaceChildren(
-    priceCard('Free', money(0, p.currency), `Your first consultation: an opening reading of the chart plus ${plural(p.freeQuestions, 'question')} answered.`),
+    priceCard('Free', money(0, p.currency), `Your first consultation: an opening reading plus ${plural(p.freeQuestions, 'question')} answered.`),
     priceCard(`${p.packQuestions} questions`, money(p.packCents, p.currency), `Start another consultation, or add ${p.packQuestions} more questions to an open one.`),
     priceCard(`${p.consultationDays}-day consultations`, `${p.consultationDays} days`, `Each consultation stays open for ${p.consultationDays} days, then becomes read-only.`),
   );
@@ -206,7 +206,7 @@ const EXAMPLE: [string, string][] = [
   ['b', 'Around mid-2021:'], ['', ' there are strong chances you changed jobs or cities. Did this happen?\n\n'],
   ['b', 'Mar 2027 – Nov 2027:'], ['', ' your strongest window for a promotion or a better offer. Apply in this period.\n\n'],
   ['b', 'Remedy:'], ['', ' chant "Om Gurave Namah" 108 times on Thursdays and wear yellow that day.\n\n'],
-  ['b', 'More in your chart:'], ['', ' a money rise linked to this job change. Ask and Kaal will date it.'],
+  ['b', 'Kaal sees more:'], ['', ' a money rise linked to this job change. Ask and Kaal will date it.'],
 ];
 
 function typeExample(): void {
@@ -362,7 +362,7 @@ function showProfile(question = ''): void {
   const submit = $('profile-submit');
   if (me!.freeAvailable) {
     note.innerHTML = '<strong>This consultation is free.</strong> ';
-    note.append(`Kaal gives an opening reading of the chart and answers ${plural(p.freeQuestions, 'question')}. Open for ${p.consultationDays} days.`);
+    note.append(`Kaal gives an opening reading and answers ${plural(p.freeQuestions, 'question')}. Open for ${p.consultationDays} days.`);
     submit.textContent = 'Start free consultation';
   } else if (credTotal() > 0) {
     const next = me!.chatCredits[0];
