@@ -12,6 +12,7 @@ export interface Topic {
   body: string;
   faqs: [string, string][];
   posts: string[];
+  cta?: [href: string, label: string];
 }
 
 export const TOPICS: Topic[] = [
@@ -208,6 +209,40 @@ Kaal does not give political or religious debate, and is not a substitute for me
     ],
     posts: ['how-accurate-is-ai-astrology', 'ai-astrologer-vs-human-astrologer', 'what-is-a-kundli'],
   },
+  {
+    slug: 'astrology-api',
+    title: 'Astrology API for Apps — Add an AI Vedic Astrologer | Kaalera',
+    h1: 'Astrology API: add Kaal to your app',
+    kicker: 'For businesses and developers',
+    description: 'Building an astrology app, horoscope chatbot or Kundli feature? Kaalera\'s API gives your users Kaal\'s readings with dated predictions and remedies, over simple HTTPS calls.',
+    body: `Building an astrology app from scratch means calculating exact Kundlis, reading dasha periods and transits, and writing clear predictions. Kaalera's API gives you all of that in a few HTTPS calls, so you can focus on your product.
+
+## What you get
+- **Kaal's readings in your app:** send a person's birth date, time and place with a question, and get back a clear answer with **dated predictions**, the main **issue** and simple **remedies**, the same as on kaalera.com.
+- **Follow-up questions** in the same consultation, so your users can keep asking.
+- **Answers in your users' language.**
+- **Simple auth:** one Bearer key (\`kal_live_...\`) from your [Developers dashboard](/developers).
+
+## Pricing
+Business & API pricing is **10% below our website prices**, in USD, taxes & fees included:
+- **$10.35** to start a consultation (first question included);
+- **$7.25** per follow-up question.
+
+You top up a prepaid USD wallet, with a first recharge of **$115**. Every call is paid from the wallet; there are no free or test API calls. Auto-recharge keeps it topped up.
+
+## Get started
+1. Sign in at [Developers](/developers) and recharge your wallet.
+2. Create an API key.
+3. Follow the [quickstart](/docs/quickstart) to make your first call.`,
+    faqs: [
+      ['Is there a free trial or test API?', 'No. Every API call is paid from your prepaid USD wallet. Once your wallet is topped up you can try the API straight away.'],
+      ['Can I build a horoscope chatbot with it?', 'Yes. Start a consultation with the user\'s birth details, then send each chat message as a follow-up question. Kaal answers with dated predictions and remedies.'],
+      ['Which astrology system does Kaal use?', 'Vedic (sidereal) astrology with Lahiri ayanamsa, whole-sign houses and the Vimshottari dasha system.'],
+      ['How much does it cost?', 'Business & API pricing is 10% below website prices: $10.35 to start a consultation and $7.25 per follow-up, taxes & fees included, from a prepaid USD wallet with a $115 first recharge.'],
+    ],
+    posts: ['build-ai-astrology-app-kaalera-api', 'add-horoscope-chatbot-to-your-app', 'astrology-api-use-cases'],
+    cta: ['/developers', 'Get your API key'],
+  },
 ];
 
 export function topicPage(site: string, t: Topic, published: Post[]): string {
@@ -218,7 +253,7 @@ export function topicPage(site: string, t: Topic, published: Post[]): string {
   <p class="w-kicker">${esc(t.kicker)}</p>
   <h1>${esc(t.h1)}</h1>
   <p class="w-lead">${esc(t.description)}</p>
-  <a class="w-cta big" href="/?ask=1">Ask Kaal — first question free</a>
+  <a class="w-cta big" href="${esc(t.cta?.[0] ?? '/?ask=1')}">${esc(t.cta?.[1] ?? 'Ask Kaal — first question free')}</a>
 </section>
 <article class="w-prose">${renderMarkdown(t.body)}</article>
 <section class="w-faq"><h2>Frequently asked questions</h2>

@@ -24,6 +24,7 @@ export const TOPIC_LINKS: [string, string][] = [
   ['/manglik-dosha', 'Manglik dosha'],
   ['/ai-astrologer', 'AI astrologer'],
   ['/kaal-vs-chatgpt', 'Kaal vs ChatGPT'],
+  ['/astrology-api', 'Astrology API for apps'],
 ];
 
 export const organizationLd = (site: string) => ({
