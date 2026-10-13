@@ -114,10 +114,13 @@ function fillLanguages(select: HTMLSelectElement, langs: string[], value = 'Engl
   select.replaceChildren(...langs.map((l) => new Option(l, l, false, l === value)));
 }
 
+/** Business accounts pay chat from the wallet at pre-fee prices (taxes & fees were paid at top-up). */
+const walletCovers = (cents: number): boolean => me?.user.accountType === 'business' && (me.walletCents ?? 0) >= cents;
+
 const credTotal = (): number => (me?.chatCredits ?? []).reduce((n, l) => n + l.credits, 0);
 
 async function goToCheckout(threadId: string, btn?: HTMLButtonElement, cents = me!.pricing.packCents): Promise<void> {
-  if (!(await confirmPurchase('chat', money(allIn(cents, me!.pricing.taxFeePercent), me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
+  if (!walletCovers(cents) && !(await confirmPurchase('chat', money(allIn(cents, me!.pricing.taxFeePercent), me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
@@ -483,6 +486,11 @@ function showProfile(question = ''): void {
     note.append(el('strong', '', `You have ${plural(credTotal(), 'question')} left.`),
       ` This consultation uses 1 now for the opening reading and your first answer. Open for ${p.consultationDays} days. Questions expire 3 months after purchase (next on ${new Date(next.expiresAt).toLocaleDateString()}).`);
     submit.textContent = 'Start consultation';
+  } else if (walletCovers(p.packCents)) {
+    note.innerHTML = '';
+    note.append(el('strong', '', `${money(p.packCents, p.currency)} to start, paid from your Business wallet.`),
+      ` An opening reading and the answer to your question, open for ${p.consultationDays} days. Extra questions come ${RELOAD} at a time for ${autoPrice()} from the wallet. Wallet balance: ${money(me!.walletCents ?? 0, p.currency)}.`);
+    submit.textContent = `Start consultation — ${money(p.packCents, p.currency)} from wallet`;
   } else {
     note.innerHTML = '';
     note.append(el('strong', '', `${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} to start.`),
@@ -570,13 +578,15 @@ profileForm.addEventListener('submit', async (e) => {
     err.textContent = 'Choose a Kundli or add a new one first.';
     return;
   }
-  if (!me!.freeAvailable && credTotal() < 1) {
+  const fromWallet = !me!.freeAvailable && credTotal() < 1 && walletCovers(me!.pricing.packCents);
+  if (fromWallet) (body as Record<string, unknown>).agreed = true;
+  else if (!me!.freeAvailable && credTotal() < 1) {
     if (!(await confirmPurchase('chat', money(allIn(me!.pricing.packCents, me!.pricing.taxFeePercent), me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
     (body as Record<string, unknown>).agreed = true;
   }
   const label = submit.textContent;
   submit.disabled = true;
-  submit.textContent = me!.freeAvailable ? 'Casting your Kundli…' : 'Opening checkout…';
+  submit.textContent = me!.freeAvailable || fromWallet || credTotal() > 0 ? 'Casting your Kundli…' : 'Opening checkout…';
   const { ok, status, data } = await api<{ thread?: Thread; checkoutUrl?: string }>('/api/threads', { method: 'POST', body: JSON.stringify(body) });
   if (data.checkoutUrl) {
     sessionStorage.removeItem(PENDING_Q);
@@ -589,7 +599,7 @@ profileForm.addEventListener('submit', async (e) => {
     sessionStorage.removeItem(PENDING_Q);
     profileForm.reset();
     me!.freeAvailable = me!.freeAvailable && !data.thread.isFree;
-    void fetch('/api/me').then((r) => (r.ok ? r.json() : null)).then((m: Me | null) => { if (m) me!.chatCredits = m.chatCredits; });
+    void fetch('/api/me').then((r) => (r.ok ? r.json() : null)).then((m: Me | null) => { if (m) { me!.chatCredits = m.chatCredits; me!.walletCents = m.walletCents; renderBiz(); } });
     upsertThread(data.thread);
     openThread(data.thread);
     if (status === 503) showBanner(data.error ?? 'Kaal is unavailable right now. Tap Retry in a minute.');
@@ -1167,6 +1177,7 @@ const chatPrices = () => ({ extraQuestionCents: me!.pricing.extraQuestionCents, 
 
 const autoPrice = (): string => {
   const p = me!.pricing;
+  if (me!.user.accountType === 'business') return money(p.extraQuestionCents * RELOAD, p.currency);
   return money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency);
 };
 
