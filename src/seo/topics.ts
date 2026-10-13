@@ -159,6 +159,55 @@ Kaal does not give political or religious debate, and is not a substitute for me
     ],
     posts: ['what-is-kaalera', 'ai-astrologer-vs-human-astrologer', 'how-accurate-is-ai-astrology'],
   },
+  {
+    slug: 'kaal-vs-chatgpt',
+    title: 'Kaal vs ChatGPT for Vedic Astrology — Tested on 5 Birth Details | Kaalera',
+    h1: 'Kaal vs ChatGPT: we tested 5 birth details',
+    kicker: 'Honest test',
+    description: 'We gave ChatGPT and Kaal the same 5 birth details and checked the ascendant, Moon sign, nakshatra and current dasha against an exact astronomical calculation.',
+    body: `Anyone can paste their birth details into ChatGPT. So we tested what it gets right, using the same question for 5 people born in different cities and years.
+
+## How we tested
+- **Question, word for word:** "I was born on [date] at [time] (local time) in [city]. Using Vedic (sidereal, Lahiri) astrology, tell me my ascendant (lagna) with degree, Moon sign, Sun sign, birth nakshatra with pada, and my current Vimshottari mahadasha and antardasha with the date the mahadasha ends. Then: when will I get a better job?"
+- **ChatGPT:** the free version at chatgpt.com, signed out, web search on, one try per person, on 13 October 2026.
+- **Exact values:** calculated with the Swiss Ephemeris (sidereal, Lahiri). Kaal reads from this same calculation, so Kaal's values match it by design.
+
+## Results
+| Birth details | Exact value | ChatGPT said |
+|---|---|---|
+| 14 May 1990, 10:30, Delhi | Cancer 9° ascendant · Moon Sagittarius · Purva Ashadha 2 · **Mars–Moon until 23 Nov 2026** | Signs and nakshatra right, no ascendant degree · **said Rahu period had already started** |
+| 2 Nov 1985, 06:15, Mumbai | Libra 9° ascendant · Moon Gemini · Mrigashira 3 · **Saturn–Mercury, Saturn until 17 Jan 2041** | Did not give any values; sent us to another calculator |
+| 20 Feb 1995, 22:40, Toronto | Libra 4° ascendant · Moon Libra · Vishakha 1 · **Saturn–Rahu, Saturn until 22 Jan 2030** | Signs and nakshatra right · **main pick Mercury–Venus**, no end date |
+| 8 Aug 1978, 14:05, London | Libra 20° ascendant · Moon Virgo · Hasta 1 · **Jupiter–Rahu, Jupiter until 4 Oct 2027** | Moon, Sun and nakshatra right, no ascendant · **said Jupiter ended in 2021, now Saturn–Mercury** |
+| 25 Dec 2001, 03:30, Bengaluru | Libra 25° ascendant · Moon Aries · Ashwini 1 · **Venus–Mercury, Venus until 25 Dec 2027** | **Ascendant wrong (Taurus)** · rest right · Venus ends "about 2028" |
+
+## Score across the 5
+| Item | ChatGPT right | Wrong | Not given |
+|---|---|---|---|
+| Moon sign | 4 | 0 | 1 |
+| Sun sign | 4 | 0 | 1 |
+| Nakshatra and pada | 4 | 0 | 1 |
+| Ascendant sign | 2 | 1 | 2 |
+| Current mahadasha and antardasha | 1 | 3 | 1 |
+| Exact mahadasha end date | 0 | 0 | 5 |
+
+## What this means
+- **ChatGPT is good at the Moon sign, Sun sign and nakshatra.** We won't pretend otherwise.
+- **The ascendant and the dasha are where it slips.** It got the current period right for 1 person out of 5 and never gave an exact end date. Those are the parts that set the timing of a prediction: a period a few years off moves every date in the reading.
+- **To its credit, ChatGPT said so.** It called its own degrees and dasha dates estimates and suggested checking them in a calculator.
+- **Kaal starts from the exact numbers,** shows them in a Kundli card above the first answer, and gives dated windows from them.
+
+## Limits of this test
+- 5 people and one try each is a small test. Another ChatGPT version, a paid plan or a different prompt can give different results.
+- This checks the calculation, not whether predictions come true. Astrology is guidance, not a guarantee.
+- You can repeat it: ask ChatGPT the question above with your own details, then compare with the Kundli card Kaal shows you.`,
+    faqs: [
+      ['Can ChatGPT make a Kundli?', 'In our test it got the Moon sign, Sun sign and nakshatra right for 4 of 5 people, but the ascendant and the current dasha were often missing or wrong, and it gave no exact dasha end dates.'],
+      ['Why does the dasha matter?', 'Vimshottari dasha periods set the timing in Vedic astrology. If the current period is wrong, the dates of every prediction move with it.'],
+      ['How does Kaal get exact values?', 'Every reading starts from a Kundli calculated from your exact birth date, time and place, and Kaal shows the key values in a card before the first answer so you can check them.'],
+    ],
+    posts: ['how-accurate-is-ai-astrology', 'ai-astrologer-vs-human-astrologer', 'what-is-a-kundli'],
+  },
 ];
 
 export function topicPage(site: string, t: Topic, published: Post[]): string {

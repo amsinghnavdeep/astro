@@ -23,6 +23,7 @@ export const TOPIC_LINKS: [string, string][] = [
   ['/sade-sati', 'Sade Sati check'],
   ['/manglik-dosha', 'Manglik dosha'],
   ['/ai-astrologer', 'AI astrologer'],
+  ['/kaal-vs-chatgpt', 'Kaal vs ChatGPT'],
 ];
 
 export const organizationLd = (site: string) => ({
