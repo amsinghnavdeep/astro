@@ -1,7 +1,7 @@
 import { confirmPurchase } from './consent.js';
 import { allIn, taxFeeNote } from '../disclaimer.js';
 import { renderMarkdown } from '../markdown.js';
-import { isPdfRequest, openReport, parseAnswer } from './extras.js';
+import { isPdfRequest, openReport, parseAnswer, nextWindow } from './extras.js';
 import { autoChargeNotice, saveBilling, type BillingInfo } from './billing.js';
 
 type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
@@ -919,8 +919,65 @@ function renderMessages(msgs: Msg[]): void {
   const nodes = msgs.map(messageNode);
   const firstKaal = msgs.findIndex((m) => m.role !== 'user');
   if (current && card?.threadId === current.id && firstKaal >= 0) nodes.splice(firstKaal, 0, cardNode(current, card.data));
+  const nudge = familyNudge(msgs);
+  if (nudge) nodes.push(nudge);
   messagesEl.replaceChildren(...nodes);
+  renderUpNext(msgs);
   if (stick) scroller.scrollTop = scroller.scrollHeight;
+}
+
+const FAMILY_NUDGE = 'kaalera_family_nudge';
+
+/** After 2 questions about themselves, suggest adding a family member's Kundli (once per consultation). */
+function familyNudge(msgs: Msg[]): HTMLElement | null {
+  const t = current;
+  if (!t || t.status !== 'active' || t.expired || t.questionsLeft < 1 || msgs.at(-1)?.role === 'user') return null;
+  if (msgs.filter((m) => m.role === 'user').length < 2) return null;
+  if (kundlis.some((k) => k.id !== t.kundliId) || localStorage.getItem(`${FAMILY_NUDGE}:${t.id}`)) return null;
+  const card = el('div', 'k-family');
+  const text = el('div');
+  text.append(el('strong', '', 'Ask about your family too'), el('div', 'muted', 'Your spouse, child or parent: add their birth details and Kaal reads their own Kundli right here, in this consultation.'));
+  const add = el('button', 'btn sm primary', 'Add a family Kundli') as HTMLButtonElement;
+  add.type = 'button';
+  add.addEventListener('click', () => openKundli(null, 'about'));
+  const close = el('button', 'icon-btn', '×') as HTMLButtonElement;
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Close');
+  close.addEventListener('click', () => {
+    localStorage.setItem(`${FAMILY_NUDGE}:${t.id}`, '1');
+    card.remove();
+  });
+  card.append(text, add, close);
+  return card;
+}
+
+let upNext: HTMLElement | null = null;
+
+/** "Your career window opens in 23 days" card above the chat, from Kaal's dated predictions. */
+function renderUpNext(msgs: Msg[]): void {
+  if (!upNext) {
+    upNext = el('div', 'k-upnext');
+    messagesEl.before(upNext);
+  }
+  const t = current;
+  const w = t && t.status === 'active' && !t.expired ? nextWindow(msgs.filter((m) => m.role !== 'user').map((m) => m.body)) : null;
+  upNext.hidden = !w;
+  if (!w) return;
+  const opens = w.days <= 0 ? 'is open now' : w.days === 1 ? 'opens tomorrow' : `opens in ${w.days} days`;
+  const text = el('div', 'k-upnext-text');
+  text.append(el('span', 'k-tl-dot', TL_GLYPH[w.kind] ?? '✦'), el('strong', '', `Your ${w.area.toLowerCase()} window ${opens}`), el('span', 'muted', w.when));
+  const ask = el('button', 'btn sm primary', 'Ask Kaal about it') as HTMLButtonElement;
+  ask.type = 'button';
+  ask.addEventListener('click', () => {
+    askInput.value = `My ${w.area.toLowerCase()} window (${w.when}) is coming. What exactly should I do, and which weeks matter most?`;
+    if (askForm.hidden) {
+      document.querySelector<HTMLButtonElement>('[data-addq]')?.click();
+      return;
+    }
+    autosize();
+    askInput.focus();
+  });
+  upNext.replaceChildren(text, ask);
 }
 
 function setWorking(on: boolean): void {
@@ -990,6 +1047,7 @@ function renderState(): void {
   inline.disabled = false;
   inline.textContent = packLabel(p);
   setWorking((t.status === 'starting' || pending > 0) && !t.expired);
+  renderUpNext(lastMsgs);
 }
 
 async function retry(b: HTMLButtonElement): Promise<void> {
