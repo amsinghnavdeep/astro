@@ -61,3 +61,15 @@ export async function sendReminderEmail(o: { to: string; name: string; area: str
     <p>Ask Kaal what to do now to make the most of it.</p>` + button(o.link, 'Ask Kaal')
     + '<p style="color:#666;font-size:13px">You asked for this reminder. Astrological guidance only, not professional advice.</p>'));
 }
+
+export async function sendPayoutRequestEmail(o: { to: string; code: string; cents: number; method: string; payTo: string; account: string; link: string }): Promise<void> {
+  await sendEmail(o.to, `Influencer payout request: ${o.code} ${usd(o.cents)}`, layout('Influencer payout request',
+    `<p>Code: <b>${escapeHtml(o.code)}</b><br>Amount: <b>${usd(o.cents)}</b><br>Send by: ${escapeHtml(o.method)}<br>Send to: <b>${escapeHtml(o.payTo)}</b><br>Kaalera account: ${escapeHtml(o.account)}</p>`
+    + '<p>Send the money yourself, then mark it as paid. You need to be signed in to Kaalera as the owner.</p>'
+    + button(o.link, 'Mark as paid')));
+}
+
+export async function sendPayoutSentEmail(o: { to: string; code: string; cents: number; method: string }): Promise<void> {
+  await sendEmail(o.to, `Your Kaalera payout of ${usd(o.cents)} was sent`, layout('Your payout was sent',
+    `<p>We sent <b>${usd(o.cents)}</b> for code ${escapeHtml(o.code)} by ${escapeHtml(o.method)}. Thank you for sharing Kaalera.</p>`));
+}

@@ -9,7 +9,6 @@ import type { Context } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
 import { grantCredits } from './credits.js';
 import type { FreeKeys } from './freeclaims.js';
-import { stripe } from './stripe.js';
 
 const REF_COOKIE = 'kaalera_ref';
 const CODE_RE = /^[A-Z0-9]{3,20}$/;
@@ -146,33 +145,26 @@ export async function partnerState(db: D1Database, user: Partnered, site: string
   const inf = await db.prepare('SELECT * FROM influencers WHERE user_id = ?').bind(user.id).first<Influencer>();
   let influencer = null;
   if (inf) {
-    if (inf.stripe_account_id && !inf.payouts_enabled) {
-      const acct = await stripe().accounts.retrieve(inf.stripe_account_id).catch(() => null);
-      if (acct?.payouts_enabled) {
-        await db.prepare('UPDATE influencers SET payouts_enabled = 1 WHERE code = ?').bind(inf.code).run();
-        inf.payouts_enabled = 1;
-      }
-    }
     const now = nowIso();
     const [clicks, signups, money, payouts] = await Promise.all([
       db.prepare('SELECT COALESCE(SUM(n), 0) AS n FROM partner_clicks WHERE code = ?').bind(inf.code).first<{ n: number }>(),
       db.prepare('SELECT COUNT(*) AS n FROM users WHERE referred_code = ?').bind(inf.code).first<{ n: number }>(),
       db.prepare(
         `SELECT COUNT(*) AS paying,
-          COALESCE(SUM(CASE WHEN status = 'pending' AND available_at > ? THEN commission_cents END), 0) AS held,
-          COALESCE(SUM(CASE WHEN status = 'pending' AND available_at <= ? THEN commission_cents END), 0) AS available,
+          COALESCE(SUM(CASE WHEN status = 'pending' AND payout_id IS NULL AND available_at > ? THEN commission_cents END), 0) AS held,
+          COALESCE(SUM(CASE WHEN status = 'pending' AND payout_id IS NULL AND available_at <= ? THEN commission_cents END), 0) AS available,
+          COALESCE(SUM(CASE WHEN status = 'pending' AND payout_id IS NOT NULL THEN commission_cents END), 0) AS requested,
           COALESCE(SUM(CASE WHEN status = 'paid' THEN commission_cents END), 0) AS paid
          FROM commissions WHERE code = ?`,
-      ).bind(now, now, inf.code).first<{ paying: number; held: number; available: number; paid: number }>(),
-      db.prepare('SELECT amount_cents, period, created_at FROM payouts WHERE code = ? ORDER BY created_at DESC LIMIT 24').bind(inf.code)
-        .all<{ amount_cents: number; period: string; created_at: string }>(),
+      ).bind(now, now, inf.code).first<{ paying: number; held: number; available: number; requested: number; paid: number }>(),
+      db.prepare('SELECT amount_cents, status, created_at, paid_at FROM payouts WHERE code = ? ORDER BY created_at DESC LIMIT 24').bind(inf.code)
+        .all<{ amount_cents: number; status: string; created_at: string; paid_at: string | null }>(),
     ]);
     influencer = {
       code: inf.code, status: inf.status, percent: inf.percent, link: `${site}/?code=${inf.code}`,
-      payoutsEnabled: !!inf.payouts_enabled, payoutsStarted: !!inf.stripe_account_id,
       clicks: clicks?.n ?? 0, signups: signups?.n ?? 0, paying: money?.paying ?? 0,
-      pendingCents: money?.held ?? 0, availableCents: money?.available ?? 0, paidCents: money?.paid ?? 0,
-      payouts: payouts.results.map((p) => ({ amountCents: p.amount_cents, period: p.period, paidAt: p.created_at })),
+      pendingCents: money?.held ?? 0, availableCents: money?.available ?? 0, requestedCents: money?.requested ?? 0, paidCents: money?.paid ?? 0,
+      payouts: payouts.results.map((p) => ({ amountCents: p.amount_cents, status: p.status, requestedAt: p.created_at, paidAt: p.paid_at })),
     };
   }
   return {
@@ -185,63 +177,55 @@ export async function partnerState(db: D1Database, user: Partnered, site: string
   };
 }
 
-/** Stripe Connect Express onboarding link for the influencer's payouts. */
-export async function connectLink(db: D1Database, user: Partnered, site: string): Promise<string | null> {
-  const inf = await db.prepare('SELECT * FROM influencers WHERE user_id = ?').bind(user.id).first<Influencer>();
-  if (!inf) return null;
-  let acct = inf.stripe_account_id;
-  if (!acct) {
-    const a = await stripe().accounts.create({
-      type: 'express', email: user.email, capabilities: { transfers: { requested: true } },
-      metadata: { influencerCode: inf.code, userId: user.id },
-    }, { idempotencyKey: `connect:${inf.code}` });
-    acct = a.id;
-    await db.prepare('UPDATE influencers SET stripe_account_id = ? WHERE code = ?').bind(acct, inf.code).run();
-  }
-  const link = await stripe().accountLinks.create({
-    account: acct, type: 'account_onboarding',
-    refresh_url: `${site}/influencers?payouts=retry`, return_url: `${site}/influencers?payouts=done`,
-  });
-  return link.url;
-}
-
 export async function payoutsCsv(db: D1Database, userId: string): Promise<string | null> {
   const inf = await db.prepare('SELECT code FROM influencers WHERE user_id = ?').bind(userId).first<{ code: string }>();
   if (!inf) return null;
-  const rows = (await db.prepare('SELECT period, amount_cents, stripe_transfer_id, created_at FROM payouts WHERE code = ? ORDER BY created_at')
-    .bind(inf.code).all<{ period: string; amount_cents: number; stripe_transfer_id: string | null; created_at: string }>()).results;
-  return ['period,amount_usd,paid_at,reference', ...rows.map((r) => `${r.period},${(r.amount_cents / 100).toFixed(2)},${r.created_at},${r.stripe_transfer_id ?? ''}`)].join('\n');
+  const rows = (await db.prepare('SELECT amount_cents, status, method, created_at, paid_at FROM payouts WHERE code = ? ORDER BY created_at')
+    .bind(inf.code).all<{ amount_cents: number; status: string; method: string | null; created_at: string; paid_at: string | null }>()).results;
+  return ['requested_at,amount_usd,status,method,paid_at', ...rows.map((r) => `${r.created_at},${(r.amount_cents / 100).toFixed(2)},${r.status},${r.method ?? ''},${r.paid_at ?? ''}`)].join('\n');
 }
 
-/** Monthly job: pay out held-long-enough commissions of at least the minimum to each active, onboarded influencer. */
-export async function runPayouts(db: D1Database, at = new Date()): Promise<{ code: string; cents: number }[]> {
-  const period = at.toISOString().slice(0, 7);
-  const now = at.toISOString();
-  const due = (await db.prepare(
-    `SELECT i.code, i.stripe_account_id, SUM(c.commission_cents) AS cents FROM influencers i
-     JOIN commissions c ON c.code = i.code AND c.status = 'pending' AND c.available_at <= ?
-     WHERE i.status = 'active' AND i.payouts_enabled = 1 AND i.stripe_account_id IS NOT NULL
-     GROUP BY i.code HAVING cents >= ?`,
-  ).bind(now, PAYOUT_MIN_CENTS).all<{ code: string; stripe_account_id: string; cents: number }>()).results;
-  const done: { code: string; cents: number }[] = [];
-  for (const d of due) {
-    const id = crypto.randomUUID();
-    const claim = await db.prepare('INSERT INTO payouts (id, code, amount_cents, period, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(code, period) DO NOTHING')
-      .bind(id, d.code, d.cents, period, now).run();
-    if (!claim.meta?.changes) continue;
-    try {
-      const tr = await stripe().transfers.create({
-        amount: d.cents, currency: 'usd', destination: d.stripe_account_id, description: `Kaalera influencer payout ${period} (${d.code})`,
-      }, { idempotencyKey: `payout:${d.code}:${period}` });
-      await db.batch([
-        db.prepare('UPDATE payouts SET stripe_transfer_id = ? WHERE id = ?').bind(tr.id, id),
-        db.prepare("UPDATE commissions SET status = 'paid', payout_id = ? WHERE code = ? AND status = 'pending' AND available_at <= ?").bind(id, d.code, now),
-      ]);
-      done.push({ code: d.code, cents: d.cents });
-    } catch (err) {
-      console.error(`Payout ${d.code} ${period} failed:`, err);
-      await db.prepare('DELETE FROM payouts WHERE id = ?').bind(id).run();
-    }
+export type PayoutMethod = 'paypal' | 'interac';
+export const PAYOUT_METHODS: Record<PayoutMethod, string> = { paypal: 'PayPal', interac: 'Interac e-Transfer' };
+
+/** Influencer asks to be paid everything available (past the hold). One open request at a time; the owner pays by hand. */
+export async function requestPayout(db: D1Database, userId: string, method: PayoutMethod, payTo: string):
+  Promise<{ error: string } | { id: string; code: string; cents: number }> {
+  const inf = await db.prepare('SELECT code, status FROM influencers WHERE user_id = ?').bind(userId).first<{ code: string; status: string }>();
+  if (!inf) return { error: 'Create your code first.' };
+  if (inf.status !== 'active') return { error: 'Your code is paused. Contact hello@kaalera.com.' };
+  const now = nowIso();
+  const avail = await db.prepare(
+    "SELECT COALESCE(SUM(commission_cents), 0) AS cents FROM commissions WHERE code = ? AND status = 'pending' AND payout_id IS NULL AND available_at <= ?",
+  ).bind(inf.code, now).first<{ cents: number }>();
+  const cents = avail?.cents ?? 0;
+  if (cents < PAYOUT_MIN_CENTS) return { error: `You can request a payout once at least $${(PAYOUT_MIN_CENTS / 100).toFixed(2)} is available.` };
+  const id = crypto.randomUUID();
+  try {
+    await db.batch([
+      db.prepare("INSERT INTO payouts (id, code, amount_cents, period, created_at, status, method, pay_to) VALUES (?, ?, ?, ?, ?, 'requested', ?, ?)")
+        .bind(id, inf.code, cents, now, now, method, payTo),
+      db.prepare("UPDATE commissions SET payout_id = ? WHERE code = ? AND status = 'pending' AND payout_id IS NULL AND available_at <= ?")
+        .bind(id, inf.code, now),
+    ]);
+  } catch {
+    return { error: 'You already have a payout request open.' };
   }
-  return done;
+  const sum = await db.prepare('SELECT COALESCE(SUM(commission_cents), 0) AS cents FROM commissions WHERE payout_id = ?').bind(id).first<{ cents: number }>();
+  if ((sum?.cents ?? 0) !== cents) await db.prepare('UPDATE payouts SET amount_cents = ? WHERE id = ?').bind(sum?.cents ?? 0, id).run();
+  return { id, code: inf.code, cents: sum?.cents ?? cents };
+}
+
+export type PayoutRow = { id: string; code: string; amount_cents: number; status: string; method: string | null; pay_to: string | null; created_at: string; paid_at: string | null; email: string };
+
+export const getPayout = (db: D1Database, id: string): Promise<PayoutRow | null> =>
+  db.prepare('SELECT p.id, p.code, p.amount_cents, p.status, p.method, p.pay_to, p.created_at, p.paid_at, u.email FROM payouts p JOIN influencers i ON i.code = p.code JOIN users u ON u.id = i.user_id WHERE p.id = ?')
+    .bind(id).first<PayoutRow>();
+
+/** Owner marks a requested payout as sent; returns false if it was not open. */
+export async function markPayoutPaid(db: D1Database, id: string): Promise<boolean> {
+  const r = await db.prepare("UPDATE payouts SET status = 'paid', paid_at = ? WHERE id = ? AND status = 'requested'").bind(nowIso(), id).run();
+  if (!r.meta?.changes) return false;
+  await db.prepare("UPDATE commissions SET status = 'paid' WHERE payout_id = ?").bind(id).run();
+  return true;
 }

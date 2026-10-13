@@ -10,7 +10,7 @@ import { deleteKundli, getKundli, kundliInput, listKundlis, MAX_KUNDLIS, publicK
 import { LANGUAGES } from './languages.js';
 import { computeChart, computeSky, chartToChatContext } from './kundli/chart.js';
 import { createLoginToken, destroySession, redeemLoginToken, userForSession, type User } from './auth.js';
-import { sendContactEmails, sendLoginEmail } from './email.js';
+import { escapeHtml, sendContactEmails, sendLoginEmail, sendPayoutRequestEmail, sendPayoutSentEmail } from './email.js';
 import { cryptoProvider, stripe } from './stripe.js';
 import {
   apiBalance, authenticateApiKey, createApiKey, grantApiCredits, listApiKeys, listApiLedger,
@@ -34,7 +34,7 @@ import { affiliatesPage, influencersPage } from './programs.js';
 import { isAdmin } from './admin.js';
 import { CLIENT_EVENTS, markLeadSignedUp, saveLead, trackPayment, trackSafe, type FunnelEvent } from './analytics.js';
 import { addReminder, listReminders, sendDueReminders } from './reminders.js';
-import { attributeSignup, captureReferral, connectLink, createInfluencer, grantFriendBonus, partnerState, payoutsCsv, runPayouts, validateCode } from './partners.js';
+import { attributeSignup, captureReferral, createInfluencer, getPayout, grantFriendBonus, markPayoutPaid, partnerState, PAYOUT_METHODS, payoutsCsv, requestPayout, validateCode, type PayoutMethod } from './partners.js';
 import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
 import { layout } from './seo/layout.js';
 import { TOPICS, topicPage } from './seo/topics.js';
@@ -346,16 +346,53 @@ app.post('/api/partner/code', async (c) => {
   return c.json({ ok: true, code: v.code });
 });
 
-app.post('/api/partner/connect', async (c) => {
+app.post('/api/partner/payout-request', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
-  try {
-    const url = await connectLink(c.env.DB, user, env.siteUrl);
-    return url ? c.json({ url }) : c.json({ error: 'Create your code first.' }, 400);
-  } catch (err) {
-    console.error('Stripe Connect link failed:', err);
-    return c.json({ error: 'Payout setup is not available right now.' }, 503);
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  const p = z.object({ method: z.enum(['paypal', 'interac']), to: z.string().trim().email().max(200) }).strict()
+    .safeParse(await c.req.json().catch(() => null));
+  if (!p.success) return c.json({ error: 'Choose PayPal or Interac and enter a valid payout email.' }, 400);
+  const to = p.data.to.toLowerCase();
+  const r = await requestPayout(c.env.DB, user.id, p.data.method, to);
+  if ('error' in r) return c.json({ error: r.error }, 400);
+  background(c, sendPayoutRequestEmail({
+    to: env.support.email ?? env.adminEmails[0], code: r.code, cents: r.cents, method: PAYOUT_METHODS[p.data.method],
+    payTo: to, account: user.email, link: `${env.siteUrl}/api/owner/payouts/${r.id}`,
+  }).catch((err) => console.error('Payout request email failed:', err)));
+  return c.json({ ok: true, cents: r.cents });
+});
+
+const ownerHtml = (title: string, inner: string): string =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)} · Kaalera</title></head>`
+  + `<body style="font-family:system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 16px"><h2>${escapeHtml(title)}</h2>${inner}</body></html>`;
+
+/** Owner-only page from the payout-request email: shows where to send the money and marks it paid. */
+app.get('/api/owner/payouts/:id', async (c) => {
+  c.header('Cache-Control', 'no-store');
+  const user = c.get('user');
+  if (!user) return c.html(ownerHtml('Sign in first', '<p>Sign in to Kaalera with the owner email, then open this link again.</p><p><a href="/?app=1">Sign in</a></p>'), 401);
+  if (!isAdmin(user.email)) return c.html(ownerHtml('Not found', ''), 404);
+  const p = await getPayout(c.env.DB, c.req.param('id'));
+  if (!p) return c.html(ownerHtml('Not found', ''), 404);
+  const details = `<p>Code: <b>${escapeHtml(p.code)}</b><br>Amount: <b>$${(p.amount_cents / 100).toFixed(2)}</b><br>`
+    + `Send by: ${escapeHtml(PAYOUT_METHODS[p.method as PayoutMethod] ?? p.method ?? '')}<br>Send to: <b>${escapeHtml(p.pay_to ?? '')}</b><br>Requested: ${escapeHtml(p.created_at.slice(0, 10))}</p>`;
+  if (p.status === 'paid') return c.html(ownerHtml('Payout paid', `${details}<p>Marked as paid on ${escapeHtml((p.paid_at ?? '').slice(0, 10))}.</p>`));
+  return c.html(ownerHtml('Payout request', `${details}<p>Send the money first, then press the button.</p>`
+    + '<form method="post"><button type="submit" style="background:#111;color:#fff;border:0;padding:10px 18px;border-radius:8px;font-size:15px">I sent it, mark as paid</button></form>'));
+});
+
+app.post('/api/owner/payouts/:id', async (c) => {
+  const user = c.get('user');
+  if (!user || !isAdmin(user.email) || !sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const id = c.req.param('id');
+  const p = await getPayout(c.env.DB, id);
+  if (!p) return c.html(ownerHtml('Not found', ''), 404);
+  if (await markPayoutPaid(c.env.DB, id)) {
+    background(c, sendPayoutSentEmail({ to: p.email, code: p.code, cents: p.amount_cents, method: PAYOUT_METHODS[p.method as PayoutMethod] ?? 'PayPal' })
+      .catch((err) => console.error('Payout sent email failed:', err)));
   }
+  return c.redirect(`/api/owner/payouts/${id}`, 303);
 });
 
 app.get('/api/partner/payouts.csv', async (c) => {
@@ -912,16 +949,11 @@ app.onError((err, c) => {
   return c.json({ error: 'Something went wrong.' }, 500);
 });
 
-const PAYOUT_CRON = '0 6 1 * *';
-
 export default {
   fetch: app.fetch,
-  async scheduled(event: { cron: string }, bindings: { DB: D1Database }, ctx: { waitUntil(p: Promise<unknown>): void }) {
-    if (event.cron === PAYOUT_CRON) ctx.waitUntil(runPayouts(bindings.DB).then((done) => console.log('Influencer payouts:', JSON.stringify(done))));
-    else {
-      ctx.waitUntil(sendDueReminders(bindings.DB).then((n) => console.log('Reminders sent:', n)));
-      ctx.waitUntil(bindings.DB.prepare("DELETE FROM email_leads WHERE signed_up = 0 AND created_at < ?")
-        .bind(new Date(Date.now() - 90 * 86_400_000).toISOString()).run().catch((err) => console.error('Lead cleanup failed:', err)));
-    }
+  async scheduled(_event: { cron: string }, bindings: { DB: D1Database }, ctx: { waitUntil(p: Promise<unknown>): void }) {
+    ctx.waitUntil(sendDueReminders(bindings.DB).then((n) => console.log('Reminders sent:', n)));
+    ctx.waitUntil(bindings.DB.prepare("DELETE FROM email_leads WHERE signed_up = 0 AND created_at < ?")
+      .bind(new Date(Date.now() - 90 * 86_400_000).toISOString()).run().catch((err) => console.error('Lead cleanup failed:', err)));
   },
 };

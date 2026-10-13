@@ -27,19 +27,19 @@ export const affiliatesPage = (site: string): string => page(site, '/affiliates'
 <script type="module" src="/partner.js"></script>`);
 
 export const influencersPage = (site: string): string => page(site, '/influencers', 'Influencer program: earn 10% with your own code',
-  'Create your own Kaalera code. Your followers get 2 free questions with Kaal, and you earn 10% of their first paid consultation, paid monthly through Stripe.', `
-<p class="w-lead">Create your own code, like <strong>PRIYA</strong> or <strong>ASTROWITHRAJ</strong>. Your followers get <strong>2 free questions</strong> with Kaal, and you earn <strong>10%</strong> of their first paid consultation.</p>
+  'Get your own Kaalera share link. Everyone who signs up through it counts under you: they get 2 free questions with Kaal, and you earn 10% of their first paid consultation.', `
+<p class="w-lead">Get your own <strong>share link</strong>, like kaalera.com/?code=PRIYA. Everyone who signs up through it counts under you: they get <strong>2 free questions</strong> with Kaal, and you earn <strong>10%</strong> of their first paid consultation.</p>
 <h2>How it works</h2>
 <ol>
-<li>Sign in and open <strong>Influencers</strong> in the menu to create your code.</li>
-<li>Share your code or link (kaalera.com/?code=YOURCODE) in your bio, videos and posts.</li>
-<li>People who sign up with your code get 2 free questions instead of 1.</li>
+<li>Sign in, open <strong>Influencers</strong> in the menu and pick your code, like <strong>PRIYA</strong> or <strong>ASTROWITHRAJ</strong>. That gives you your share link.</li>
+<li>Put your link in your bio, videos and posts. Followers can also type your code when they sign up.</li>
+<li>Everyone who signs up through your link gets 2 free questions instead of 1, and their payments count under you.</li>
 <li>You earn 10% of each referred customer's first paid consultation: the opening and any extra questions in it, before taxes &amp; fees.</li>
 </ol>
 <h2>Payouts</h2>
 <ul>
-<li>Paid monthly in USD through Stripe, which handles your bank details, identity check and tax forms.</li>
-<li>Earnings are held 30 days, then paid on the 1st of the month once you have at least $50.</li>
+<li>Earnings are held 30 days. Once at least $50 is available, tap <strong>Request payout</strong> on your dashboard.</li>
+<li>We send it in USD by PayPal or Interac e-Transfer to the email you give, and email you when it's sent.</li>
 <li>Your dashboard shows clicks, sign-ups, paying customers, earnings and payouts. Customer names and emails are never shown.</li>
 </ul>
 <h2>Rules</h2>
