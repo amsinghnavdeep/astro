@@ -34,6 +34,7 @@ import { affiliatesPage, influencersPage } from './programs.js';
 import { chatPrices } from './festivals.js';
 import { sendExpiryReminders, sendFestivalEmails, sendInfluencerDigests, unsubscribe, validUnsubToken } from './engagement.js';
 import { isAdmin } from './admin.js';
+import { adminPage, type Person } from './adminPage.js';
 import { CLIENT_EVENTS, funnel, markLeadSignedUp, saveLead, trackPayment, trackSafe, type FunnelEvent } from './analytics.js';
 import { addReminder, listReminders, sendDueReminders } from './reminders.js';
 import { attributeSignup, captureReferral, createInfluencer, getPayout, grantFriendBonus, markPayoutPaid, partnerState, PAYOUT_METHODS, payoutsCsv, requestPayout, validateCode, type PayoutMethod } from './partners.js';
@@ -372,39 +373,33 @@ const ownerHtml = (title: string, inner: string): string =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)} · Kaalera</title></head>`
   + `<body style="font-family:system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 16px"><h2>${escapeHtml(title)}</h2>${inner}</body></html>`;
 
-/** Owner-only dashboard: daily funnel and payment totals. Counts only, no customer names or emails. */
+/** Owner-only dashboard: funnel, revenue and people. Never shows chat text or birth details. */
 app.get('/admin', async (c) => {
   c.header('Cache-Control', 'no-store');
+  c.header('X-Robots-Tag', 'noindex');
   const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
   if (!user) return c.html(ownerHtml('Sign in first', '<p>Sign in to Kaalera with the owner email, then open this page again.</p><p><a href="/?app=1">Sign in</a></p>'), 401);
   if (!isAdmin(user.email)) return c.html(ownerHtml('Not found', ''), 404);
   const days = Math.min(365, Math.max(1, Number(c.req.query('days')) || 30));
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
-  const f = await funnel(c.env.DB, days);
-  const pays = (await c.env.DB.prepare(
-    "SELECT substr(created_at, 1, 10) AS day, kind, COUNT(*) AS n, SUM(amount_cents) AS cents FROM payments WHERE created_at >= ? GROUP BY day, kind ORDER BY day DESC",
-  ).bind(since).all<{ day: string; kind: string; n: number; cents: number }>()).results;
-  const all = await c.env.DB.prepare(
-    'SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM payments) AS payments, (SELECT COALESCE(SUM(amount_cents), 0) FROM payments) AS cents',
-  ).first<{ users: number; payments: number; cents: number }>();
-  const usd = (cents: number) => `$${(cents / 100).toFixed(2)}`;
-  const t = f.totals;
-  const rev = pays.reduce((a, p) => a + p.cents, 0);
-  const tile = (label: string, v: string | number) => `<div class="tile"><b>${escapeHtml(String(v))}</b><span>${escapeHtml(label)}</span></div>`;
-  const events = Object.keys(t).filter((e) => !e.startsWith('leads_'));
-  const byDay = new Map<string, Record<string, number>>();
-  for (const r of f.daily) (byDay.get(r.day) ?? byDay.set(r.day, {}).get(r.day)!)[r.event] = r.n;
-  const dayRows = [...byDay.keys()].sort().reverse().map((d) => `<tr><td>${d}</td>${events.map((e) => `<td>${byDay.get(d)![e] ?? ''}</td>`).join('')}</tr>`).join('');
-  const payRows = pays.map((p) => `<tr><td>${p.day}</td><td>${escapeHtml(p.kind)}</td><td>${p.n}</td><td>${usd(p.cents)}</td></tr>`).join('');
-  const range = [7, 30, 90, 365].map((d) => d === days ? `<b>${d} days</b>` : `<a href="/admin?days=${d}">${d} days</a>`).join(' · ');
-  return c.html(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Kaalera</title>
-<style>body{font-family:system-ui,sans-serif;max-width:1000px;margin:32px auto;padding:0 16px;color:#1c1917}h1{font-size:22px}h2{font-size:17px;margin-top:28px}.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}.tile{border:1px solid #e7e5e4;border-radius:10px;padding:12px}.tile b{display:block;font-size:22px;color:#c2410c}.tile span{font-size:13px;color:#57534e}table{border-collapse:collapse;width:100%;font-size:13px;overflow-x:auto;display:block}td,th{border-bottom:1px solid #e7e5e4;padding:6px 8px;text-align:left;white-space:nowrap}th{background:#fafaf9}.muted{color:#78716c;font-size:13px}</style></head>
-<body><h1>Kaalera admin</h1><p class="muted">Last ${range}. Counts only, no customer details. Bots aren't counted.</p>
-<div class="tiles">${tile('Revenue', usd(rev))}${tile('Payments', pays.reduce((a, p) => a + p.n, 0))}${tile('Home page views', t.home_view ?? 0)}${tile('Sign-ups', t.signup ?? 0)}${tile('Free questions', t.free_question ?? 0)}${tile('Checkouts opened', t.checkout_opened ?? 0)}${tile('First payments', t.first_payment ?? 0)}${tile('Repeat payments', t.repeat_payment ?? 0)}${tile('Emails typed, no sign-up', t.leads_abandoned ?? 0)}</div>
-<p class="muted">All time: ${all?.users ?? 0} accounts · ${all?.payments ?? 0} payments · ${usd(all?.cents ?? 0)} revenue.</p>
-<h2>Payments by day</h2>${payRows ? `<table><tr><th>Day</th><th>Type</th><th>Count</th><th>Amount</th></tr>${payRows}</table>` : '<p class="muted">No payments in this period.</p>'}
-<h2>Activity by day</h2>${dayRows ? `<table><tr><th>Day</th>${events.map((e) => `<th>${escapeHtml(e.replace(/_/g, ' '))}</th>`).join('')}</tr>${dayRows}</table>` : '<p class="muted">No activity in this period.</p>'}
-</body></html>`);
+  const db = c.env.DB;
+  const [f, revenue, all, people] = await Promise.all([
+    funnel(db, days),
+    db.prepare('SELECT substr(created_at, 1, 10) AS day, SUM(amount_cents) AS cents, COUNT(*) AS n FROM payments WHERE created_at >= ? GROUP BY day')
+      .bind(since).all<{ day: string; cents: number; n: number }>(),
+    db.prepare('SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM payments) AS payments, (SELECT COALESCE(SUM(amount_cents), 0) FROM payments) AS cents')
+      .first<{ users: number; payments: number; cents: number }>(),
+    db.prepare(`SELECT u.name, u.email, u.account_type, u.business_name, u.created_at, u.last_seen_at,
+        (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'web') AS web,
+        (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'api') AS api,
+        (SELECT COALESCE(SUM(amount_cents), 0) FROM payments p WHERE p.user_id = u.id) AS cents,
+        (SELECT substr(group_concat(m.body, ' '), 1, 6000) FROM messages m JOIN threads t ON t.id = m.thread_id WHERE t.user_id = u.id AND m.role = 'user') AS asked
+      FROM users u ORDER BY COALESCE(u.last_seen_at, u.created_at) DESC LIMIT 1000`).all<Person>(),
+  ]);
+  return c.html(adminPage({
+    days, q: (c.req.query('q') ?? '').trim().slice(0, 100), pain: (c.req.query('pain') ?? '').slice(0, 40), totals: f.totals,
+    revenue: revenue.results, all: all ?? { users: 0, payments: 0, cents: 0 }, people: people.results,
+  }));
 });
 
 /** Owner-only page from the payout-request email: shows where to send the money and marks it paid. */
