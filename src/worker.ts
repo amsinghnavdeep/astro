@@ -32,6 +32,7 @@ import { autoChargeQuestion, autoRechargeApi, ensureCustomer, getBilling, public
 import { CONTACT_TOPICS, contactPage, privacyPage, termsPage } from './legal.js';
 import { affiliatesPage, influencersPage } from './programs.js';
 import { isAdmin } from './admin.js';
+import { CLIENT_EVENTS, markLeadSignedUp, saveLead, trackPayment, trackSafe, type FunnelEvent } from './analytics.js';
 import { addReminder, listReminders, sendDueReminders } from './reminders.js';
 import { attributeSignup, captureReferral, connectLink, createInfluencer, grantFriendBonus, partnerState, payoutsCsv, runPayouts, validateCode } from './partners.js';
 import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
@@ -154,6 +155,7 @@ async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadI
   });
   if (!s.url) throw new Error('Stripe returned no checkout URL');
   await c.env.DB.prepare('UPDATE purchase_consents SET stripe_session_id = ? WHERE id = ?').bind(s.id, consentId).run();
+  background(c, trackSafe(c.env.DB, 'checkout_opened'));
   return s.url;
 }
 
@@ -171,14 +173,20 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
       `INSERT INTO payments (stripe_session_id, user_id, thread_id, kind, amount_cents, currency, created_at)
        VALUES (?, ?, NULL, 'api_credits', ?, ?, ?) ON CONFLICT(stripe_session_id) DO NOTHING`,
     ).bind(s.id, m.userId, s.amount_total ?? 0, s.currency ?? env.stripe.currency, new Date().toISOString()).run();
-    if (ins.meta?.changes) await sendReceipt(db, m.userId, { ...receipt, item: `API wallet top-up ${usdCents(Number(m.credits))}`, api: true });
+    if (ins.meta?.changes) {
+      await sendReceipt(db, m.userId, { ...receipt, item: `API wallet top-up ${usdCents(Number(m.credits))}`, api: true });
+      await trackPayment(db, m.userId);
+    }
     return { kind, threadId: null };
   }
   const t = await applyPayment(db, {
     stripeSessionId: s.id, userId: m.userId, threadId: m.threadId, kind, credits: Number(m.credits) || 1,
     amountCents: s.amount_total ?? 0, currency: s.currency ?? env.stripe.currency,
   });
-  if (t) await sendReceipt(db, m.userId, { ...receipt, item: RECEIPT_ITEM[kind] });
+  if (t) {
+    await sendReceipt(db, m.userId, { ...receipt, item: RECEIPT_ITEM[kind] });
+    await trackPayment(db, m.userId);
+  }
   const current = t ?? (await getThreadById(db, m.threadId));
   if (current && !current.devin_session_id && current.status !== 'starting') {
     try {
@@ -254,12 +262,13 @@ app.use('/api/*', async (c, next) => {
 const unauth = (c: C) => c.json({ error: 'account_required' }, 401);
 
 app.post('/api/login', async (c) => {
-  const p = z.object({ email: z.string().trim().email().max(200), name: z.string().trim().max(80).optional() })
+  const p = z.object({ email: z.string().trim().email().max(200), name: z.string().trim().max(80).optional(), optin: z.boolean().optional() })
     .safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: 'Enter a valid email.' }, 400);
   const email = p.data.email.toLowerCase();
   if (isDisposable(email) && !(await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first()))
     return c.json({ error: 'Please use your regular email address. Temporary email services are not accepted.' }, 400);
+  if (p.data.optin) await saveLead(c.env.DB, email, true).catch((err) => console.error('Lead save failed:', err));
   const token = await createLoginToken(c.env.DB, email, p.data.name);
   if (!token) return c.json({ error: 'Too many sign-in links requested. Try again in 15 minutes.' }, 429);
   const link = `${env.siteUrl}/auth/verify?token=${encodeURIComponent(token)}`;
@@ -273,15 +282,42 @@ app.post('/api/login', async (c) => {
   return c.json({ sent: true });
 });
 
+const sameSite = (c: C): boolean => {
+  const origin = c.req.header('origin');
+  return !!origin && (origin === new URL(env.siteUrl).origin || origin === new URL(c.req.url).origin);
+};
+
+app.post('/api/lead', async (c) => {
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  const p = z.object({ email: z.string().trim().email().max(200), optin: z.boolean().optional() }).strict()
+    .safeParse(await c.req.json().catch(() => null));
+  if (!p.success) return c.json({ ok: false }, 400);
+  const email = p.data.email.toLowerCase();
+  if (isDisposable(email)) return c.json({ ok: false }, 400);
+  if (await saveLead(c.env.DB, email, !!p.data.optin)) background(c, trackSafe(c.env.DB, 'email_typed'));
+  return c.json({ ok: true });
+});
+
+app.post('/api/track', async (c) => {
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  const event = ((await c.req.json().catch(() => ({}))) as { event?: unknown }).event;
+  if (typeof event !== 'string' || !CLIENT_EVENTS.includes(event as FunnelEvent)) return c.json({ ok: false }, 400);
+  background(c, trackSafe(c.env.DB, event as FunnelEvent));
+  return c.json({ ok: true });
+});
+
 app.get('/auth/verify', async (c) => {
   const session = await redeemLoginToken(c.env.DB, c.req.query('token') ?? '');
   if (!session) return c.redirect('/?login=expired');
   const fresh = await userForSession(c.env.DB, session);
-  if (fresh) await attributeSignup(c, c.env.DB, fresh, await freeKeys(c)).catch((err) => console.error('Referral attribution failed:', err));
+  if (fresh) {
+    await attributeSignup(c, c.env.DB, fresh, await freeKeys(c)).catch((err) => console.error('Referral attribution failed:', err));
+    background(c, Promise.all([trackSafe(c.env.DB, 'signup'), markLeadSignedUp(c.env.DB, fresh.email)]));
+  }
   setCookie(c, COOKIE, session, {
     httpOnly: true, sameSite: 'Lax', path: '/', secure: env.siteUrl.startsWith('https'), maxAge: 60 * 60 * 24 * 30,
   });
-  return c.redirect('/');
+  return c.redirect('/?app=1');
 });
 
 app.post('/api/ref', async (c) => {
@@ -403,7 +439,8 @@ async function upsertKundli(c: C, id?: string) {
   const data = parsed.success ? named(parsed.data) : null;
   if (!data) return c.json({ error: BIRTH_ERROR }, 400);
   if (!id && (await listKundlis(c.env.DB, user.id)).length >= MAX_KUNDLIS) return c.json({ error: `You can save up to ${MAX_KUNDLIS} Kundlis.` }, 400);
-  if (!(await chartText({ ...data, language: 'English' }))) return c.json({ error: 'Could not compute this chart. Check the date, time and birthplace.' }, 400);
+  if (!(await chartText({ ...data, language: 'English' }))) return c.json({ error: 'Could not calculate this Kundli. Check the date, time and birthplace.' }, 400);
+  if (!id) background(c, trackSafe(c.env.DB, 'kundli_added'));
   const k = await saveKundli(c.env.DB, user.id, data, id);
   return k ? c.json({ kundli: publicKundli(k) }, id ? 200 : 201) : c.json({ error: 'Not found' }, 404);
 }
@@ -432,9 +469,10 @@ app.post('/api/threads', async (c) => {
   const p = { data: { ...kundliInput(k), language: body.data.language, question: body.data.question } };
   if ((await listThreads(db, user.id)).length >= MAX_THREADS) return c.json({ error: `You can keep up to ${MAX_THREADS} consultations.` }, 400);
   const chart = await chartText(p.data);
-  if (!chart) return c.json({ error: 'Could not compute this chart. Check the date, time and birthplace.' }, 400);
+  if (!chart) return c.json({ error: 'Could not calculate this Kundli. Check the date, time and birthplace.' }, 400);
 
   const free = !blocked && (await claimFreeConsultation(db, user.id));
+  if (free) background(c, trackSafe(db, 'free_question'));
   if (free) {
     await recordFreeClaims(db, user.id, keys);
     await grantFriendBonus(db, user);
@@ -517,6 +555,7 @@ app.post('/api/threads/:id/reminders', async (c) => {
   const p = z.object({ area: z.string().trim().min(1).max(80), when: z.string().trim().min(4).max(60) }).safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: 'Bad reminder.' }, 400);
   const r = await addReminder(c.env.DB, t.user_id, t.id, p.data.area, p.data.when);
+  if (!('error' in r)) background(c, trackSafe(c.env.DB, 'reminder_set'));
   return 'error' in r ? c.json(r, 409) : c.json(r);
 });
 
@@ -576,7 +615,7 @@ app.post('/api/threads/:id/messages', async (c) => {
     const k = await getKundli(c.env.DB, t.user_id, p.data.kundliId);
     if (!k) return c.json({ error: 'That Kundli was not found.' }, 400);
     context = (await chartContext(k, t.full_name)) ?? undefined;
-    if (!context) return c.json({ error: 'Could not compute that chart. Check its birth details.' }, 400);
+    if (!context) return c.json({ error: 'Could not calculate that Kundli. Check its birth details.' }, 400);
   }
   let r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context);
   let autoCharged = false;
@@ -710,7 +749,7 @@ app.post('/v1/consultations', async (c) => {
   if (!p.success) return apiError(c, 400, 'invalid_request', parsed.success ? 'fullName is required unless newborn is true.' : parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   const db = c.env.DB;
   const chart = await chartText(p.data);
-  if (!chart) return apiError(c, 400, 'chart_failed', 'Could not compute the chart. Check date, time, place and timezone.');
+  if (!chart) return apiError(c, 400, 'chart_failed', 'Could not calculate the Kundli. Check date, time, place and timezone.');
   const t = newThread(userId, p.data, chart, p.data.question, { source: 'api', api_key_id: keyId });
   const price = apiPrice(await getPrices(db));
   if ((await apiBalance(db, userId)) < price.startCents) await autoRechargeApi(db, userId, price.startCents);
@@ -819,13 +858,15 @@ app.route('/api/admin', admin);
 
 /* ---------- public SEO pages: server-rendered, edge-cached, refreshed on every blog change ---------- */
 
-const PUBLIC_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
+/** Bump when public page HTML or headers change so cached copies are replaced. */
+const PUBLIC_CACHE_REV = '2026-10-cf-analytics';
+const PUBLIC_CSP = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
 const CONTENT_TYPE = { html: 'text/html; charset=utf-8', xml: 'application/xml; charset=utf-8', rss: 'application/rss+xml; charset=utf-8', text: 'text/plain; charset=utf-8' } as const;
 const edgeCache = (): Cache | undefined => (typeof caches === 'undefined' ? undefined : (caches as unknown as { default: Cache }).default);
 
 async function publicPage(c: C, type: keyof typeof CONTENT_TYPE, render: () => Promise<string | null>): Promise<Response> {
   const cache = edgeCache();
-  const key = new Request(`${new URL(c.req.url).origin}${c.req.path}?v=${await blogVersion(c.env.DB)}`);
+  const key = new Request(`${new URL(c.req.url).origin}${c.req.path}?v=${await blogVersion(c.env.DB)}&r=${PUBLIC_CACHE_REV}`);
   const hit = cache ? await cache.match(key) : undefined;
   if (hit) return new Response(hit.body, hit);
   const body = await render();
@@ -877,6 +918,10 @@ export default {
   fetch: app.fetch,
   async scheduled(event: { cron: string }, bindings: { DB: D1Database }, ctx: { waitUntil(p: Promise<unknown>): void }) {
     if (event.cron === PAYOUT_CRON) ctx.waitUntil(runPayouts(bindings.DB).then((done) => console.log('Influencer payouts:', JSON.stringify(done))));
-    else ctx.waitUntil(sendDueReminders(bindings.DB).then((n) => console.log('Reminders sent:', n)));
+    else {
+      ctx.waitUntil(sendDueReminders(bindings.DB).then((n) => console.log('Reminders sent:', n)));
+      ctx.waitUntil(bindings.DB.prepare("DELETE FROM email_leads WHERE signed_up = 0 AND created_at < ?")
+        .bind(new Date(Date.now() - 90 * 86_400_000).toISOString()).run().catch((err) => console.error('Lead cleanup failed:', err)));
+    }
   },
 };

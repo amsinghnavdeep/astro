@@ -232,7 +232,7 @@ function renderBilling(): void {
     <div class="d-pack">
       <div class="d-pack-credits">${usd(p.cents)}</div>
       <div class="d-muted d-small">about ${plural(Math.floor(p.cents / ap.questionCents), 'question')}</div>
-      <div class="d-pack-price">${usd(p.cents)}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
+      <div class="d-pack-price">${usd(withFee(p.cents))}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
       <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Add ${usd(p.cents)}</button>
     </div>`).join('');
   renderAutoRecharge();
@@ -240,7 +240,7 @@ function renderBilling(): void {
     <div class="d-pack">
       <div class="d-pack-credits">${plural(p.credits, 'credit')}</div>
       <div class="d-muted d-small">${plural(p.credits, 'question')}</div>
-      <div class="d-pack-price">${usd(p.cents)}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
+      <div class="d-pack-price">${usd(withFee(p.cents))}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
       <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Buy ${usd(p.cents)}</button>
     </div>`).join('');
 }
@@ -248,7 +248,7 @@ function renderBilling(): void {
 $('packs').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pack]');
   if (!btn) return;
-  if (!(await confirmPurchase('api', (btn.textContent ?? '').replace(/^Buy\s*/, '') + taxFeeNote(state?.taxFeePercent ?? 0), { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0 }))) return;
+  if (!(await confirmPurchase('api', `${usd(withFee((state?.packs ?? []).find((p) => p.id === btn.dataset.pack)?.cents ?? 0))}${taxFeeNote(state?.taxFeePercent ?? 0)}`, { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0 }))) return;
   $('buy-error').textContent = '';
   btn.disabled = true;
   btn.textContent = 'Opening secure checkout…';
@@ -278,7 +278,7 @@ function renderAutoRecharge(): void {
 }
 
 const arText = (b: BillingInfo): string =>
-  `When your wallet drops below ${usd(b.apiLowCents)}, we add ${usd(b.apiAutoRechargeCents)} for ${usd(withFee(b.apiAutoRechargeCents))} (${usd(b.apiAutoRechargeCents)}${taxFeeNote(state?.taxFeePercent ?? 0)}), up to ${usd(b.apiAutoRechargeCapCents)} a month.`;
+  `When your wallet drops below ${usd(b.apiLowCents)}, we add ${usd(b.apiAutoRechargeCents)} to your wallet for ${usd(withFee(b.apiAutoRechargeCents))}${taxFeeNote(state?.taxFeePercent ?? 0)}, up to ${usd(b.apiAutoRechargeCapCents)} a month.`;
 
 $('ar-form').addEventListener('submit', async (e) => {
   e.preventDefault();

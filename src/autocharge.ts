@@ -1,3 +1,4 @@
+import { trackPayment } from './analytics.js';
 /**
  * Saved-card billing, on by default:
  *  - chat: when a consultation is out of questions, the next question is charged off-session (extra question + fee).
@@ -82,6 +83,7 @@ export async function autoChargeQuestion(db: D1Database, t: Thread, used: number
   await applyPayment(db, { stripeSessionId: pi.id, userId: t.user_id, threadId: t.id, kind: 'topup', credits: 1, amountCents: pi.amount, currency: pi.currency });
   await db.prepare('UPDATE payments SET auto = 1 WHERE stripe_session_id = ?').bind(pi.id).run();
   await sendReceipt(db, t.user_id, { item: RECEIPT_ITEM.topup, totalCents: pi.amount, baseCents: p.extraQuestionCents, auto: true, ref: pi.id });
+  await trackPayment(db, t.user_id);
   return true;
 }
 

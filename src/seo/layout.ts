@@ -71,6 +71,7 @@ ${article && m.modified ? `<meta property="article:modified_time" content="${esc
 <link rel="stylesheet" href="/site.css">
 <script src="/theme.js"></script>
 ${(m.jsonLd ?? []).map((o) => `<script type="application/ld+json">${ldJson(o)}</script>`).join('\n')}
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "f7e133eb76b54c81ab5181bb69473560"}'></script>
 </head>
 <body>
 <header class="w-top">

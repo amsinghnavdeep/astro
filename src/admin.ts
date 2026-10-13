@@ -5,6 +5,7 @@ import { env } from './env.js';
 import { deletePost, listPosts, savePost, slugify } from './blog.js';
 import { getPrices, priceHistory, PRICE_LIMITS, setPrices, type Prices } from './settings.js';
 import type { AppEnv } from './types.js';
+import { funnel } from './analytics.js';
 
 export const admin = new Hono<AppEnv>();
 export const isAdmin = (email: string | undefined | null): boolean => !!email && env.adminEmails.includes(email.toLowerCase());
@@ -17,6 +18,12 @@ admin.use('*', async (c, next) => {
 });
 
 admin.get('/me', (c) => c.json({ admin: true, email: c.get('user')!.email }));
+
+/** Funnel totals only — no emails, names or per-user rows. */
+admin.get('/funnel', async (c) => {
+  const days = Math.min(365, Math.max(1, Number(c.req.query('days')) || 30));
+  return c.json(await funnel(c.env.DB, days));
+});
 
 const int = (k: keyof Prices) => z.number().int().min(PRICE_LIMITS[k][0]).max(PRICE_LIMITS[k][1]);
 const pricesSchema = z.object({

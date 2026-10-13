@@ -1,5 +1,5 @@
 import { confirmPurchase } from './consent.js';
-import { taxFeeNote } from '../disclaimer.js';
+import { allIn, taxFeeNote } from '../disclaimer.js';
 import { renderMarkdown } from '../markdown.js';
 import { isPdfRequest, openReport, parseAnswer } from './extras.js';
 import { autoChargeNotice, saveBilling, type BillingInfo } from './billing.js';
@@ -69,7 +69,7 @@ async function api<T>(url: string, init?: RequestInit) {
 const money = (cents: number, currency = 'usd') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const packLabel = (p: Pricing) => `Add a question — ${money(p.extraQuestionCents, p.currency)}${taxFeeNote(p.taxFeePercent)}`;
+const packLabel = (p: Pricing) => `Add a question — ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}`;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -115,7 +115,7 @@ function fillLanguages(select: HTMLSelectElement, langs: string[], value = 'Engl
 const credTotal = (): number => (me?.chatCredits ?? []).reduce((n, l) => n + l.credits, 0);
 
 async function goToCheckout(threadId: string, btn?: HTMLButtonElement, cents = me!.pricing.packCents): Promise<void> {
-  if (!(await confirmPurchase('chat', money(cents, me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
+  if (!(await confirmPurchase('chat', money(allIn(cents, me!.pricing.taxFeePercent), me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
@@ -133,6 +133,7 @@ document.addEventListener('click', (e) => {
   const t = e.target as HTMLElement;
   if (t.closest('[data-signin]')) openSignin();
   if (t.closest('[data-signup]')) openSignin(false, true);
+  if (t.closest('[data-open-app]')) void enterApp();
   if (t.closest('[data-close]')) (t.closest('dialog') as HTMLDialogElement | null)?.close();
   const add = t.closest<HTMLButtonElement>('[data-addq]');
   if (add && current) goToCheckout(current.id, add, me!.pricing.extraQuestionCents);
@@ -152,7 +153,7 @@ async function renderPrices(): Promise<void> {
   const p = data;
   $('l-prices').replaceChildren(
     priceCard('Free', money(0, p.currency), `Your first consultation: an opening reading plus ${plural(p.freeQuestions, 'question')} answered.`),
-    priceCard('Consultation', money(p.packCents, p.currency), `Start a consultation with your first question. Each extra question is ${money(p.extraQuestionCents, p.currency)}.${p.taxFeePercent ? ` Plus a flat ${p.taxFeePercent}% taxes & fees.` : ''}`),
+    priceCard('Consultation', money(allIn(p.packCents, p.taxFeePercent), p.currency), `Start a consultation with your first question. Each extra question is ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)}.${p.taxFeePercent ? ' Taxes & fees included.' : ''}`),
     priceCard(`${p.consultationDays}-day consultations`, `${p.consultationDays} days`, `Each consultation stays open for ${p.consultationDays} days, then becomes read-only.`),
   );
 }
@@ -248,7 +249,8 @@ function openSignin(expired = false, signup = false): void {
 
 function startFromLanding(text: string): void {
   if (text.trim()) sessionStorage.setItem(PENDING_Q, text.trim());
-  openSignin();
+  if (me) void enterApp();
+  else openSignin();
 }
 
 $<HTMLFormElement>('l-form').addEventListener('submit', (e) => {
@@ -269,6 +271,16 @@ document.querySelectorAll<HTMLButtonElement>('.l-chip').forEach((c) =>
   }),
 );
 
+const loginEmail = $<HTMLFormElement>('login-form').querySelector<HTMLInputElement>('input[name=email]')!;
+let lastLead = '';
+loginEmail.addEventListener('blur', () => {
+  const email = loginEmail.value.trim().toLowerCase();
+  if (email === lastLead || !loginEmail.checkValidity() || !/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) return;
+  lastLead = email;
+  const optin = $<HTMLFormElement>('login-form').querySelector<HTMLInputElement>('input[name=optin]')?.checked ?? false;
+  void fetch('/api/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, optin }), keepalive: true }).catch(() => undefined);
+});
+
 $<HTMLFormElement>('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target as HTMLFormElement;
@@ -277,7 +289,7 @@ $<HTMLFormElement>('login-form').addEventListener('submit', async (e) => {
   btn.disabled = true;
   const { ok, data } = await api<{ sent: boolean; devLink?: string }>('/api/login', {
     method: 'POST',
-    body: JSON.stringify({ email: String(fd.get('email') ?? ''), name: String(fd.get('name') ?? '') || undefined }),
+    body: JSON.stringify({ email: String(fd.get('email') ?? ''), name: String(fd.get('name') ?? '') || undefined, optin: fd.get('optin') === 'on' }),
   });
   btn.disabled = false;
   if (!ok) {
@@ -365,9 +377,9 @@ function showProfile(question = ''): void {
     submit.textContent = 'Start consultation';
   } else {
     note.innerHTML = '';
-    note.append(el('strong', '', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)} to start.`),
-      ` An opening reading and the answer to your question, open for ${p.consultationDays} days. Extra questions are ${money(p.extraQuestionCents, p.currency)} each. You'll pay securely by card.`);
-    submit.textContent = `Continue to payment — ${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)}`;
+    note.append(el('strong', '', `${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} to start.`),
+      ` An opening reading and the answer to your question, open for ${p.consultationDays} days. Extra questions are ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)} each. You'll pay securely by card.`);
+    submit.textContent = `Continue to payment — ${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}`;
   }
   history.replaceState(null, '', '/');
 }
@@ -451,7 +463,7 @@ profileForm.addEventListener('submit', async (e) => {
     return;
   }
   if (!me!.freeAvailable && credTotal() < 1) {
-    if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
+    if (!(await confirmPurchase('chat', money(allIn(me!.pricing.packCents, me!.pricing.taxFeePercent), me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
     (body as Record<string, unknown>).agreed = true;
   }
   const label = submit.textContent;
@@ -854,13 +866,13 @@ function renderState(): void {
   if (t.expired) {
     panel(`This consultation closed after ${p.consultationDays} days`, 'You can still read it. Start a new consultation to ask more.', btn('Start a new consultation', () => showProfile()));
   } else if (t.status === 'awaiting_payment') {
-    panel('Complete payment to start', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)} for an opening reading and the answer to your question.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
+    panel('Complete payment to start', `${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} for an opening reading and the answer to your question.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
   } else if (t.status === 'failed') {
     panel("Kaal couldn't start this consultation", 'Your question is saved and you were not charged for a failed start.', btn('Retry', retry));
   } else if (isLive && t.questionsLeft < 1 && pending === 0) {
     const b = btn(packLabel(p), () => undefined);
     b.dataset.addq = '';
-    panel("You've used all questions in this consultation", `Add another question for ${money(p.extraQuestionCents, p.currency)}${taxFeeNote(p.taxFeePercent)} · ${timeLeft(t)} in this consultation.`, b);
+    panel("You've used all questions in this consultation", `Add another question for ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} · ${timeLeft(t)} in this consultation.`, b);
   }
   askForm.hidden = !isLive || t.questionsLeft < 1;
   askSubmit.disabled = sending;
@@ -1001,7 +1013,7 @@ function renderAutoToggle(): void {
 async function maybeAutoNotice(): Promise<void> {
   const b = me?.billing;
   if (!b?.card || b.chatAutoChargeAcked) return;
-  const r = await autoChargeNotice('chat', b, `When your questions run out, each extra question is charged automatically at ${autoPrice()} (${money(me!.pricing.extraQuestionCents)} + ${me!.pricing.taxFeePercent}% taxes & fees), up to ${b.chatAutoDailyMax} a day. You can turn it off any time in the menu.`);
+  const r = await autoChargeNotice('chat', b, `When your questions run out, each extra question is charged automatically at ${autoPrice()} incl. taxes & fees, up to ${b.chatAutoDailyMax} a day. You can turn it off any time in the menu.`);
   if (r) me!.billing = r;
   renderAutoToggle();
 }
@@ -1020,6 +1032,18 @@ $('autocharge-toggle')?.addEventListener('click', async () => {
   showBanner(r ? (on ? `Auto-charge on: extra questions are charged ${autoPrice()} automatically.` : 'Auto-charge off: you will be asked to pay for each extra question.') : 'Could not save. Please try again.', 5000);
 });
 
+const trackHome = (): void => {
+  if (sessionStorage.getItem('kaalera:hv')) return;
+  sessionStorage.setItem('kaalera:hv', '1');
+  void fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'home_view' }), keepalive: true }).catch(() => undefined);
+};
+
+let enteringApp = false;
+async function enterApp(): Promise<void> {
+  enteringApp = true;
+  await boot();
+}
+
 async function boot(): Promise<void> {
   setupTimezones();
   const params = new URLSearchParams(location.search);
@@ -1028,6 +1052,7 @@ async function boot(): Promise<void> {
   if (!res.ok) {
     landingView.hidden = false;
     appView.hidden = true;
+    trackHome();
     renderPrices();
     void runConsole();
     if (params.get('login') === 'expired') {
@@ -1037,6 +1062,17 @@ async function boot(): Promise<void> {
     return;
   }
   me = res.data;
+  const deepLink = params.has('t') || params.has('checkout') || params.has('app') || !!sessionStorage.getItem(PENDING_Q);
+  if (!deepLink && !enteringApp) {
+    landingView.hidden = false;
+    appView.hidden = true;
+    renderPrices();
+    void runConsole();
+    document.querySelectorAll<HTMLElement>('[data-signin],[data-signup]').forEach((b) => { b.hidden = true; });
+    document.querySelectorAll<HTMLElement>('[data-open-app]').forEach((b) => { b.hidden = false; });
+    return;
+  }
+  if (params.has('app')) history.replaceState(null, '', location.pathname + location.search.replace(/[?&]app=1/, '').replace(/^&/, '?'));
   landingView.hidden = true;
   appView.hidden = false;
   $('me-name').textContent = me.user.name || me.user.email.split('@')[0];

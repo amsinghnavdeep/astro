@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/styles.css" />
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "f7e133eb76b54c81ab5181bb69473560"}'></script>
 </head>
 <body>
   <div id="boot" class="boot"><span class="spinner"></span></div>
@@ -27,6 +28,7 @@
         <a href="/influencers">Influencers</a>
         <button class="btn sm" type="button" data-signin>Sign in</button>
         <button class="btn sm primary" type="button" data-signup>Sign up</button>
+        <button class="btn sm primary" type="button" data-open-app hidden>Open my chats</button>
       </nav>
     </header>
 
@@ -151,6 +153,7 @@
       <p class="notice" id="login-expired" hidden>That sign-in link has expired or was already used. Request a new one below.</p>
       <label>Name<input name="name" placeholder="Your name" maxlength="80" autocomplete="name" /></label>
       <label>Email<input name="email" type="email" placeholder="you@example.com" required autocomplete="email" /></label>
+      <label class="check"><input name="optin" type="checkbox" /> Email me Kaal's predictions and offers. Unsubscribe any time.</label>
       <p class="error" id="login-error"></p>
       <button class="btn primary wide" type="submit" id="login-submit">Email me a sign-in link</button>
     </form>
