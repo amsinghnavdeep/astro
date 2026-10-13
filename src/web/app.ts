@@ -1105,7 +1105,6 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   else showBanner('Payment received — Kaal is starting your consultation.', 6000);
   const fresh = await api<Me>('/api/me');
   if (fresh.ok) me = fresh.data;
-  renderAutoToggle();
   renderBiz();
 }
 
@@ -1123,30 +1122,6 @@ const autoReload = (): boolean => {
   if (me.user.accountType === 'business') return (me.walletCents ?? 0) >= me.pricing.extraQuestionCents * RELOAD;
   return !!(me.billing?.card && me.billing.chatAutoCharge);
 };
-
-function renderAutoToggle(): void {
-  const b = me?.billing;
-  const btn = $<HTMLButtonElement>('autocharge-toggle');
-  if (!btn) return;
-  btn.hidden = !b?.card;
-  btn.textContent = `Auto-reload: ${b?.chatAutoCharge ? 'On' : 'Off'}`;
-  btn.title = b?.chatAutoCharge ? `When you run out, ${RELOAD} questions are added for ${autoPrice()} on card •••• ${b.card?.last4 ?? ''}. Click to turn off.` : 'Click to turn auto-reload on.';
-}
-
-
-$('autocharge-toggle')?.addEventListener('click', async () => {
-  const btn = $<HTMLButtonElement>('autocharge-toggle');
-  const on = !me?.billing?.chatAutoCharge;
-  btn.disabled = true;
-  btn.classList.add('is-busy');
-  btn.textContent = 'Saving…';
-  const r = await saveBilling({ chatAutoCharge: on, ack: 'chat' });
-  btn.disabled = false;
-  btn.classList.remove('is-busy');
-  if (r && me) me.billing = r;
-  renderAutoToggle();
-  showBanner(r ? (on ? `Auto-reload on: ${RELOAD} questions are added for ${autoPrice()} whenever you run out.` : 'Auto-reload off: you will be asked to pay when you run out of questions.') : 'Could not save. Please try again.', 5000);
-});
 
 const trackHome = (): void => {
   if (sessionStorage.getItem('kaalera:hv')) return;
@@ -1233,7 +1208,6 @@ async function boot(): Promise<void> {
   const wantedId = params.get('t');
   const confirming = checkout?.startsWith('cs_') ? confirmCheckout(checkout) : null;
   if (confirming) await confirming;
-  else renderAutoToggle();
   const { data } = await api<{ threads: Thread[] }>('/api/threads');
   threads = data.threads ?? [];
   const keepBanner = !banner.hidden ? banner.textContent : null;

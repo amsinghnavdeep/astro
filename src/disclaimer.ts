@@ -13,7 +13,7 @@ export const API_AUTO_DEFAULT = { lowCents: 1000, cents: 10_000, capCents: 50_00
 export const autoNote = (area: 'chat' | 'api', p: AutoPrices): string => {
   const fee = taxFeeNote(p.taxFeePercent);
   if (area === 'chat') {
-    return `Auto-reload is on: your card is saved and when your questions run out, 2 more are added automatically for ${usd(withFee(p.extraQuestionCents * 2, p.taxFeePercent))}${fee}, up to 10 questions a day. Turn it off any time in your account menu.`;
+    return `Auto-reload is on: your card is saved and when your questions run out, 2 more are added automatically for ${usd(withFee(p.extraQuestionCents * 2, p.taxFeePercent))}${fee}, up to 10 questions a day. You can turn it off any time on your Account page.`;
   }
   const pack = API_AUTO_DEFAULT.cents;
   return `Auto-recharge is on: your card is saved and when your wallet drops below ${usd(API_AUTO_DEFAULT.lowCents)} we add ${usd(pack)} to your wallet for ${usd(withFee(pack, p.taxFeePercent))}${fee}, up to ${usd(API_AUTO_DEFAULT.capCents)} a month. Change or turn it off on the Developers page.`;

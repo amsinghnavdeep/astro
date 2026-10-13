@@ -3,10 +3,10 @@ import type { D1Database } from '@cloudflare/workers-types';
 
 export const EVENTS = [
   'home_view', 'email_typed', 'signup', 'kundli_added', 'free_question', 'checkout_opened',
-  'first_payment', 'repeat_payment', 'reminder_set',
+  'first_payment', 'repeat_payment', 'reminder_set', 'autoreload_off_price', 'autoreload_off_unused', 'autoreload_off_other',
 ] as const;
 export type FunnelEvent = (typeof EVENTS)[number];
-export const CLIENT_EVENTS: FunnelEvent[] = ['home_view'];
+export const CLIENT_EVENTS: FunnelEvent[] = ['home_view', 'autoreload_off_price', 'autoreload_off_unused', 'autoreload_off_other'];
 
 const today = () => new Date().toISOString().slice(0, 10);
 

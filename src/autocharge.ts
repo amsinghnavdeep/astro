@@ -136,7 +136,7 @@ export async function sendReceipt(db: D1Database, userId: string, o: { item: str
     await sendReceiptEmail({
       to: u.email, item: o.item, baseCents: base, feeCents: Math.max(0, o.totalCents - base), feePercent: tax, totalCents: o.totalCents,
       billedTo: u.business_name ? [u.business_name, u.tax_id && `Tax no. ${u.tax_id}`].filter(Boolean).join(' · ') : null,
-      last4: u.card_last4, auto: o.auto, ref: o.ref, manageUrl: `${env.siteUrl}${o.api ? '/developers#billing' : '/?billing=1'}`,
+      last4: u.card_last4, auto: o.auto, ref: o.ref, manageUrl: `${env.siteUrl}${o.api ? '/developers#billing' : '/account'}`,
     });
   } catch (err) {
     console.error('Receipt email failed:', err);

@@ -43,8 +43,8 @@ export async function sendReceiptEmail(o: {
     `<p>Thank you. ${o.auto ? 'This was charged automatically to your saved card.' : 'Your payment went through.'}</p>
     <table style="width:100%;border-collapse:collapse">${row(o.item, usd(o.baseCents))}${o.feeCents ? row(`Taxes & fees (${o.feePercent}%)`, usd(o.feeCents)) : ''}
     ${row('Total (USD)', usd(o.totalCents), true)}${o.last4 ? row('Card', `•••• ${o.last4}`) : ''}${row('Date', new Date().toUTCString().slice(5, 16))}${row('Reference', o.ref)}${o.billedTo ? row('Billed to', o.billedTo) : ''}</table>
-    <p style="color:#666;font-size:13px">All sales are final — no refunds. Auto-charge is ${o.auto ? 'on' : 'on by default'} for future questions; you can turn it off any time.</p>`
-    + button(o.manageUrl, 'Manage auto-charge')));
+    <p style="color:#666;font-size:13px">All sales are final — no refunds. Automatic billing is ${o.auto ? 'on' : 'on by default'}; you can change it on your Account page.</p>`
+    + button(o.manageUrl, 'Manage billing')));
 }
 
 export async function sendContactEmails(o: { owner: string; name: string; email: string; topic: string; message: string }): Promise<void> {
