@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { ensureDeviceCookie, freeBlocked, freeKeys, isDisposable, recordFreeClaims } from './freeclaims.js';
 import { z } from 'zod';
 import type Stripe from 'stripe';
 import type { D1Database } from '@cloudflare/workers-types';
@@ -110,6 +111,7 @@ async function createThreadWithQuestion(db: D1Database, t: Thread, question: str
 type CheckoutKind = 'consultation' | 'topup' | 'api_credits';
 
 const CONSENT_REQUIRED = { error: 'Please tick the box to accept the terms before paying.', code: 'consent_required' };
+const FREE_BLOCKED = { error: 'The free reading was already used on this device or connection. Further questions are paid.', code: 'free_used' };
 const agreedIn = (body: unknown): boolean => !!body && typeof body === 'object' && (body as { agreed?: unknown }).agreed === true;
 
 async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadId?: string; credits: number; cents: number; name: string; returnPath: string }): Promise<string> {
@@ -203,6 +205,7 @@ app.use('/api/*', async (c, next) => {
 app.use('/api/*', async (c, next) => {
   const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
   c.set('user', user);
+  ensureDeviceCookie(c, env.siteUrl.startsWith('https'));
   const seen = (user as (User & { last_seen_at?: string | null }) | null)?.last_seen_at;
   if (user && (!seen || Date.now() - Date.parse(seen) > 5 * 60_000)) {
     const touch = c.env.DB.prepare('UPDATE users SET last_seen_at = ? WHERE id = ?').bind(new Date().toISOString(), user.id).run();
@@ -222,6 +225,8 @@ app.post('/api/login', async (c) => {
     .safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: 'Enter a valid email.' }, 400);
   const email = p.data.email.toLowerCase();
+  if (isDisposable(email) && !(await c.env.DB.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first()))
+    return c.json({ error: 'Please use your regular email address. Temporary email services are not accepted.' }, 400);
   const token = await createLoginToken(c.env.DB, email, p.data.name);
   if (!token) return c.json({ error: 'Too many sign-in links requested. Try again in 15 minutes.' }, 429);
   const link = `${env.siteUrl}/auth/verify?token=${encodeURIComponent(token)}`;
@@ -317,7 +322,10 @@ app.post('/api/threads', async (c) => {
   const body = z.object({ kundliId: z.string().min(1), question: questionText(), language, agreed: z.boolean().optional() })
     .safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: 'Choose or add a Kundli and write your question.' }, 400);
-  if (user.free_used && !body.data.agreed && (await chatCredits(c)) < 1) return c.json(CONSENT_REQUIRED, 400);
+  const keys = await freeKeys(c);
+  const blocked = !user.free_used && (await freeBlocked(c.env.DB, keys));
+  if ((user.free_used || blocked) && !body.data.agreed && (await chatCredits(c)) < 1)
+    return c.json(blocked ? FREE_BLOCKED : CONSENT_REQUIRED, 400);
   const db = c.env.DB;
   const k = await getKundli(db, user.id, body.data.kundliId);
   if (!k) return c.json({ error: 'Choose or add a Kundli first.' }, 400);
@@ -326,7 +334,8 @@ app.post('/api/threads', async (c) => {
   const chart = await chartText(p.data);
   if (!chart) return c.json({ error: 'Could not compute this chart. Check the date, time and birthplace.' }, 400);
 
-  const free = await claimFreeConsultation(db, user.id);
+  const free = !blocked && (await claimFreeConsultation(db, user.id));
+  if (free) await recordFreeClaims(db, user.id, keys);
   const t = newThread(user.id, p.data, chart, p.data.question, free ? { is_free: 1, questions_allowed: env.chat.freeQuestions } : {});
   await createThreadWithQuestion(db, t, p.data.question);
   t.kundli_id = k.id;

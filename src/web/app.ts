@@ -47,8 +47,18 @@ let workingTimer: number | undefined;
 
 /* ---------- helpers ---------- */
 
+function deviceId(): string {
+  try {
+    let id = localStorage.getItem('kaalera_device');
+    if (!id) localStorage.setItem('kaalera_device', (id = crypto.randomUUID().replace(/-/g, '')));
+    return id;
+  } catch {
+    return '';
+  }
+}
+
 async function api<T>(url: string, init?: RequestInit) {
-  const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' });
+  const res = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Kaalera-Device': deviceId() }, credentials: 'same-origin' });
   const data = (await res.json().catch(() => ({}))) as T & { error?: string };
   return { ok: res.ok, status: res.status, data };
 }
@@ -119,6 +129,7 @@ async function goToCheckout(threadId: string, btn?: HTMLButtonElement): Promise<
 document.addEventListener('click', (e) => {
   const t = e.target as HTMLElement;
   if (t.closest('[data-signin]')) openSignin();
+  if (t.closest('[data-signup]')) openSignin(false, true);
   if (t.closest('[data-close]')) (t.closest('dialog') as HTMLDialogElement | null)?.close();
   const add = t.closest<HTMLButtonElement>('[data-addq]');
   if (add && current) goToCheckout(current.id, add);
@@ -143,7 +154,12 @@ async function renderPrices(): Promise<void> {
   );
 }
 
-function openSignin(expired = false): void {
+function openSignin(expired = false, signup = false): void {
+  $('login-title').textContent = signup ? 'Create your Kaalera account' : 'Sign in to Kaalera';
+  $('login-sub').textContent = signup
+    ? 'Enter your name and email. We\'ll email you a link to finish signing up. No password needed.'
+    : 'We\'ll email you a sign-in link. No password needed.';
+  $('login-submit').textContent = signup ? 'Create account' : 'Email me a sign-in link';
   $('login-expired').hidden = !expired;
   $('login-form').hidden = false;
   $('login-sent').hidden = true;
@@ -381,6 +397,7 @@ profileForm.addEventListener('submit', async (e) => {
     if (status === 503) showBanner(data.error ?? 'Kaal is unavailable right now. Tap Retry in a minute.');
     return;
   }
+  if ((data as { code?: string }).code === 'free_used') me!.freeAvailable = false;
   if (!ok) err.textContent = data.error ?? 'Something went wrong. Please try again.';
 });
 

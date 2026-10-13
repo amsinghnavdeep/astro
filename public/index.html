@@ -23,6 +23,7 @@
         <a href="/developers">Developers</a>
         <a href="/docs">Docs</a>
         <button class="btn sm" type="button" data-signin>Sign in</button>
+        <button class="btn sm primary" type="button" data-signup>Sign up</button>
       </nav>
     </header>
 
@@ -108,7 +109,7 @@
     <form id="login-form" class="modal-body">
       <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
       <div class="logo">K</div>
-      <h2>Sign in to Kaalera</h2>
+      <h2 id="login-title">Sign in to Kaalera</h2>
       <p class="muted" id="login-sub">We'll email you a sign-in link. No password needed.</p>
       <p class="notice" id="login-expired" hidden>That sign-in link has expired or was already used. Request a new one below.</p>
       <label>Name<input name="name" placeholder="Your name" maxlength="80" autocomplete="name" /></label>
