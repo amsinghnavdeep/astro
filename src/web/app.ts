@@ -380,11 +380,19 @@ loginEmail.addEventListener('blur', () => {
   void fetch('/api/lead', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, optin }), keepalive: true }).catch(() => undefined);
 });
 
+const BIZ_SIGNUP = 'kaalera_biz_signup';
+$<HTMLFormElement>('login-form').addEventListener('change', (e) => {
+  const t = e.target as HTMLInputElement;
+  if (t.name === 'acct') $('acct-biz-note').hidden = t.value !== 'business';
+});
+
 $<HTMLFormElement>('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const form = e.target as HTMLFormElement;
   const btn = $<HTMLButtonElement>('login-submit');
   const fd = new FormData(form);
+  if (fd.get('acct') === 'business') localStorage.setItem(BIZ_SIGNUP, '1');
+  else localStorage.removeItem(BIZ_SIGNUP);
   btn.disabled = true;
   const { ok, data } = await api<{ sent: boolean; devLink?: string }>('/api/login', {
     method: 'POST',
@@ -1189,6 +1197,10 @@ async function boot(): Promise<void> {
   me = res.data;
   showDeal(me.pricing);
   renderBiz();
+  if (localStorage.getItem(BIZ_SIGNUP)) {
+    localStorage.removeItem(BIZ_SIGNUP);
+    if (me.user.accountType !== 'business') $('biz-toggle').click();
+  }
   const deepLink = params.has('t') || params.has('checkout') || params.has('app') || !!sessionStorage.getItem(PENDING_Q);
   if (!deepLink && !enteringApp) {
     landingView.hidden = false;

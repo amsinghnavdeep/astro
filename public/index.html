@@ -167,6 +167,12 @@
       <p class="notice" id="login-expired" hidden>That sign-in link has expired or was already used. Request a new one below.</p>
       <label>Name<input name="name" placeholder="Your name" maxlength="80" autocomplete="name" /></label>
       <label>Email<input name="email" type="email" placeholder="you@example.com" required autocomplete="email" /></label>
+      <fieldset class="acct-type">
+        <legend>Are you a business?</legend>
+        <label class="check"><input name="acct" type="radio" value="personal" checked /> No, personal: first question free</label>
+        <label class="check"><input name="acct" type="radio" value="business" /> Yes, business (pandit, astrologer, company)</label>
+        <p class="notice" id="acct-biz-note" hidden>Business accounts start with a <strong>$100</strong> payment ($115 with taxes &amp; fees) into your Business wallet. The wallet pays for chat at 10% lower prices and for the API. No free question for Business.</p>
+      </fieldset>
       <label class="check"><input name="optin" type="checkbox" /> Email me Kaal's predictions and offers. Unsubscribe any time.</label>
       <p class="error" id="login-error"></p>
       <button class="btn primary wide" type="submit" id="login-submit">Email me a sign-in link</button>

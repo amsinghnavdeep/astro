@@ -413,3 +413,6 @@ label.check input { width: auto; margin-top: 2px; flex: none; }
 .share-pop .btn-s { padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--soft); cursor: pointer; text-decoration: none; font-size: 13px; font-weight: 600; }
 .share-pop .btn-s.primary { background: #25d366; border-color: #25d366; color: #fff; }
 @media (max-width: 640px) { .share-pop { left: 12px; right: 12px; bottom: 96px; width: auto; } }
+.acct-type { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.acct-type legend { font-size: 13px; font-weight: 600; margin-bottom: 4px; padding: 0; }
+.modal-body label.check { flex-direction: row; }

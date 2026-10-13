@@ -437,7 +437,7 @@ app.get('/api/me', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
   return c.json({
-    user: { name: user.name, email: user.email, accountType: user.account_type ?? 'personal', businessName: user.business_name ?? null }, freeAvailable: !user.free_used,
+    user: { name: user.name, email: user.email, accountType: user.account_type ?? 'personal', businessName: user.business_name ?? null }, freeAvailable: !user.free_used && user.account_type !== 'business',
     chatCredits: await creditLots(c.env.DB, 'chat', user.id),
     walletCents: user.account_type === 'business' ? await apiBalance(c.env.DB, user.id) : null,
     pricing: await pricing(c.env.DB, user.id), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
@@ -514,7 +514,7 @@ app.post('/api/threads', async (c) => {
   const chart = await chartText(p.data);
   if (!chart) return c.json({ error: 'Could not calculate this Kundli. Check the date, time and birthplace.' }, 400);
 
-  const free = !blocked && (await claimFreeConsultation(db, user.id));
+  const free = !blocked && user.account_type !== 'business' && (await claimFreeConsultation(db, user.id));
   if (free) background(c, trackSafe(db, 'free_question'));
   if (free) {
     await recordFreeClaims(db, user.id, keys);
