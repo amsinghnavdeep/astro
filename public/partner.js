@@ -54,26 +54,39 @@ function render(s) {
     });
     return;
   }
-  const payouts = i.payoutsEnabled ? '<p class="p-ok">Payouts are set up.</p>' : `<button id="p-connect" class="p-btn primary" type="button">${i.payoutsStarted ? "Finish payout setup" : "Set up payouts"}</button>`;
-  root.innerHTML = `<section class="p-card"><h2>Your code: ${esc(i.code)}${i.status === "paused" ? ' <span class="p-err">(paused)</span>' : ""}</h2>
-    ${share(i.link, `Use my code ${i.code} on Kaalera for 2 free questions with Kaal:`)}
+  const min = s.rules.payoutMinCents;
+  const payouts = i.requestedCents > 0 ? `<p class="p-ok">Payout of ${usd(i.requestedCents)} requested. We'll email you when it's sent.</p>` : i.availableCents >= min ? `<form id="p-payout" class="p-link"><select name="method" aria-label="Pay me by"><option value="paypal">PayPal</option><option value="interac">Interac e-Transfer</option></select>
+        <input name="to" type="email" required maxlength="200" placeholder="Payout email" aria-label="Payout email">
+        <button class="p-btn primary" type="submit">Request ${usd(i.availableCents)}</button></form><p id="p-perr" class="p-err" role="alert"></p>` : `<p class="p-muted">You can request a payout once at least ${usd(min)} is available.</p>`;
+  root.innerHTML = `<section class="p-card"><h2>Your share link${i.status === "paused" ? ' <span class="p-err">(paused)</span>' : ""}</h2>
+    ${share(i.link, `Use my link for 2 free questions with Kaal on Kaalera:`)}
+    <p class="p-muted">Everyone who signs up through this link counts under you. Your code <strong>${esc(i.code)}</strong> works too if they type it at sign-up.</p>
     <div class="p-stats">${stat("Clicks", i.clicks)}${stat("Sign-ups", i.signups)}${stat("Paying customers", i.paying)}</div>
     <div class="p-stats">${stat(`On hold (${s.rules.holdDays} days)`, usd(i.pendingCents))}${stat("Available", usd(i.availableCents))}${stat("Paid", usd(i.paidCents))}</div>
-    <p class="p-muted">You earn ${i.percent}% of each customer's first paid consultation. Paid on the 1st of each month once at least ${usd(s.rules.payoutMinCents)} is available.</p>
+    <p class="p-muted">You earn ${i.percent}% of each customer's first paid consultation. Once at least ${usd(min)} is available, request a payout and we'll send it by PayPal or Interac e-Transfer.</p>
     ${payouts}
-    ${i.payouts.length ? `<h3>Payouts</h3><table class="p-table"><tr><th>Month</th><th>Amount</th></tr>${i.payouts.map((p) => `<tr><td>${esc(p.period)}</td><td>${usd(p.amountCents)}</td></tr>`).join("")}</table>
+    ${i.payouts.length ? `<h3>Payouts</h3><table class="p-table"><tr><th>Requested</th><th>Amount</th><th>Status</th></tr>${i.payouts.map((p) => `<tr><td>${esc(p.requestedAt.slice(0, 10))}</td><td>${usd(p.amountCents)}</td><td>${p.status === "paid" ? `Paid ${esc((p.paidAt ?? "").slice(0, 10))}` : "Requested"}</td></tr>`).join("")}</table>
     <p><a href="/api/partner/payouts.csv">Download CSV</a></p>` : ""}</section>`;
-  document.getElementById("p-connect")?.addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
+  document.getElementById("p-payout")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const btn = f.querySelector("button");
+    const fd = new FormData(f);
     btn.disabled = true;
-    btn.textContent = "Opening Stripe\u2026";
-    const res = await fetch("/api/partner/connect", { method: "POST" });
+    btn.textContent = "Requesting\u2026";
+    const res = await fetch("/api/partner/payout-request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ method: fd.get("method"), to: String(fd.get("to") ?? "") })
+    });
     const d = await res.json().catch(() => ({}));
-    if (d.url) location.href = d.url;
-    else {
+    if (!res.ok) {
+      document.getElementById("p-perr").textContent = d.error ?? "Could not request the payout. Try again.";
       btn.disabled = false;
-      btn.textContent = d.error ?? "Could not open payout setup. Try again.";
+      btn.textContent = `Request ${usd(i.availableCents)}`;
+      return;
     }
+    void load();
   });
 }
 document.addEventListener("click", (e) => {
