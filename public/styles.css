@@ -272,3 +272,55 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .consent-actions .consent-pay { background: #111; color: #fff; border-color: #111; }
 .consent-actions .consent-pay:disabled { opacity: .4; cursor: not-allowed; }
 .buy-note { font-size: 12px; color: #6b7280; line-height: 1.5; margin: 8px 0 0; }
+
+/* Landing v2 */
+.saffron { color: #f59e0b; }
+.l-hero2 { max-width: 1120px; width: 100%; margin: 0 auto; padding: 7vh 24px 56px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
+.l-left .heritage { margin: 0 0 14px !important; }
+.l-left h1 { font-size: 48px; line-height: 1.08; font-weight: 650; letter-spacing: -0.03em; margin: 0 0 14px; }
+.l-lead { font-size: 17px; margin: 0 0 24px; max-width: 520px; }
+.l-left .l-chips { justify-content: flex-start; }
+.l-trust { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 18px; }
+.sky-card { border: 1px solid var(--line); border-radius: 20px; background: #0b0b0d; color: #f4f4f5; padding: 18px 18px 14px; box-shadow: 0 24px 60px rgba(0,0,0,.18); }
+.sky-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.sky-head .tiny { margin-left: auto; color: #a1a1aa; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; box-shadow: 0 0 0 0 rgba(245,158,11,.6); animation: live 2s infinite; }
+@keyframes live { 70% { box-shadow: 0 0 0 8px rgba(245,158,11,0); } 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); } }
+#sky-wheel { width: 100%; max-width: 340px; display: block; margin: 6px auto 2px; }
+#sky-wheel .ring { fill: none; stroke: #3f3f46; }
+#sky-wheel .sign { fill: #71717a; font-size: 11px; }
+#sky-wheel .pl circle { fill: #18181b; stroke: #52525b; }
+#sky-wheel .pl.lum circle { fill: #f59e0b; stroke: #ffa53a; }
+#sky-wheel .pl text { fill: #fafafa; font-size: 9px; font-weight: 600; }
+#sky-wheel .pl.lum text { fill: #0b0b0b; }
+#sky-wheel .pl.moon circle { animation: glow 3s ease-in-out infinite; }
+@keyframes glow { 50% { stroke-width: 4; stroke: rgba(255,165,58,.5); } }
+.sky-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; font-size: 12px; color: #d4d4d8; }
+.sky-list b { color: #fff; font-weight: 600; }
+.sky-list .r { color: #f59e0b; }
+.sky-note { color: #a1a1aa !important; margin: 10px 0 0; }
+.topic-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+.topic { font: inherit; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 14px; padding: 16px; cursor: pointer; display: grid; gap: 4px; transition: border-color .15s, transform .15s, box-shadow .15s; }
+.topic:hover { border-color: #f59e0b; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.06); }
+.topic b { font-size: 15px; }
+.topic span:last-child { color: var(--muted); font-size: 13px; }
+.t-ic { width: 32px; height: 32px; border-radius: 10px; background: #fff7ea; color: #b45309; display: grid; place-items: center; font-size: 17px; margin-bottom: 4px; }
+.step-n { width: 28px; height: 28px; border-radius: 50%; background: #0b0b0b; color: #f59e0b; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.l-example { display: grid; grid-template-columns: .8fr 1.2fr; gap: 32px; align-items: center; }
+.ex-card { border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.05); }
+.ex-q { margin-left: auto; width: fit-content; background: var(--soft); border-radius: 14px; padding: 8px 12px; font-size: 14px; margin-bottom: 12px; }
+.ex-a { display: flex; gap: 10px; align-items: flex-start; }
+.ex-av { width: 28px; height: 28px; border-radius: 50%; flex: none; }
+.ex-text { font-size: 14px; line-height: 1.6; min-height: 150px; white-space: pre-line; }
+.ex-text b { font-weight: 600; }
+.ex-note { margin: 10px 0 0; }
+.faq { margin-top: 14px; display: grid; gap: 8px; }
+.faq details { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; background: #fff; }
+.faq summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.faq p { margin: 8px 0 0; font-size: 14px; }
+@media (max-width: 860px) {
+  .l-hero2, .l-example { grid-template-columns: 1fr; gap: 28px; padding-top: 4vh; }
+  .l-left h1 { font-size: 36px; }
+  .topic-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .live-dot, #sky-wheel .pl.moon circle { animation: none; } }

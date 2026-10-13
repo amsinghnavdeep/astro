@@ -18,6 +18,7 @@
     <header class="l-nav">
       <a class="brand" href="/"><span class="logo sm">K</span> Kaalera</a>
       <nav class="l-links">
+        <a href="#topics">Topics</a>
         <a href="#how">How it works</a>
         <a href="#pricing">Pricing</a>
         <a href="/developers">Developers</a>
@@ -27,34 +28,66 @@
       </nav>
     </header>
 
-    <main class="l-hero">
-      <div class="hero-art"><svg class="zodiac-wheel" viewBox="0 0 200 200" aria-hidden="true"><g fill="none" stroke="currentColor"><circle cx="100" cy="100" r="96" stroke-width=".8"/><circle cx="100" cy="100" r="78" stroke-width=".6"/><circle cx="100" cy="100" r="40" stroke-width=".6" stroke-dasharray="2 4"/><line x1="178.0" y1="100.0" x2="196.0" y2="100.0" stroke-width=".6"/><line x1="167.5" y1="139.0" x2="183.1" y2="148.0" stroke-width=".6"/><line x1="139.0" y1="167.6" x2="148.0" y2="183.1" stroke-width=".6"/><line x1="100.0" y1="178.0" x2="100.0" y2="196.0" stroke-width=".6"/><line x1="61.0" y1="167.5" x2="52.0" y2="183.1" stroke-width=".6"/><line x1="32.4" y1="139.0" x2="16.9" y2="148.0" stroke-width=".6"/><line x1="22.0" y1="100.0" x2="4.0" y2="100.0" stroke-width=".6"/><line x1="32.5" y1="61.0" x2="16.9" y2="52.0" stroke-width=".6"/><line x1="61.0" y1="32.4" x2="52.0" y2="16.9" stroke-width=".6"/><line x1="100.0" y1="22.0" x2="100.0" y2="4.0" stroke-width=".6"/><line x1="139.0" y1="32.5" x2="148.0" y2="16.9" stroke-width=".6"/><line x1="167.6" y1="61.0" x2="183.1" y2="52.0" stroke-width=".6"/></g><g font-size="9" fill="currentColor" text-anchor="middle" dominant-baseline="central"><text x="184.0" y="122.5">♈</text><text x="161.5" y="161.5">♉</text><text x="122.5" y="184.0">♊</text><text x="77.5" y="184.0">♋</text><text x="38.5" y="161.5">♌</text><text x="16.0" y="122.5">♍</text><text x="16.0" y="77.5">♎</text><text x="38.5" y="38.5">♏</text><text x="77.5" y="16.0">♐</text><text x="122.5" y="16.0">♑</text><text x="161.5" y="38.5">♒</text><text x="184.0" y="77.5">♓</text></g></svg><img class="hero-orb hero-kaal" src="/kaal.svg" alt="Kaal" /></div>
-      <p class="heritage">☾ AI trained by a 7,000-year-old lineage of Kashmiri Himalayan monks ✦</p>
-      <h1>What would you like to know?</h1>
-      <p class="muted">Ask Kaal about career, marriage, health, money or a past event. Every answer is read from your own birth chart and explains the planets, houses and dashas behind it.</p>
-      <form id="l-form" class="composer l-composer">
-        <textarea id="l-input" rows="3" maxlength="600" placeholder="e.g. When will I get a better job?" required></textarea>
-        <div class="composer-bar">
-          <span class="tiny muted">Your first question is free</span>
-          <button class="send" type="submit" title="Ask" aria-label="Ask">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+    <main class="l-hero2">
+      <div class="l-left">
+        <p class="heritage">☾ AI trained by a 7,000-year-old lineage of Kashmiri Himalayan monks ✦</p>
+        <h1>Your chart already knows.<br /><span class="saffron">Ask Kaal.</span></h1>
+        <p class="muted l-lead">Dated predictions for career, marriage, money and health, read from your own birth chart. Straight answers, with remedies.</p>
+        <form id="l-form" class="composer l-composer">
+          <textarea id="l-input" rows="3" maxlength="600" placeholder="e.g. When will I get a better job?" required></textarea>
+          <div class="composer-bar">
+            <span class="tiny muted">Your first question is free</span>
+            <button class="send" type="submit" title="Ask" aria-label="Ask">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </form>
+        <div class="suggestions l-chips">
+          <button type="button" class="chip l-chip">When will my career grow?</button>
+          <button type="button" class="chip l-chip">When will I get married?</button>
+          <button type="button" class="chip l-chip">Why was last year so hard?</button>
         </div>
-      </form>
-      <div class="suggestions l-chips">
-        <button type="button" class="chip l-chip">When will my career grow?</button>
-        <button type="button" class="chip l-chip">When will I get married?</button>
-        <button type="button" class="chip l-chip">Why was last year so hard?</button>
-        <button type="button" class="chip l-chip">How will my child's education go?</button>
+        <div class="l-trust tiny muted"><span>✓ First question free</span><span>✓ No subscription</span><span>✓ Answers in your language</span></div>
       </div>
+      <aside class="sky-card" aria-label="The sky right now">
+        <div class="sky-head"><span class="live-dot"></span><b>The sky right now</b><span class="tiny muted" id="sky-time"></span></div>
+        <svg id="sky-wheel" viewBox="0 0 300 300" role="img" aria-label="Current planet positions"></svg>
+        <ul id="sky-list" class="sky-list"></ul>
+        <p class="tiny muted sky-note">Sidereal (Lahiri) positions, calculated live. Kaal reads these against your birth chart.</p>
+      </aside>
     </main>
 
+    <section id="topics" class="l-section">
+      <h2>What people ask Kaal</h2>
+      <p class="muted">Tap a topic to start.</p>
+      <div class="topic-grid">
+        <button type="button" class="topic" data-q="When will my career grow?"><span class="t-ic">♄</span><b>Career</b><span>When will my career grow?</span></button>
+        <button type="button" class="topic" data-q="When will I get married?"><span class="t-ic">♀</span><b>Marriage</b><span>When will I get married?</span></button>
+        <button type="button" class="topic" data-q="When will my money situation improve?"><span class="t-ic">♃</span><b>Money</b><span>When will my money situation improve?</span></button>
+        <button type="button" class="topic" data-q="What should I watch for in my health this year?"><span class="t-ic">☾</span><b>Health</b><span>What should I watch for this year?</span></button>
+        <button type="button" class="topic" data-q="How will my child's education go?"><span class="t-ic">☉</span><b>Children</b><span>How will my child's education go?</span></button>
+        <button type="button" class="topic" data-q="Why was last year so hard?"><span class="t-ic">☊</span><b>Past events</b><span>Why was last year so hard?</span></button>
+      </div>
+    </section>
+
     <section id="how" class="l-section">
-      <h2>How it works</h2>
-      <div class="l-grid">
-        <div class="l-card"><div class="l-num">🔮</div><h3>Ask your question</h3><p class="muted">Anything about your past or future, in plain words.</p></div>
-        <div class="l-card"><div class="l-num">☉</div><h3>Add birth details</h3><p class="muted">Pick or add a Kundli: name, date, time and place of birth. Your chart is cast to the arc-second.</p></div>
-        <div class="l-card"><div class="l-num">☾</div><h3>Chat with Kaal</h3><p class="muted">An opening reading, then answers with timing from your dashas and transits.</p></div>
+      <h2>How Kaal reads you</h2>
+      <div class="l-grid steps">
+        <div class="l-card"><div class="step-n">1</div><h3>Ask in plain words</h3><p class="muted">Anything about your past or future.</p></div>
+        <div class="l-card"><div class="step-n">2</div><h3>Add birth details</h3><p class="muted">Name, date, time and place of birth. Your chart is cast to the arc-second.</p></div>
+        <div class="l-card"><div class="step-n">3</div><h3>Get dated answers</h3><p class="muted">Clear time windows from your dashas and transits, plus simple remedies.</p></div>
+      </div>
+    </section>
+
+    <section class="l-section l-example">
+      <div class="ex-copy">
+        <h2>An answer looks like this</h2>
+        <p class="muted">Short, dated and specific. No long astrology lessons.</p>
+      </div>
+      <div class="ex-card">
+        <div class="ex-q">When will my career grow?</div>
+        <div class="ex-a"><div class="kaal-av ex-av"></div><div id="ex-a" class="ex-text"></div></div>
+        <p class="tiny muted ex-note">Example only, not a real customer's reading.</p>
       </div>
     </section>
 
@@ -63,6 +96,16 @@
       <p class="muted">No subscription. Pay only for the questions you ask.</p>
       <p class="buy-note">Guidance only, not professional advice. All sales are final — no refunds. Chat questions expire 3 months after purchase.</p>
       <div class="l-grid" id="l-prices"></div>
+    </section>
+
+    <section id="faq" class="l-section">
+      <h2>Questions</h2>
+      <div class="faq">
+        <details><summary>What do I need to start?</summary><p class="muted">Your name, date, time and place of birth. You can save Kundlis for family members too.</p></details>
+        <details><summary>Is the first question really free?</summary><p class="muted">Yes. Every new account gets one free consultation with an opening reading.</p></details>
+        <details><summary>How long do bought questions last?</summary><p class="muted">Chat questions can be used for 3 months after purchase. Each consultation stays open for 7 days.</p></details>
+        <details><summary>Can I get a refund?</summary><p class="muted">All sales are final. Readings are astrological guidance, not professional advice.</p></details>
+      </div>
     </section>
 
     <footer class="l-foot tiny muted">

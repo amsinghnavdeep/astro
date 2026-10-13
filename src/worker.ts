@@ -8,7 +8,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { env } from './env.js';
 import { deleteKundli, getKundli, kundliInput, listKundlis, MAX_KUNDLIS, publicKundli, saveKundli, type Kundli } from './kundlis.js';
 import { LANGUAGES } from './languages.js';
-import { computeChart, chartToChatContext } from './kundli/chart.js';
+import { computeChart, computeSky, chartToChatContext } from './kundli/chart.js';
 import { createLoginToken, destroySession, redeemLoginToken, userForSession, type User } from './auth.js';
 import { sendLoginEmail } from './email.js';
 import { cryptoProvider, stripe } from './stripe.js';
@@ -256,6 +256,12 @@ app.post('/api/logout', async (c) => {
 });
 
 app.get('/api/plans', (c) => c.json({ ...pricing(), languages: LANGUAGES }));
+
+app.get('/api/sky', async (c) => {
+  const now = Date.now();
+  c.header('Cache-Control', 'public, max-age=600');
+  return c.json({ at: new Date(now).toISOString(), planets: await computeSky(now) });
+});
 
 app.get('/api/me', async (c) => {
   const user = c.get('user');
