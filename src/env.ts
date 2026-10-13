@@ -27,7 +27,7 @@ export const env = {
   },
   email: {
     get apiKey() { return optional('RESEND_API_KEY'); },
-    get from() { return process.env.EMAIL_FROM || 'Kaalera <hello@askkaali.com>'; },
+    get from() { return process.env.EMAIL_FROM || 'Kaalera <hello@kaalera.com>'; },
   },
   api: {
     get creditCents() { return int('API_CREDIT_CENTS', 1000); },
