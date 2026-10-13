@@ -1,4 +1,5 @@
 /** Purchase disclaimer: the customer must tick the box before any checkout opens. */
+
 const BASE = "Kaal's readings are astrological guidance for personal reflection only. They are not medical, legal, financial or other professional advice, and predictions are not guaranteed. All sales are final — no refunds.";
 
 export const CONSENT = {

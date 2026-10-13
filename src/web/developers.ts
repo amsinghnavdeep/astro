@@ -1,8 +1,9 @@
 import { confirmPurchase } from './consent.js';
+import { taxFeeNote } from '../disclaimer.js';
 type Key = { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
 type Entry = { id: string; delta: number; reason: string; ref: string; api_key_id: string | null; thread_id: string | null; created_at: string };
 type Pack = { id: string; credits: number; cents: number };
-type Developer = { keys: Key[]; balance: number; ledger: Entry[]; packs: Pack[]; creditCents: number };
+type Developer = { keys: Key[]; balance: number; ledger: Entry[]; packs: Pack[]; creditCents: number; taxFeePercent: number };
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const TABS = ['keys', 'billing', 'usage'] as const;
@@ -227,7 +228,7 @@ function renderBilling(): void {
     <div class="d-pack">
       <div class="d-pack-credits">${plural(p.credits, 'credit')}</div>
       <div class="d-muted d-small">${plural(p.credits, 'question')}</div>
-      <div class="d-pack-price">${usd(p.cents)}</div>
+      <div class="d-pack-price">${usd(p.cents)}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
       <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Buy ${usd(p.cents)}</button>
     </div>`).join('');
 }
@@ -235,7 +236,7 @@ function renderBilling(): void {
 $('packs').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pack]');
   if (!btn) return;
-  if (!(await confirmPurchase('api', (btn.textContent ?? '').replace(/^Buy\s*/, '')))) return;
+  if (!(await confirmPurchase('api', (btn.textContent ?? '').replace(/^Buy\s*/, '') + taxFeeNote(state?.taxFeePercent ?? 0)))) return;
   $('buy-error').textContent = '';
   btn.disabled = true;
   btn.textContent = 'Opening secure checkout…';
@@ -287,7 +288,7 @@ function renderQuickstart(): void {
   const base = location.origin;
   $('quickstart-code').textContent = `export KAALERA_API_KEY=kal_live_...
 
-# 1. Start a consultation (1 credit)
+# 1. Start a consultation (2 credits)
 curl -s ${base}/v1/consultations \\
   -H "Authorization: Bearer $KAALERA_API_KEY" \\
   -H "Content-Type: application/json" \\

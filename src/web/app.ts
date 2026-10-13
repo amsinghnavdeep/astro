@@ -1,5 +1,7 @@
 import { confirmPurchase } from './consent.js';
+import { taxFeeNote } from '../disclaimer.js';
 import { renderMarkdown } from '../markdown.js';
+import { isPdfRequest, openReport, parseAnswer } from './extras.js';
 
 type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
 type Thread = {
@@ -8,7 +10,7 @@ type Thread = {
   expired: boolean; expiresAt: string | null; createdAt: string; kundliId: string | null;
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
-type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string };
+type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number };
 type Me = { user: { name: string; email: string }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
@@ -66,7 +68,7 @@ async function api<T>(url: string, init?: RequestInit) {
 const money = (cents: number, currency = 'usd') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const packLabel = (p: Pricing) => `Add ${p.packQuestions} questions — ${money(p.packCents, p.currency)}`;
+const packLabel = (p: Pricing) => `Add a question — ${money(p.extraQuestionCents, p.currency)}${taxFeeNote(p.taxFeePercent)}`;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -111,8 +113,8 @@ function fillLanguages(select: HTMLSelectElement, langs: string[], value = 'Engl
 
 const credTotal = (): number => (me?.chatCredits ?? []).reduce((n, l) => n + l.credits, 0);
 
-async function goToCheckout(threadId: string, btn?: HTMLButtonElement): Promise<void> {
-  if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency)))) return;
+async function goToCheckout(threadId: string, btn?: HTMLButtonElement, cents = me!.pricing.packCents): Promise<void> {
+  if (!(await confirmPurchase('chat', money(cents, me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent)))) return;
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
@@ -132,7 +134,7 @@ document.addEventListener('click', (e) => {
   if (t.closest('[data-signup]')) openSignin(false, true);
   if (t.closest('[data-close]')) (t.closest('dialog') as HTMLDialogElement | null)?.close();
   const add = t.closest<HTMLButtonElement>('[data-addq]');
-  if (add && current) goToCheckout(current.id, add);
+  if (add && current) goToCheckout(current.id, add, me!.pricing.extraQuestionCents);
 });
 
 /* ---------- landing + sign-in ---------- */
@@ -149,7 +151,7 @@ async function renderPrices(): Promise<void> {
   const p = data;
   $('l-prices').replaceChildren(
     priceCard('Free', money(0, p.currency), `Your first consultation: an opening reading plus ${plural(p.freeQuestions, 'question')} answered.`),
-    priceCard(`${p.packQuestions} questions`, money(p.packCents, p.currency), `Start another consultation, or add ${p.packQuestions} more questions to an open one.`),
+    priceCard('Consultation', money(p.packCents, p.currency), `Start a consultation with your first question. Each extra question is ${money(p.extraQuestionCents, p.currency)}.${p.taxFeePercent ? ` Plus a flat ${p.taxFeePercent}% taxes & fees.` : ''}`),
     priceCard(`${p.consultationDays}-day consultations`, `${p.consultationDays} days`, `Each consultation stays open for ${p.consultationDays} days, then becomes read-only.`),
   );
 }
@@ -362,9 +364,9 @@ function showProfile(question = ''): void {
     submit.textContent = 'Start consultation';
   } else {
     note.innerHTML = '';
-    note.append(el('strong', '', `${money(p.packCents, p.currency)} for ${p.packQuestions} questions.`),
-      ` An opening reading plus answers to ${plural(p.packQuestions, 'question')}, open for ${p.consultationDays} days. You'll pay securely by card.`);
-    submit.textContent = `Continue to payment — ${money(p.packCents, p.currency)}`;
+    note.append(el('strong', '', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)} to start.`),
+      ` An opening reading and the answer to your question, open for ${p.consultationDays} days. Extra questions are ${money(p.extraQuestionCents, p.currency)} each. You'll pay securely by card.`);
+    submit.textContent = `Continue to payment — ${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)}`;
   }
   history.replaceState(null, '', '/');
 }
@@ -448,7 +450,7 @@ profileForm.addEventListener('submit', async (e) => {
     return;
   }
   if (!me!.freeAvailable && credTotal() < 1) {
-    if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency)))) return;
+    if (!(await confirmPurchase('chat', money(me!.pricing.packCents, me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent)))) return;
     (body as Record<string, unknown>).agreed = true;
   }
   const label = submit.textContent;
@@ -651,14 +653,60 @@ function messageNode(m: Msg): HTMLElement {
   const who = el('div', 'who');
   who.append(el('span', 'avatar kaal-av', 'K'), el('span', '', 'Kaal'));
   const body = el('div', 'body');
-  body.innerHTML = renderMarkdown(m.body);
-  div.append(who, body);
+  const parsed = parseAnswer(m.body);
+  if (parsed.timeline.length) {
+    const tl = el('div', 'k-timeline');
+    tl.setAttribute('aria-label', 'Prediction timeline');
+    for (const p of parsed.timeline) {
+      const item = el('div', 'k-tl-item');
+      item.append(el('span', 'k-tl-dot', TL_GLYPH[p.kind] ?? '✦'), el('span', 'k-tl-area', p.area), el('span', 'k-tl-when', p.when));
+      tl.append(item);
+    }
+    div.append(who, tl);
+  } else div.append(who);
+  body.innerHTML = renderMarkdown(parsed.main);
+  div.append(body);
+  if (parsed.next.length) {
+    const next = el('div', 'k-next');
+    next.append(el('span', 'k-next-title', 'Ask Kaal next'));
+    for (const q of parsed.next) {
+      const chip = el('button', 'k-chip', q) as HTMLButtonElement;
+      chip.type = 'button';
+      chip.addEventListener('click', () => {
+        askInput.value = q;
+        autosize();
+        askInput.focus();
+      });
+      next.append(chip);
+    }
+    div.append(next);
+  }
+  return div;
+}
+
+const TL_GLYPH: Record<string, string> = { career: '▲', love: '♥', money: '◆', health: '✚', travel: '✈', family: '●', star: '✦' };
+
+function pdfReply(t: Thread): HTMLElement {
+  const div = el('div', 'msg kaal');
+  const who = el('div', 'who');
+  who.append(el('span', 'avatar kaal-av', 'K'), el('span', '', 'Kaal'));
+  const body = el('div', 'body', 'Here is your reading as a PDF. Tap the button, then choose "Save as PDF".');
+  const b = el('button', 'btn primary k-pdf', 'Download PDF') as HTMLButtonElement;
+  b.type = 'button';
+  b.addEventListener('click', () => openReport({
+    name: t.fullName,
+    birth: `${t.dateOfBirth}, ${t.timeOfBirth}, ${t.placeOfBirth}`,
+    msgs: lastMsgs.map((m) => ({ role: m.role, body: m.body, createdAt: m.createdAt })),
+  }));
+  div.append(who, body, b);
   return div;
 }
 
 const nearBottom = () => scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 140;
 
+let lastMsgs: Msg[] = [];
 function renderMessages(msgs: Msg[]): void {
+  lastMsgs = msgs;
   const key = msgs.map((m) => m.id).join(',');
   if (key === renderedKey) return;
   const stick = nearBottom() || !renderedKey || msgs.at(-1)?.role === 'user';
@@ -717,13 +765,13 @@ function renderState(): void {
   if (t.expired) {
     panel(`This consultation closed after ${p.consultationDays} days`, 'You can still read it. Start a new consultation to ask more.', btn('Start a new consultation', () => showProfile()));
   } else if (t.status === 'awaiting_payment') {
-    panel('Complete payment to start', `${money(p.packCents, p.currency)} for an opening reading plus ${plural(p.packQuestions, 'question')}.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
+    panel('Complete payment to start', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)} for an opening reading and the answer to your question.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
   } else if (t.status === 'failed') {
     panel("Kaal couldn't start this consultation", 'Your question is saved and you were not charged for a failed start.', btn('Retry', retry));
   } else if (isLive && t.questionsLeft < 1 && pending === 0) {
     const b = btn(packLabel(p), () => undefined);
     b.dataset.addq = '';
-    panel("You've used all questions in this consultation", `Add ${p.packQuestions} more questions for ${money(p.packCents, p.currency)} · ${timeLeft(t)} in this consultation.`, b);
+    panel("You've used all questions in this consultation", `Add another question for ${money(p.extraQuestionCents, p.currency)}${taxFeeNote(p.taxFeePercent)} · ${timeLeft(t)} in this consultation.`, b);
   }
   askForm.hidden = !isLive || t.questionsLeft < 1;
   askSubmit.disabled = sending;
@@ -777,6 +825,13 @@ async function ask(text: string): Promise<void> {
   text = text.trim();
   if (!current || !text || sending) return;
   askError.textContent = '';
+  if (isPdfRequest(text)) {
+    messagesEl.append(messageNode({ id: 'tmp', role: 'user', body: text, createdAt: new Date().toISOString() }), pdfReply(current));
+    askInput.value = '';
+    autosize();
+    scroller.scrollTop = scroller.scrollHeight;
+    return;
+  }
   sending = true;
   const t = current;
   messagesEl.append(messageNode({ id: 'tmp', role: 'user', body: text, createdAt: new Date().toISOString() }));
@@ -829,7 +884,7 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   const { ok, data } = await api<{ paid: boolean; kind?: string }>(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`);
   const p = me!.pricing;
   if (!ok || !data.paid) showBanner(data.error ?? "We couldn't confirm the payment yet. If you were charged, it will appear shortly.");
-  else if (data.kind === 'topup') showBanner(`Payment received — ${p.packQuestions} questions added.`, 6000);
+  else if (data.kind === 'topup') showBanner('Payment received — question added.', 6000);
   else showBanner('Payment received — Kaal is starting your consultation.', 6000);
 }
 

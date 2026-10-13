@@ -26,9 +26,9 @@
 
 <h2>How it works</h2>
 <ol class="steps">
-  <li><h3>Create a consultation</h3><p>Send the birth details and a first question to <a href="/docs/consultations-create"><code>POST /v1/consultations</code></a>. This costs 1 credit.</p></li>
+  <li><h3>Create a consultation</h3><p>Send the birth details and a first question to <a href="/docs/consultations-create"><code>POST /v1/consultations</code></a>. This costs 2 credits ($10).</p></li>
   <li><h3>Poll for the answer</h3><p>Kaal usually answers within a few minutes. Poll <a href="/docs/consultations-get"><code>GET /v1/consultations/:id</code></a> until a message with <code>role: "kaal"</code> appears.</p></li>
-  <li><h3>Ask follow-ups</h3><p>Ask more questions in the same consultation with <a href="/docs/questions-create"><code>POST /v1/consultations/:id/questions</code></a> for 1 credit each. Kaal remembers the Kundli and the earlier answers. Consultations stay open for 7 days.</p></li>
+  <li><h3>Ask follow-ups</h3><p>Ask more questions in the same consultation with <a href="/docs/questions-create"><code>POST /v1/consultations/:id/questions</code></a> for 1 credit ($5) each. Kaal remembers the Kundli and the earlier answers. Consultations stay open for 7 days.</p></li>
 </ol>
 
 <h2>Base URL</h2>
@@ -41,7 +41,7 @@
   <a class="card" href="/docs/quickstart"><strong>Quickstart</strong><span>Make your first consultation in five minutes.</span></a>
   <a class="card" href="/docs/authentication"><strong>Authentication</strong><span>Create and use API keys safely.</span></a>
   <a class="card" href="/docs/consultations-create"><strong>API reference</strong><span>Endpoints, parameters and responses.</span></a>
-  <a class="card" href="/docs/pricing"><strong>Pricing</strong><span>1 credit = 1 question = $10.</span></a>
+  <a class="card" href="/docs/pricing"><strong>Pricing</strong><span>1 credit = $5. No free or test API.</span></a>
 </div>
 </article>
 </body>

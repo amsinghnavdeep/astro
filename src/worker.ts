@@ -23,7 +23,14 @@ import {
 } from './chat.js';
 
 import { support } from './support.js';
-import { CHECKOUT_NOTE, DISCLAIMER } from './disclaimer.js';
+import { checkoutNote, DISCLAIMER } from './disclaimer.js';
+import { API_START_CREDITS, apiActivated, apiPacks, getPrices, taxesAndFees } from './settings.js';
+
+const usdCents = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
+import { admin } from './admin.js';
+import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
+import { layout } from './seo/layout.js';
+import { TOPICS, topicPage } from './seo/topics.js';
 import { creditBalance, creditLots, spendCredit } from './credits.js';
 import type { AppEnv } from './types.js';
 
@@ -38,13 +45,13 @@ const app = new Hono<AppEnv>();
 const COOKIE = 'kaalera_session';
 const MAX_THREADS = 20;
 
-const pricing = () => ({
-  freeQuestions: env.chat.freeQuestions,
-  packQuestions: env.chat.packQuestions,
-  packCents: env.chat.packCents,
-  consultationDays: env.chat.consultationDays,
-  currency: env.stripe.currency,
-});
+const pricing = async (db: D1Database) => {
+  const p = await getPrices(db);
+  return {
+    freeQuestions: p.freeQuestions, packQuestions: p.chatPackQuestions, packCents: p.chatPackCents, extraQuestionCents: p.extraQuestionCents,
+    consultationDays: env.chat.consultationDays, currency: env.stripe.currency, taxFeePercent: p.taxFeePercent,
+  };
+};
 
 /* ---------- shared validation ---------- */
 
@@ -121,14 +128,18 @@ async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadI
     `INSERT INTO purchase_consents (id, user_id, kind, thread_id, disclaimer, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(consentId, user.id, o.kind, o.threadId ?? null, DISCLAIMER[area], c.req.header('cf-connecting-ip') ?? null,
     (c.req.header('user-agent') ?? '').slice(0, 300) || null, new Date().toISOString()).run();
+  const tax = (await getPrices(c.env.DB)).taxFeePercent;
   const s = await stripe().checkout.sessions.create({
-    custom_text: { submit: { message: CHECKOUT_NOTE[area] } },
+    custom_text: { submit: { message: checkoutNote(area, tax) } },
     mode: 'payment',
     customer_email: user.email,
-    line_items: [{
-      quantity: 1,
-      price_data: { currency: env.stripe.currency, unit_amount: o.cents, product_data: { name: o.name } },
-    }],
+    line_items: [
+      { quantity: 1, price_data: { currency: env.stripe.currency, unit_amount: o.cents, product_data: { name: o.name } } },
+      ...(tax > 0 ? [{
+        quantity: 1,
+        price_data: { currency: env.stripe.currency, unit_amount: taxesAndFees(o.cents, tax), product_data: { name: `Taxes & fees (${tax}%)` } },
+      }] : []),
+    ],
     metadata: { kind: o.kind, userId: user.id, threadId: o.threadId ?? '', credits: String(o.credits), consentId },
     success_url: `${env.siteUrl}${o.returnPath}${o.returnPath.includes('?') ? '&' : '?'}checkout={CHECKOUT_SESSION_ID}`,
     cancel_url: `${env.siteUrl}${o.returnPath}`,
@@ -153,7 +164,7 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
     return { kind, threadId: null };
   }
   const t = await applyPayment(db, {
-    stripeSessionId: s.id, userId: m.userId, threadId: m.threadId, kind,
+    stripeSessionId: s.id, userId: m.userId, threadId: m.threadId, kind, credits: Number(m.credits) || 1,
     amountCents: s.amount_total ?? 0, currency: s.currency ?? env.stripe.currency,
   });
   const current = t ?? (await getThreadById(db, m.threadId));
@@ -255,7 +266,7 @@ app.post('/api/logout', async (c) => {
   return c.json({ ok: true });
 });
 
-app.get('/api/plans', (c) => c.json({ ...pricing(), languages: LANGUAGES }));
+app.get('/api/plans', async (c) => c.json({ ...(await pricing(c.env.DB)), languages: LANGUAGES }));
 
 app.get('/api/sky', async (c) => {
   const now = Date.now();
@@ -269,7 +280,7 @@ app.get('/api/me', async (c) => {
   return c.json({
     user: { name: user.name, email: user.email }, freeAvailable: !user.free_used,
     chatCredits: await creditLots(c.env.DB, 'chat', user.id),
-    pricing: pricing(), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
+    pricing: await pricing(c.env.DB), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
   });
 });
 
@@ -333,6 +344,7 @@ app.post('/api/threads', async (c) => {
   if ((user.free_used || blocked) && !body.data.agreed && (await chatCredits(c)) < 1)
     return c.json(blocked ? FREE_BLOCKED : CONSENT_REQUIRED, 400);
   const db = c.env.DB;
+  const pr = await getPrices(db);
   const k = await getKundli(db, user.id, body.data.kundliId);
   if (!k) return c.json({ error: 'Choose or add a Kundli first.' }, 400);
   const p = { data: { ...kundliInput(k), language: body.data.language, question: body.data.question } };
@@ -342,7 +354,7 @@ app.post('/api/threads', async (c) => {
 
   const free = !blocked && (await claimFreeConsultation(db, user.id));
   if (free) await recordFreeClaims(db, user.id, keys);
-  const t = newThread(user.id, p.data, chart, p.data.question, free ? { is_free: 1, questions_allowed: env.chat.freeQuestions } : {});
+  const t = newThread(user.id, p.data, chart, p.data.question, free ? { is_free: 1, questions_allowed: pr.freeQuestions } : {});
   await createThreadWithQuestion(db, t, p.data.question);
   t.kundli_id = k.id;
   await db.prepare('UPDATE threads SET kundli_id = ? WHERE id = ?').bind(k.id, t.id).run();
@@ -351,8 +363,8 @@ app.post('/api/threads', async (c) => {
     t.questions_allowed = 1;
   } else if (!free) {
     const url = await createCheckout(c, user, {
-      kind: 'consultation', threadId: t.id, credits: env.chat.packQuestions, cents: env.chat.packCents,
-      name: `Kaalera consultation — ${env.chat.packQuestions} questions for ${t.full_name}`, returnPath: `/?t=${t.id}`,
+      kind: 'consultation', threadId: t.id, credits: pr.chatPackQuestions, cents: pr.chatPackCents,
+      name: `Kaalera consultation for ${t.full_name}`, returnPath: `/?t=${t.id}`,
     });
     return c.json({ thread: await pubT(c, t), checkoutUrl: url });
   }
@@ -377,11 +389,12 @@ app.post('/api/threads/:id/checkout', async (c) => {
   if (isExpired(t)) return c.json({ error: 'This consultation has closed. Start a new one.' }, 409);
   if (!agreedIn(await c.req.json().catch(() => null))) return c.json(CONSENT_REQUIRED, 400);
   const kind: CheckoutKind = t.status === 'awaiting_payment' ? 'consultation' : 'topup';
+  const pr = await getPrices(c.env.DB);
   const url = await createCheckout(c, user, {
-    kind, threadId: t.id, credits: env.chat.packQuestions, cents: env.chat.packCents,
-    name: kind === 'topup'
-      ? `Kaalera — ${env.chat.packQuestions} more questions for ${t.full_name}`
-      : `Kaalera consultation — ${env.chat.packQuestions} questions for ${t.full_name}`,
+    kind, threadId: t.id,
+    credits: kind === 'topup' ? 1 : pr.chatPackQuestions,
+    cents: kind === 'topup' ? pr.extraQuestionCents : pr.chatPackCents,
+    name: kind === 'topup' ? `Kaalera — 1 more question for ${t.full_name}` : `Kaalera consultation for ${t.full_name}`,
     returnPath: `/?t=${t.id}`,
   });
   return c.json({ checkoutUrl: url });
@@ -482,8 +495,10 @@ app.get('/api/developer', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
   const db = c.env.DB;
+  const pr = await getPrices(db);
   const [keys, balance, ledger] = await Promise.all([listApiKeys(db, user.id), apiBalance(db, user.id), listApiLedger(db, user.id)]);
-  return c.json({ keys, balance, ledger, packs: env.api.packs, creditCents: env.api.creditCents, creditLots: await creditLots(db, 'api', user.id) });
+  return c.json({ keys, balance, ledger, packs: apiPacks(pr), creditCents: pr.apiCreditCents, taxFeePercent: pr.taxFeePercent,
+    activated: await apiActivated(db, user.id, pr), minRechargeCents: pr.apiMinRechargeCents, creditLots: await creditLots(db, 'api', user.id) });
 });
 
 app.post('/api/developer/keys', async (c) => {
@@ -505,8 +520,12 @@ app.post('/api/developer/checkout', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
   const body = (await c.req.json().catch(() => ({}))) as { packId?: string; agreed?: boolean };
-  const pack = env.api.packs.find((p) => p.id === body.packId);
+  const pr = await getPrices(c.env.DB);
+  const pack = apiPacks(pr).find((p) => p.id === body.packId);
   if (!pack) return c.json({ error: 'Unknown pack' }, 400);
+  if (pack.cents < pr.apiMinRechargeCents && !(await apiActivated(c.env.DB, user.id, pr))) {
+    return c.json({ error: 'below_minimum', message: `Your first API recharge must be at least ${usdCents(pr.apiMinRechargeCents)}.` }, 400);
+  }
   if (!agreedIn(body)) return c.json(CONSENT_REQUIRED, 400);
   const url = await createCheckout(c, user, {
     kind: 'api_credits', credits: pack.credits, cents: pack.cents,
@@ -531,6 +550,13 @@ app.use('/v1/*', async (c, next) => {
   }
   if (await limited(c, 'RL_API', auth.keyId)) return apiError(c, 429, 'rate_limited', 'Rate limit exceeded (120 requests per minute per key).');
   c.set('api', auth);
+  const pr = await getPrices(c.env.DB);
+  if (!(await apiActivated(c.env.DB, c.get('api').userId, pr))) {
+    return c.json({
+      error: 'activation_required',
+      message: `Recharge at least ${usdCents(pr.apiMinRechargeCents)} of API credits to activate your API keys.`,
+    }, 402);
+  }
   await next();
 });
 
@@ -554,14 +580,23 @@ app.post('/v1/consultations', async (c) => {
   if (!chart) return apiError(c, 400, 'chart_failed', 'Could not compute the chart. Check date, time, place and timezone.');
   const t = newThread(userId, p.data, chart, p.data.question, { source: 'api', api_key_id: keyId });
   const ref = `consultation:${t.id}`;
-  if (!(await spendApiCredit(db, userId, ref, keyId, t.id))) return apiError(c, 402, 'insufficient_credits', 'Not enough API credits. Buy more at /developers.');
+  const refs = Array.from({ length: API_START_CREDITS }, (_, i) => (i ? `${ref}:${i + 1}` : ref));
+  const spent: string[] = [];
+  for (const r of refs) {
+    if (!(await spendApiCredit(db, userId, r, keyId, t.id))) break;
+    spent.push(r);
+  }
+  if (spent.length < refs.length) {
+    for (const r of spent) await refundApiCredit(db, userId, r);
+    return apiError(c, 402, 'insufficient_credits', `Starting a consultation needs ${API_START_CREDITS} API credits. Buy more at /developers.`);
+  }
   await createThreadWithQuestion(db, t, p.data.question);
   try {
     const started = await startThreadSession(db, t);
     return c.json({ consultation: apiConsultation(started, await listMessages(db, started.id)), credits_remaining: await apiBalance(db, userId) }, 201);
   } catch (err) {
     console.error('API session start failed:', err);
-    await refundApiCredit(db, userId, ref);
+    for (const r of refs) await refundApiCredit(db, userId, r);
     return apiError(c, 503, 'unavailable', 'Kaal is unavailable right now. You were not charged.');
   }
 });
@@ -604,6 +639,46 @@ app.post('/v1/consultations/:id/questions', async (c) => {
 });
 
 app.route('/api/support', support);
+app.route('/api/admin', admin);
+
+/* ---------- public SEO pages: server-rendered, edge-cached, refreshed on every blog change ---------- */
+
+const PUBLIC_CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
+const CONTENT_TYPE = { html: 'text/html; charset=utf-8', xml: 'application/xml; charset=utf-8', rss: 'application/rss+xml; charset=utf-8', text: 'text/plain; charset=utf-8' } as const;
+const edgeCache = (): Cache | undefined => (typeof caches === 'undefined' ? undefined : (caches as unknown as { default: Cache }).default);
+
+async function publicPage(c: C, type: keyof typeof CONTENT_TYPE, render: () => Promise<string | null>): Promise<Response> {
+  const cache = edgeCache();
+  const key = new Request(`${new URL(c.req.url).origin}${c.req.path}?v=${await blogVersion(c.env.DB)}`);
+  const hit = cache ? await cache.match(key) : undefined;
+  if (hit) return new Response(hit.body, hit);
+  const body = await render();
+  const headers = { 'Content-Type': CONTENT_TYPE[type], 'Content-Security-Policy': PUBLIC_CSP };
+  if (body === null) {
+    const html = layout({ site: env.siteUrl, path: c.req.path, title: 'Page not found | Kaalera', description: 'This page does not exist.' },
+      '<section class="w-hero"><h1>Page not found</h1><p class="w-lead"><a href="/blog">Read the blog</a> or <a href="/">ask Kaal</a>.</p></section>');
+    return new Response(html, { status: 404, headers: { ...headers, 'Content-Type': CONTENT_TYPE.html, 'Cache-Control': 'no-store' } });
+  }
+  const res = new Response(body, { headers: { ...headers, 'Cache-Control': 'public, max-age=60, s-maxage=86400' } });
+  if (cache) {
+    const put = cache.put(key, res.clone());
+    try { c.executionCtx.waitUntil(put); } catch { await put; }
+  }
+  return res;
+}
+
+const published = (c: C) => listPosts(c.env.DB, true);
+app.get('/robots.txt', (c) => publicPage(c, 'text', async () => robotsTxt(env.siteUrl)));
+app.get('/sitemap.xml', (c) => publicPage(c, 'xml', async () => sitemapXml(env.siteUrl, await published(c))));
+app.get('/llms.txt', (c) => publicPage(c, 'text', async () => llmsTxt(env.siteUrl, await published(c))));
+app.get('/blog/rss.xml', (c) => publicPage(c, 'rss', async () => rssXml(env.siteUrl, await published(c))));
+app.get('/blog', (c) => publicPage(c, 'html', async () => blogIndexPage(env.siteUrl, await published(c))));
+app.get('/blog/:slug', (c) => publicPage(c, 'html', async () => {
+  const p = await getPublishedPost(c.env.DB, c.req.param('slug'));
+  if (!p) return null;
+  return blogPostPage(env.siteUrl, p, (await published(c)).filter((x) => x.slug !== p.slug).slice(0, 3));
+}));
+for (const t of TOPICS) app.get(`/${t.slug}`, (c) => publicPage(c, 'html', async () => topicPage(env.siteUrl, t, await published(c))));
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
 app.onError((err, c) => {
