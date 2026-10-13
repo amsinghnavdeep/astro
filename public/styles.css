@@ -110,6 +110,13 @@ input:focus, select:focus, textarea:focus { border-color: #a3a3a3; box-shadow: 0
 .messages { display: flex; flex-direction: column; gap: 24px; }
 .msg.user { align-self: flex-end; background: var(--soft); border-radius: 16px; padding: 10px 14px; max-width: 80%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.kaal { align-self: stretch; }
+.msg.kaal.enter { animation: msg-in .35s ease-out; }
+@keyframes msg-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.msg.kaal.typing .k-next, .msg.kaal.typing .k-timeline .k-tl-remind { visibility: hidden; }
+.msg.kaal.enter .k-next { animation: msg-in .4s ease-out; }
+.msg.kaal.typing .body > :last-child::after { content: '▍'; color: #e8871e; animation: caret 1s steps(1) infinite; margin-left: 1px; }
+@keyframes caret { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .msg.kaal.enter, .msg.kaal.enter .k-next { animation: none; } }
 .who { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 6px; }
 .who .avatar { width: 24px; height: 24px; font-size: 11px; }
 .body { overflow-wrap: anywhere; padding-left: 32px; }

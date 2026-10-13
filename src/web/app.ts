@@ -910,6 +910,41 @@ function cardNode(t: Thread, d: KundliCard): HTMLElement {
   return box;
 }
 
+const typed = new Set<string>();
+let seen: { threadId: string; ids: Set<string> } | null = null;
+let typingTimer = 0;
+
+/** Reveals an answer word by word at reading pace, keeping the view pinned to the bottom. */
+function typeOut(div: HTMLElement): void {
+  const body = div.querySelector<HTMLElement>('.body');
+  if (!body || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+  const parts: { node: Text; words: string[] }[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const node = n as Text;
+    parts.push({ node, words: node.data.match(/\S+\s*|\s+/g) ?? [] });
+    node.data = '';
+  }
+  div.classList.add('enter', 'typing');
+  let i = 0;
+  let w = 0;
+  clearInterval(typingTimer);
+  typingTimer = window.setInterval(() => {
+    const stick = nearBottom();
+    for (let k = 0; k < 1 && i < parts.length; k++) {
+      const p = parts[i];
+      if (w < p.words.length) p.node.data += p.words[w++];
+      if (w >= p.words.length) { i++; w = 0; }
+    }
+    if (stick) scroller.scrollTop = scroller.scrollHeight;
+    if (i >= parts.length) {
+      clearInterval(typingTimer);
+      div.classList.remove('typing');
+      if (nearBottom()) scroller.scrollTop = scroller.scrollHeight;
+    }
+  }, 38);
+}
+
 let lastMsgs: Msg[] = [];
 function renderMessages(msgs: Msg[]): void {
   lastMsgs = msgs;
@@ -917,7 +952,18 @@ function renderMessages(msgs: Msg[]): void {
   if (key === renderedKey) return;
   const stick = nearBottom() || !renderedKey || msgs.at(-1)?.role === 'user';
   renderedKey = key;
+  const tid = current?.id ?? '';
+  const fresh = seen?.threadId === tid
+    ? msgs.filter((m) => m.role !== 'user' && !seen!.ids.has(m.id) && !typed.has(m.id))
+    : [];
+  seen = { threadId: tid, ids: new Set(msgs.map((m) => m.id)) };
+  clearInterval(typingTimer);
   const nodes = msgs.map(messageNode);
+  const toType = fresh.at(-1);
+  if (toType) {
+    typed.add(toType.id);
+    typeOut(nodes[msgs.indexOf(toType)]);
+  }
   const firstKaal = msgs.findIndex((m) => m.role !== 'user');
   if (current && card?.threadId === current.id && firstKaal >= 0) nodes.splice(firstKaal, 0, cardNode(current, card.data));
   messagesEl.replaceChildren(...nodes);
