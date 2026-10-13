@@ -1,7 +1,7 @@
 POSTS = [
 ("build-ai-astrology-app-kaalera-api", "How to build an AI astrology app with the Kaalera API",
- "A step-by-step guide to adding an AI Vedic astrologer to your app with the Kaalera API: keys, wallet, consultations and follow-ups, with real code.",
-"""Want an astrology chat inside your own app, without building an astrology engine or prompt pipeline? The **Kaalera API** gives you **Kaal**, an AI Vedic astrologer, over simple REST calls.
+ "A step-by-step guide to adding an AI astrologer to your app with the Kaalera API: keys, wallet, consultations and follow-ups, with real code.",
+"""Want an astrology chat inside your own app, without building an astrology engine or prompt pipeline? The **Kaalera API** gives you **Kaal**, an AI astrologer, over simple REST calls.
 
 ## How it fits together
 **Your app → Kaalera API → Kaal → answer back to your app.** You send birth details and a question; Kaalera computes the Kundli, Kaal writes the reading, and you poll for the answer.
@@ -71,7 +71,7 @@ Try it yourself: [ask Kaal](/ai-astrologer) — your first question is free.""")
 The **calculations** are exact: planet positions, ascendant, nakshatras and dasha dates come from astronomical formulas. Given the right birth time, an AI computes them as precisely as any software an astrologer uses.
 
 ## What is interpretation
-Turning those positions into predictions is **interpretation**, based on classical Vedic rules. That is true for human and AI astrologers alike. No astrologer — human or AI — can guarantee that an event will happen.
+Turning those positions into predictions is **interpretation**, based on classical rules. That is true for human and AI astrologers alike. No astrologer — human or AI — can guarantee that an event will happen.
 
 ## What affects accuracy most
 1. **Birth time.** A wrong time can shift houses and dasha dates. See [why birth time matters](/blog/why-exact-birth-time-matters).
@@ -116,7 +116,7 @@ Kaal's readings are guidance for reflection only, not medical, legal or financia
 """Daily sun-sign horoscopes are the same for millions of people. A **personal astrology chatbot** answers each user from their own birth details — that is what keeps them coming back.
 
 ## What you get with Kaalera
-- **Kaal**, an AI Vedic astrologer, behind a REST API.
+- **Kaal**, an AI astrologer, behind a REST API.
 - Answers with **dated predictions**, a short issue line, remedies and suggested next questions.
 - Many languages, including English, Hindi and Hinglish.
 - Prepaid USD wallet, 10% below website prices: $10.35 to start a consultation, $7.25 per follow-up (taxes & fees included).

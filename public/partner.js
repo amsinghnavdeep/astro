@@ -5,7 +5,8 @@ var esc = (s) => s.replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 var stat = (label, v) => `<div class="p-stat"><div class="p-num">${esc(String(v))}</div><div class="p-label">${esc(label)}</div></div>`;
 var share = (link, text) => `
   <div class="p-link"><input readonly value="${esc(link)}" aria-label="Your link"><button class="p-btn" type="button" data-copy="${esc(link)}">Copy</button>
-  <a class="p-btn primary" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(`${text} ${link}`)}">Share on WhatsApp</a></div>`;
+  <a class="p-btn primary" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(`${text} ${link}`)}">Share on WhatsApp</a>
+  <button class="p-btn" type="button" data-native-share="${esc(link)}" data-text="${esc(text)}">Share\u2026</button></div>`;
 async function load() {
   if (!root) return;
   root.innerHTML = '<p class="p-muted">Loading your dashboard\u2026</p>';
@@ -26,7 +27,7 @@ function render(s) {
   if (root.dataset.kind === "affiliates") {
     const a = s.referral;
     root.innerHTML = `<section class="p-card"><h2>Your link</h2>
-      ${share(a.link, "Ask Kaal, the AI Vedic astrologer. We both get 2 free questions:")}
+      ${share(a.link, "Ask Kaal, the AI astrologer. We both get 2 free questions:")}
       <div class="p-stats">${stat("Friends joined", a.invited)}${stat("Friends who paid", a.rewards)}${stat("Questions earned", a.earnedQuestions)}</div>
       <p class="p-muted">Up to ${a.monthlyMax} rewards a month. Reward questions expire after 3 months.</p></section>`;
     return;
@@ -90,6 +91,15 @@ function render(s) {
   });
 }
 document.addEventListener("click", (e) => {
+  const ns = e.target.closest("[data-native-share]");
+  if (ns) {
+    const url = ns.dataset.nativeShare ?? "";
+    if (navigator.share) void navigator.share({ text: ns.dataset.text ?? "", url }).catch(() => void 0);
+    else void navigator.clipboard.writeText(url).then(() => {
+      ns.textContent = "Copied";
+    });
+    return;
+  }
   const b = e.target.closest("[data-copy]");
   if (!b) return;
   void navigator.clipboard.writeText(b.dataset.copy ?? "").then(() => {

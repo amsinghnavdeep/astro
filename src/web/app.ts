@@ -11,7 +11,8 @@ type Thread = {
   expired: boolean; expiresAt: string | null; createdAt: string; kundliId: string | null;
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
-type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number };
+type Deal = { name: string; percent: number; endsOn: string };
+type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; fullPackCents?: number };
 type Me = { user: { name: string; email: string }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
@@ -148,13 +149,69 @@ function priceCard(name: string, amt: string, note: string): HTMLElement {
   return d;
 }
 
+function showDeal(p: Pricing): void {
+  const d = p.deal;
+  const ends = d ? new Date(`${d.endsOn}T00:00:00Z`).toLocaleDateString(undefined, { month: 'long', day: 'numeric', timeZone: 'UTC' }) : '';
+  document.querySelectorAll<HTMLElement>('.deal-bar').forEach((b) => {
+    b.hidden = !d;
+    b.textContent = d ? `${d.name} offer: ${d.percent}% off every consultation and question until ${ends}.` : '';
+  });
+}
+
+const SHARE_SNOOZE_MS = 3 * 86_400_000;
+let shareShown = false;
+let shareThreadId = '';
+
+/** Corner card asking to share a referral or influencer link: once per visit, 3-day snooze after closing, never while busy. */
+async function maybeShare(kind: 'customer' | 'influencer'): Promise<void> {
+  const key = `kaalera:share:${kind}`;
+  if (shareShown || Date.now() - Number(localStorage.getItem(key) || 0) < SHARE_SNOOZE_MS) return;
+  if (sending || !working.hidden || appView.hidden || askInput.value.trim()) return;
+  const { ok, data } = await api<{ referral: { link: string }; influencer: { link: string; status: string; percent: number } | null }>('/api/partner');
+  if (!ok || shareShown) return;
+  const inf = data.influencer?.status === 'active' ? data.influencer : null;
+  if (kind === 'influencer' && !inf) return;
+  shareShown = true;
+  const link = inf ? inf.link : data.referral.link;
+  const text = inf ? 'Ask Kaal, the AI astrologer. Use my link for 2 free questions:' : 'Ask Kaal, the AI astrologer. You get 2 free questions with my link:';
+  const card = el('div', 'share-pop');
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-label', 'Share Kaalera');
+  const close = el('button', 'x', '✕');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Close');
+  const snooze = () => { localStorage.setItem(key, String(Date.now())); card.remove(); };
+  close.addEventListener('click', snooze);
+  const wa = el('a', 'btn-s primary', 'WhatsApp');
+  wa.href = `https://wa.me/?text=${encodeURIComponent(`${text} ${link}`)}`;
+  wa.target = '_blank';
+  wa.rel = 'noopener';
+  wa.addEventListener('click', snooze);
+  const more = el('button', 'btn-s', 'Share…');
+  more.type = 'button';
+  more.addEventListener('click', async () => {
+    if (navigator.share) await navigator.share({ text, url: link }).then(snooze, () => undefined);
+    else { await navigator.clipboard.writeText(link); more.textContent = 'Copied'; }
+  });
+  const copy = el('button', 'btn-s', 'Copy link');
+  copy.type = 'button';
+  copy.addEventListener('click', async () => { await navigator.clipboard.writeText(link); copy.textContent = 'Copied'; });
+  const row = el('div', 'row');
+  row.append(wa, more, copy);
+  card.append(close, el('h4', '', inf ? 'Share your link today' : 'Share Kaal with a friend'),
+    el('p', '', inf ? `Everyone who signs up through your link counts under you, and you earn ${inf.percent}% of their first paid consultation.`
+      : 'Your friend gets 2 free questions. You get 2 more when they first pay.'), row);
+  document.body.append(card);
+}
+
 async function renderPrices(): Promise<void> {
   const { ok, data } = await api<Pricing>('/api/plans');
   if (!ok) return;
   const p = data;
+  showDeal(p);
   $('l-prices').replaceChildren(
     priceCard('Free', money(0, p.currency), `Your first consultation: an opening reading plus ${plural(p.freeQuestions, 'question')} answered.`),
-    priceCard('Consultation', money(allIn(p.packCents, p.taxFeePercent), p.currency), `Start a consultation with your first question. Each extra question is ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)}.${p.taxFeePercent ? ' Taxes & fees included.' : ''}`),
+    priceCard('Consultation', money(allIn(p.packCents, p.taxFeePercent), p.currency), `${p.deal && p.fullPackCents ? `${p.deal.name}: ${p.deal.percent}% off (was ${money(allIn(p.fullPackCents, p.taxFeePercent), p.currency)}). ` : ''}Start a consultation with your first question. Each extra question is ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)}.${p.taxFeePercent ? ' Taxes & fees included.' : ''}`),
     priceCard(`${p.consultationDays}-day consultations`, `${p.consultationDays} days`, `Each consultation stays open for ${p.consultationDays} days, then becomes read-only.`),
   );
 }
@@ -911,7 +968,11 @@ async function poll(): Promise<void> {
   if (ok) {
     pending = data.pending;
     upsertThread(data.thread);
+    const prevLast = lastMsgs.at(-1)?.id;
     renderMessages(data.messages);
+    const last = data.messages.at(-1);
+    if (shareThreadId === id && last && last.role !== 'user' && last.id !== prevLast && data.pending === 0) window.setTimeout(() => void maybeShare('customer'), 4000);
+    shareThreadId = id;
     renderState();
   }
   const busy = ok && (data.pending > 0 || data.thread.status === 'starting');
@@ -1083,6 +1144,7 @@ async function boot(): Promise<void> {
     return;
   }
   me = res.data;
+  showDeal(me.pricing);
   const deepLink = params.has('t') || params.has('checkout') || params.has('app') || !!sessionStorage.getItem(PENDING_Q);
   if (!deepLink && !enteringApp) {
     landingView.hidden = false;
@@ -1096,6 +1158,7 @@ async function boot(): Promise<void> {
   if (params.has('app')) history.replaceState(null, '', location.pathname + location.search.replace(/[?&]app=1/, '').replace(/^&/, '?'));
   landingView.hidden = true;
   appView.hidden = false;
+  window.setTimeout(() => void maybeShare('influencer'), 15000);
   $('me-name').textContent = me.user.name || me.user.email.split('@')[0];
   $('me-email').textContent = me.user.email;
   $('me-avatar').textContent = (me.user.name || me.user.email).slice(0, 1).toUpperCase();

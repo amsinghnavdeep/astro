@@ -10,6 +10,7 @@ import type { D1Database } from '@cloudflare/workers-types';
 import { env } from './env.js';
 import { stripe } from './stripe.js';
 import { getPrices, taxesAndFees } from './settings.js';
+import { chatPrices } from './festivals.js';
 import { apiBalance, grantApiCredits } from './api.js';
 import { applyPayment, type Thread } from './chat.js';
 import { sendReceiptEmail } from './email.js';
@@ -75,7 +76,7 @@ export async function autoChargeQuestion(db: D1Database, t: Thread, used: number
   if (!b || !b.chat_autocharge || !b.stripe_pm_id) return false;
   const day = new Date(Date.now() - 86_400_000).toISOString();
   if ((await autoSpendSince(db, t.user_id, "'topup'", day)).n >= CHAT_AUTO_DAILY_MAX) return false;
-  const p = await getPrices(db);
+  const p = await chatPrices(db);
   const cents = p.extraQuestionCents + taxesAndFees(p.extraQuestionCents, p.taxFeePercent);
   const pi = await chargeSaved(b, cents, 'Kaalera — extra question', { kind: 'topup', userId: t.user_id, threadId: t.id, auto: '1' },
     `auto-q:${t.id}:${used}`);

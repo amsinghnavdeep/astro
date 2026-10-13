@@ -1,11 +1,11 @@
 POSTS = [
 ("what-is-a-kundli", "What is a Kundli, and what can it tell you?",
  "A plain-English guide to the Janam Kundli: the ascendant, Moon sign, nakshatra, houses and dashas, and what they can and cannot tell you.",
-"""A **Kundli** (also called Janam Kundli or Janam Patri) is a snapshot of the sky at the exact minute and place you were born, drawn the Vedic way. Astrologers use it to describe your nature and to time the main events of your life.
+"""A **Kundli** (also called Janam Kundli or Janam Patri) is a snapshot of the sky at the exact minute and place you were born, drawn the classical way. Astrologers use it to describe your nature and to time the main events of your life.
 
 ## The building blocks
 - **Lagna (ascendant):** the sign rising on the eastern horizon at birth. It sets the order of the twelve houses and changes about every two hours, which is why birth time matters.
-- **Moon sign (Rashi) and nakshatra:** where the Moon was. The Moon moves fast, so it is central to Vedic readings and to Sade Sati.
+- **Moon sign (Rashi) and nakshatra:** where the Moon was. The Moon moves fast, so it is central to readings and to Sade Sati.
 - **Nine grahas:** Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu and Ketu.
 - **Twelve houses:** each rules an area of life — the 7th partnership, the 10th career, the 2nd and 11th money, and so on.
 - **Dashas:** planetary periods that time *when* things happen. See [Mahadasha explained](/blog/mahadasha-explained).
@@ -43,7 +43,7 @@ No. Saturn rewards patience and hard work. If Saturn is well placed in your Kund
 Want to know if it is running for you and when it ends? Use the [Sade Sati check](/sade-sati)."""),
 ("mahadasha-explained", "Mahadasha: why life changes in phases",
  "How the 120-year Vimshottari dasha system times the chapters of your life, and how to read your current period.",
-"""Ever noticed that life seems to move in chapters? Vedic astrology explains this with **dashas** — planetary periods that decide which planet's results come forward at each stage of life.
+"""Ever noticed that life seems to move in chapters? Astrology explains this with **dashas** — planetary periods that decide which planet's results come forward at each stage of life.
 
 ## The Vimshottari system
 The most widely used system is **Vimshottari**, a 120-year cycle. The starting planet depends on the nakshatra of your Moon at birth. The periods are:
@@ -133,9 +133,9 @@ For an error of an hour or less, the Moon sign and the signs of most planets usu
 3. If you only know roughly (“early morning”), give your best guess. Kaal will tell you when a prediction depends on an exact time.
 
 Ready? [Make your free Kundli](/kundli)."""),
-("what-is-kaalera", "What is Kaalera? Meet Kaal, the AI Vedic astrologer",
- "Kaalera is an AI astrology service where Kaal, an AI Vedic astrologer, answers your questions with dated predictions and simple remedies.",
-"""**Kaalera** is an AI astrology service. Its astrologer, **Kaal**, is an AI that reads your Vedic Kundli and answers your questions in a chat — about career, marriage, health, money, family or travel.
+("what-is-kaalera", "What is Kaalera? Meet Kaal, the AI astrologer",
+ "Kaalera is an AI astrology service where Kaal, an AI astrologer, answers your questions with dated predictions and simple remedies.",
+"""**Kaalera** is an AI astrology service. Its astrologer, **Kaal**, is an AI that reads your Kundli and answers your questions in a chat — about career, marriage, health, money, family or travel.
 
 ## What makes Kaal different
 - **Dated predictions.** Instead of “good times are coming”, Kaal names windows such as “March to June 2027”.

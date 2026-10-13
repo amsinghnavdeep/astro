@@ -403,3 +403,13 @@ label.check input { width: auto; margin-top: 2px; flex: none; }
 .agent-av-wrap .agent-dot { position: absolute; right: -1px; bottom: -1px; margin: 0; box-shadow: 0 0 0 2px #09090b; }
 
 .topbar-brand { text-decoration: none; margin-right: 4px; }
+
+.deal-bar { background: #e8590c; color: #fff; text-align: center; padding: 8px 14px; font-size: 13px; font-weight: 600; }
+.share-pop { position: fixed; right: 18px; bottom: 18px; z-index: 40; width: min(340px, calc(100vw - 36px)); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 14px; box-shadow: 0 12px 32px rgba(0,0,0,.16); padding: 14px 16px; }
+.share-pop h4 { margin: 0 24px 4px 0; font-size: 15px; }
+.share-pop p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+.share-pop .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.share-pop .x { position: absolute; top: 8px; right: 10px; background: none; border: 0; cursor: pointer; color: var(--muted); font-size: 15px; }
+.share-pop .btn-s { padding: 7px 12px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--soft); cursor: pointer; text-decoration: none; font-size: 13px; font-weight: 600; }
+.share-pop .btn-s.primary { background: #25d366; border-color: #25d366; color: #fff; }
+@media (max-width: 640px) { .share-pop { left: 12px; right: 12px; bottom: 96px; width: auto; } }

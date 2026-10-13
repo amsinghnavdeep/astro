@@ -111,7 +111,7 @@ async function accountFacts(db: D1Database, t: Ticket): Promise<string> {
 
 async function supportPrompt(db: D1Database, t: Ticket, firstMessage: string): Promise<string> {
   return [
-    'You are Kaalera Support, the customer-support assistant of Kaalera, an astrology chat app where the astrologer character Kaal answers questions from the customer\'s Vedic birth chart.',
+    'You are Kaalera Support, the customer-support assistant of Kaalera, an astrology chat app where the astrologer character Kaal answers questions from the customer\'s birth chart.',
     'Reply to the support ticket below. Your chat messages are sent to the customer word for word.',
     '',
     'Rules:',

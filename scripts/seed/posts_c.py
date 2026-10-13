@@ -1,7 +1,7 @@
 POSTS = [
-("meet-kaal-ai-vedic-astrologer", "Meet Kaal, Kaalera's AI Vedic astrologer",
+("meet-kaal-ai-vedic-astrologer", "Meet Kaal, Kaalera's AI astrologer",
  "What Kaal is, what you can ask, and what you get back: dated predictions, the main issue in your Kundli and simple remedies, in your own language.",
-"""**Kaal** is Kaalera's AI Vedic astrologer. You give your birth date, time and place, ask a question about your life, and Kaal reads your Kundli and answers.
+"""**Kaal** is Kaalera's AI astrologer. You give your birth date, time and place, ask a question about your life, and Kaal reads your Kundli and answers.
 
 ## What you can ask
 - **Career:** when will my career grow, is a job change coming?
@@ -30,10 +30,10 @@ Your first question is free. After that, a consultation is **$11.50** and each e
 """Here is what happens between your question and Kaal's answer.
 
 ## 1. Your exact Kundli
-Kaal starts from your **birth date, local time and place**. It works out your Kundli exactly, the Vedic way (sidereal, Lahiri ayanamsa, whole-sign houses): your **Lagna**, the nine grahas, the twelve houses and your **nakshatra**. Nothing is guessed. That is why [your birth time matters](/blog/why-exact-birth-time-matters).
+Kaal starts from your **birth date, local time and place**. It works out your Kundli exactly, the classical way (sidereal, Lahiri ayanamsa, whole-sign houses): your **Lagna**, the nine grahas, the twelve houses and your **nakshatra**. Nothing is guessed. That is why [your birth time matters](/blog/why-exact-birth-time-matters).
 
 ## 2. Your dasha periods
-Vedic astrology times life events with the **Vimshottari dasha** periods. Kaal reads your current mahadasha and antardasha and when each one ends. See [Mahadasha explained](/blog/mahadasha-explained).
+Astrology times life events with the **Vimshottari dasha** periods. Kaal reads your current mahadasha and antardasha and when each one ends. See [Mahadasha explained](/blog/mahadasha-explained).
 
 ## 3. The sky ahead
 Kaal checks where the slow planets, like Saturn, Jupiter, Rahu and Ketu, will move through your houses in the coming years.
@@ -49,8 +49,8 @@ Kaal does not predict death or guarantee events. For health, legal or money deci
 
 [Get your free first answer](/)"""),
 ("kaalera-api-pricing", "Kaalera API: what you get and what it costs",
- "Add Kaal's AI Vedic astrology to your app. What the API returns, Business & API pricing 10% below the website, and how the prepaid USD wallet works.",
-"""The **Kaalera API** lets businesses and developers add Kaal, our AI Vedic astrologer, to their own app, website or chatbot.
+ "Add Kaal's AI astrology to your app. What the API returns, Business & API pricing 10% below the website, and how the prepaid USD wallet works.",
+"""The **Kaalera API** lets businesses and developers add Kaal, our AI astrologer, to their own app, website or chatbot.
 
 ## What you get
 - **Consultations:** send a person's birth date, time and place with a question. Kaal answers with dated predictions, the main issue and remedies.

@@ -122,7 +122,7 @@ export const postCard = (p: Post, featured = false): string => `
 
 export const askKaalCard = (): string => `
 <div class="b-ask">
-  <div class="b-ask-head"><img src="/kaal.svg" alt="" width="44" height="44"><div><strong>Kaal</strong><span>AI Vedic astrologer</span></div></div>
+  <div class="b-ask-head"><img src="/kaal.svg" alt="" width="44" height="44"><div><strong>Kaal</strong><span>AI astrologer</span></div></div>
   <p>Ask about your career, marriage, money or health. Kaal reads your own Kundli and gives dates and remedies. Your first question is free.</p>
   <a class="w-cta big" href="/">Ask Kaal free</a>
   <ul><li><a href="/">When will my career grow?</a></li><li><a href="/">When will I get married?</a></li><li><a href="/">Why was last year so hard?</a></li></ul>
@@ -131,8 +131,8 @@ export const askKaalCard = (): string => `
 export function blogIndexPage(site: string, posts: Post[]): string {
   const [first, ...rest] = posts;
   return layout({
-    site, path: '/blog', title: 'Vedic Astrology Blog — Kundli, Dasha, Sade Sati & Remedies | Kaalera',
-    description: 'Plain-English guides to Vedic astrology: Kundli, Mahadasha, Sade Sati, Manglik dosha, Rahu and Ketu, remedies, and building with an AI astrology API.',
+    site, path: '/blog', title: 'Astrology Blog — Kundli, Dasha, Sade Sati & Remedies | Kaalera',
+    description: 'Plain-English guides to astrology: Kundli, Mahadasha, Sade Sati, Manglik dosha, Rahu and Ketu, remedies, and building with an AI astrology API.',
     jsonLd: [organizationLd(site), breadcrumbLd(site, [['Home', '/'], ['Blog', '/blog']]), {
       '@context': 'https://schema.org', '@type': 'Blog', name: 'Kaalera blog', url: `${site}/blog`,
       blogPost: posts.slice(0, 50).map((p) => ({ '@type': 'BlogPosting', headline: p.title, url: `${site}/blog/${p.slug}`, datePublished: p.published_at })),
@@ -141,7 +141,7 @@ export function blogIndexPage(site: string, posts: Post[]): string {
 <section class="b-hero">
   <div class="b-hero-text">
     <p class="w-kicker">Kaalera blog</p>
-    <h1>Vedic astrology, <span class="b-saffron">explained simply</span></h1>
+    <h1>Astrology, <span class="b-saffron">explained simply</span></h1>
     <p class="w-lead">Guides to your Kundli, planetary periods, doshas and remedies, plus notes for developers building with the Kaalera astrology API.</p>
   </div>
   <div class="b-hero-media">${coverArt('kaalera-blog-wheel')}</div>
@@ -198,7 +198,7 @@ export function rssXml(site: string, posts: Post[]): string {
 <guid isPermaLink="true">${site}/blog/${esc(p.slug)}</guid><pubDate>${new Date(p.published_at ?? p.updated_at).toUTCString()}</pubDate>
 <description>${esc(p.summary)}</description></item>`);
   return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>Kaalera blog</title><link>${site}/blog</link>
-<description>Vedic astrology guides and AI astrology API notes from Kaalera.</description><language>en</language>
+<description>Astrology guides and AI astrology API notes from Kaalera.</description><language>en</language>
 ${items.join('\n')}
 </channel></rss>\n`;
 }
@@ -212,7 +212,7 @@ export function robotsTxt(site: string): string {
 export function llmsTxt(site: string, posts: Post[]): string {
   return `# Kaalera
 
-> Kaalera is an AI Vedic astrology service. Its AI astrologer, Kaal, reads a person's Kundli from their birth date, time and place and answers questions about marriage, career, money, health and family with dated predictions, one short line on the main planetary issue, and 1-2 remedies. The first question is free; paid packs add more questions. Kaalera also offers a public REST API so developers can add an AI astrology agent to their own apps.
+> Kaalera is an AI astrology service. Its AI astrologer, Kaal, reads a person's Kundli from their birth date, time and place and answers questions about marriage, career, money, health and family with dated predictions, one short line on the main planetary issue, and 1-2 remedies. The first question is free; paid packs add more questions. Kaalera also offers a public REST API so developers can add an AI astrology agent to their own apps.
 
 ## For people
 - [Ask Kaal (chat)](${site}/): ask a question about your future; first question free.

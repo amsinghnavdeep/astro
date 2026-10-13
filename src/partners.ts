@@ -72,10 +72,10 @@ export async function grantFriendBonus(db: D1Database, user: Partnered): Promise
 /** Called once per newly recorded website payment (applyPayment is idempotent per payment). */
 export async function onChatPayment(
   db: D1Database, p: { userId: string; threadId: string; kind: 'consultation' | 'topup'; amountCents: number }, taxFeePercent: number,
-): Promise<void> {
+): Promise<{ code: string; feeCents: number } | null> {
   const u = await db.prepare('SELECT referred_by, referred_code FROM users WHERE id = ?').bind(p.userId)
     .first<{ referred_by: string | null; referred_code: string | null }>();
-  if (!u) return;
+  if (!u) return null;
   if (u.referred_by) {
     const month = new Date();
     month.setUTCDate(1);
@@ -90,7 +90,7 @@ export async function onChatPayment(
   }
   if (u.referred_code) {
     const inf = await db.prepare('SELECT percent FROM influencers WHERE code = ?').bind(u.referred_code).first<{ percent: number }>();
-    if (!inf) return;
+    if (!inf) return null;
     const base = Math.round((p.amountCents * 100) / (100 + taxFeePercent));
     const fee = Math.round((base * inf.percent) / 100);
     if (p.kind === 'consultation') {
@@ -99,12 +99,13 @@ export async function onChatPayment(
         `INSERT INTO commissions (customer_id, code, thread_id, base_cents, commission_cents, created_at, available_at)
          VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(customer_id) DO NOTHING`,
       ).bind(p.userId, u.referred_code, p.threadId, base, fee, new Date(now).toISOString(), new Date(now + PAYOUT_HOLD_DAYS * DAY).toISOString()).run();
-      if (ins.meta?.changes) return;
+      if (ins.meta?.changes) return { code: u.referred_code, feeCents: fee };
     }
     await db.prepare(
       "UPDATE commissions SET base_cents = base_cents + ?, commission_cents = commission_cents + ? WHERE customer_id = ? AND thread_id = ? AND status = 'pending'",
     ).bind(base, fee, p.userId, p.threadId).run();
   }
+  return null;
 }
 
 const randomRef = (): string => {

@@ -92,7 +92,7 @@ ${main}
 <footer class="w-foot">
   <nav aria-label="Topics">${TOPIC_LINKS.map(([href, label]) => `<a href="${href}">${esc(label)}</a>`).join('')}</nav>
   <nav aria-label="Site"><a href="/">Ask Kaal</a><a href="/blog">Blog</a><a href="/developers">Astrology API</a><a href="/docs">API docs</a><a href="/support">Support</a><a href="/affiliates">Affiliates</a><a href="/influencers">Influencers</a><a href="/contact">Contact</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></nav>
-  <p>Kaalera — AI Vedic astrology. Guidance for reflection only, not professional advice.</p>
+  <p>Kaalera — AI astrology. Guidance for reflection only, not professional advice.</p>
 </footer>
 </body>
 </html>`;

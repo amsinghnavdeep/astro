@@ -6,6 +6,7 @@ import { deletePost, listPosts, savePost, slugify } from './blog.js';
 import { getPrices, priceHistory, PRICE_LIMITS, setPrices, type Prices } from './settings.js';
 import type { AppEnv } from './types.js';
 import { funnel } from './analytics.js';
+import { listFestivals, updateFestival } from './festivals.js';
 
 export const admin = new Hono<AppEnv>();
 export const isAdmin = (email: string | undefined | null): boolean => !!email && env.adminEmails.includes(email.toLowerCase());
@@ -66,3 +67,15 @@ admin.post('/posts', (c) => upsert(c, null));
 admin.put('/posts/:id', (c) => upsert(c, c.req.param('id')));
 admin.delete('/posts/:id', async (c) =>
   ((await deletePost(c.env.DB, c.req.param('id'))) ? c.json({ ok: true }) : c.json({ error: 'Not found' }, 404)));
+
+const festivalSchema = z.object({
+  enabled: z.boolean(), percent: z.number().int().min(0).max(50), festivalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+}).partial().strict();
+
+admin.get('/festivals', async (c) => c.json({ festivals: await listFestivals(c.env.DB) }));
+
+admin.put('/festivals/:id', async (c) => {
+  const p = festivalSchema.safeParse(await c.req.json().catch(() => null));
+  if (!p.success) return c.json({ error: p.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }, 400);
+  return (await updateFestival(c.env.DB, c.req.param('id'), p.data)) ? c.json({ festivals: await listFestivals(c.env.DB) }) : c.json({ error: 'Not found' }, 404);
+});

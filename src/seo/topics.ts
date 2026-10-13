@@ -21,8 +21,8 @@ export const TOPICS: Topic[] = [
     title: 'Free Kundli Online — Janam Kundli by Date of Birth | Kaalera',
     h1: 'Free Kundli online, read by an AI astrologer',
     kicker: 'Janam Kundli',
-    description: 'Make your Janam Kundli free from your date, time and place of birth, then ask Kaal, an AI Vedic astrologer, for dated predictions and simple remedies.',
-    body: `A **Kundli** (Janam Kundli or Janam Patri) is the Vedic map of the sky at the exact moment you were born. It records your **Lagna** (ascendant), the sign and **nakshatra** of your Moon, where each of the nine grahas sits across the twelve houses, and the **Vimshottari dasha** periods that time the chapters of your life.
+    description: 'Make your Janam Kundli free from your date, time and place of birth, then ask Kaal, an AI astrologer, for dated predictions and simple remedies.',
+    body: `A **Kundli** (Janam Kundli or Janam Patri) is the map of the sky at the exact moment you were born. It records your **Lagna** (ascendant), the sign and **nakshatra** of your Moon, where each of the nine grahas sits across the twelve houses, and the **Vimshottari dasha** periods that time the chapters of your life.
 
 ## What Kaalera does with your Kundli
 - Calculates it from your date, time and place of birth, using sidereal (Lahiri) positions.
@@ -38,7 +38,7 @@ Your first question is free.`,
     faqs: [
       ['Is the Kundli really free?', 'Yes. Creating and saving a Kundli is free, and your first question to Kaal is free. More questions are sold in small packs.'],
       ['What if I do not know my exact birth time?', 'Give the closest time you know. The Moon sign and most planet signs stay the same, but the ascendant and houses can change, so time-sensitive predictions become less precise.'],
-      ['Which system does Kaalera use?', 'Vedic (sidereal) astrology with Lahiri ayanamsa, whole-sign houses and the Vimshottari dasha system.'],
+      ['Which system does Kaalera use?', 'Sidereal astrology with Lahiri ayanamsa, whole-sign houses and the Vimshottari dasha system.'],
     ],
     posts: ['what-is-a-kundli', 'why-exact-birth-time-matters', 'mahadasha-explained'],
   },
@@ -48,7 +48,7 @@ Your first question is free.`,
     h1: 'Marriage prediction by date of birth',
     kicker: 'When will I get married?',
     description: 'Ask Kaal when marriage is likely, from your date, time and place of birth. Dated windows from your 7th house, Venus, Jupiter and dasha periods, plus simple remedies.',
-    body: `In Vedic astrology, marriage timing is read mainly from the **7th house** and its lord, **Venus** (the natural significator of partnership) and, traditionally for women, **Jupiter**. The timing itself comes from the **dasha** running at the time and from slow transits — especially Jupiter and Saturn — touching the 7th house, its lord or the Moon.
+    body: `In astrology, marriage timing is read mainly from the **7th house** and its lord, **Venus** (the natural significator of partnership) and, traditionally for women, **Jupiter**. The timing itself comes from the **dasha** running at the time and from slow transits — especially Jupiter and Saturn — touching the 7th house, its lord or the Moon.
 
 ## What Kaal tells you
 - The most likely **date windows** for marriage, not a vague "soon".
@@ -138,8 +138,8 @@ Ask Kaal whether you are Manglik, whether it is cancelled, and one or two remedi
     title: 'AI Astrologer — Ask an Astrologer Online, Astrology Chat | Kaalera',
     h1: 'Ask Kaal, the AI astrologer',
     kicker: 'AI astrology chat',
-    description: 'Chat with Kaal, an AI Vedic astrologer, about career, marriage, health or money. Dated, to-the-point predictions with simple remedies. First question free.',
-    body: `**Kaal** is Kaalera's AI Vedic astrologer. You add your birth details once, then chat like you would with an astrologer online — but answers come in minutes, any time of day, in your language.
+    description: 'Chat with Kaal, an AI astrologer, about career, marriage, health or money. Dated, to-the-point predictions with simple remedies. First question free.',
+    body: `**Kaal** is Kaalera's AI astrologer. You add your birth details once, then chat like you would with an astrologer online — but answers come in minutes, any time of day, in your language.
 
 ## How it works
 1. Add your date, time and place of birth.
@@ -154,7 +154,7 @@ Ask Kaal whether you are Manglik, whether it is cancelled, and one or two remedi
 
 Kaal does not give political or religious debate, and is not a substitute for medical, legal or financial advice.`,
     faqs: [
-      ['Is an AI astrologer accurate?', 'Kaal uses the same calculations as a Vedic astrologer. Like any astrology, predictions are guidance, not guarantees. Read our honest take: How accurate is AI astrology?'],
+      ['Is an AI astrologer accurate?', 'Kaal uses the same calculations as a astrologer. Like any astrology, predictions are guidance, not guarantees. Read our honest take: How accurate is AI astrology?'],
       ['Which languages does Kaal answer in?', 'English by default, and also Hindi, Hinglish and several other languages you can pick in the chat.'],
       ['Is there an API for developers?', 'Yes. The Kaalera API lets you add Kaal to your own app. See the Developers page.'],
     ],
@@ -162,14 +162,14 @@ Kaal does not give political or religious debate, and is not a substitute for me
   },
   {
     slug: 'kaal-vs-chatgpt',
-    title: 'Kaal vs ChatGPT for Vedic Astrology — Tested on 5 Birth Details | Kaalera',
+    title: 'Kaal vs ChatGPT for Astrology — Tested on 5 Birth Details | Kaalera',
     h1: 'Kaal vs ChatGPT: we tested 5 birth details',
     kicker: 'Honest test',
     description: 'We gave ChatGPT and Kaal the same 5 birth details and checked the ascendant, Moon sign, nakshatra and current dasha against an exact astronomical calculation.',
     body: `Anyone can paste their birth details into ChatGPT. So we tested what it gets right, using the same question for 5 people born in different cities and years.
 
 ## How we tested
-- **Question, word for word:** "I was born on [date] at [time] (local time) in [city]. Using Vedic (sidereal, Lahiri) astrology, tell me my ascendant (lagna) with degree, Moon sign, Sun sign, birth nakshatra with pada, and my current Vimshottari mahadasha and antardasha with the date the mahadasha ends. Then: when will I get a better job?"
+- **Question, word for word:** "I was born on [date] at [time] (local time) in [city]. Using sidereal (Lahiri) astrology, tell me my ascendant (lagna) with degree, Moon sign, Sun sign, birth nakshatra with pada, and my current Vimshottari mahadasha and antardasha with the date the mahadasha ends. Then: when will I get a better job?"
 - **ChatGPT:** the free version at chatgpt.com, signed out, web search on, one try per person, on 13 October 2026.
 - **Exact values:** calculated with the Swiss Ephemeris (sidereal, Lahiri). Kaal reads from this same calculation, so Kaal's values match it by design.
 
@@ -204,14 +204,14 @@ Kaal does not give political or religious debate, and is not a substitute for me
 - You can repeat it: ask ChatGPT the question above with your own details, then compare with the Kundli card Kaal shows you.`,
     faqs: [
       ['Can ChatGPT make a Kundli?', 'In our test it got the Moon sign, Sun sign and nakshatra right for 4 of 5 people, but the ascendant and the current dasha were often missing or wrong, and it gave no exact dasha end dates.'],
-      ['Why does the dasha matter?', 'Vimshottari dasha periods set the timing in Vedic astrology. If the current period is wrong, the dates of every prediction move with it.'],
+      ['Why does the dasha matter?', 'Vimshottari dasha periods set the timing in astrology. If the current period is wrong, the dates of every prediction move with it.'],
       ['How does Kaal get exact values?', 'Every reading starts from a Kundli calculated from your exact birth date, time and place, and Kaal shows the key values in a card before the first answer so you can check them.'],
     ],
     posts: ['how-accurate-is-ai-astrology', 'ai-astrologer-vs-human-astrologer', 'what-is-a-kundli'],
   },
   {
     slug: 'astrology-api',
-    title: 'Astrology API for Apps — Add an AI Vedic Astrologer | Kaalera',
+    title: 'Astrology API for Apps — Add an AI Astrologer | Kaalera',
     h1: 'Astrology API: add Kaal to your app',
     kicker: 'For businesses and developers',
     description: 'Building an astrology app, horoscope chatbot or Kundli feature? Kaalera\'s API gives your users Kaal\'s readings with dated predictions and remedies, over simple HTTPS calls.',
@@ -237,7 +237,7 @@ You top up a prepaid USD wallet, with a first recharge of **$115**. Every call i
     faqs: [
       ['Is there a free trial or test API?', 'No. Every API call is paid from your prepaid USD wallet. Once your wallet is topped up you can try the API straight away.'],
       ['Can I build a horoscope chatbot with it?', 'Yes. Start a consultation with the user\'s birth details, then send each chat message as a follow-up question. Kaal answers with dated predictions and remedies.'],
-      ['Which astrology system does Kaal use?', 'Vedic (sidereal) astrology with Lahiri ayanamsa, whole-sign houses and the Vimshottari dasha system.'],
+      ['Which astrology system does Kaal use?', 'Sidereal astrology with Lahiri ayanamsa, whole-sign houses and the Vimshottari dasha system.'],
       ['How much does it cost?', 'Business & API pricing is 10% below website prices: $10.35 to start a consultation and $7.25 per follow-up, taxes & fees included, from a prepaid USD wallet with a $115 first recharge.'],
     ],
     posts: ['build-ai-astrology-app-kaalera-api', 'add-horoscope-chatbot-to-your-app', 'astrology-api-use-cases'],

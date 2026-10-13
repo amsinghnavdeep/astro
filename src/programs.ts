@@ -7,7 +7,7 @@ const page = (site: string, path: string, title: string, description: string, bo
 
 export const affiliatesPage = (site: string): string => page(site, '/affiliates', 'Affiliates: share Kaalera, get 2 free questions',
   'Share your Kaalera link. Your friend gets 2 free questions with Kaal, and you get 2 free questions when they make their first payment.', `
-<p class="w-lead">Share Kaalera with a friend. <strong>You both get 2 free questions</strong> with Kaal, the AI Vedic astrologer.</p>
+<p class="w-lead">Share Kaalera with a friend. <strong>You both get 2 free questions</strong> with Kaal, the AI astrologer.</p>
 <h2>How it works</h2>
 <ol>
 <li>Sign in and open <strong>Affiliates</strong> in the menu to get your personal link.</li>

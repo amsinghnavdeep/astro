@@ -31,6 +31,8 @@ import { admin } from './admin.js';
 import { autoChargeQuestion, autoRechargeApi, ensureCustomer, getBilling, publicBilling, RECEIPT_ITEM, saveCardFromCheckout, sendReceipt } from './autocharge.js';
 import { CONTACT_TOPICS, contactPage, privacyPage, termsPage } from './legal.js';
 import { affiliatesPage, influencersPage } from './programs.js';
+import { chatPrices } from './festivals.js';
+import { sendExpiryReminders, sendFestivalEmails, sendInfluencerDigests, unsubscribe, validUnsubToken } from './engagement.js';
 import { isAdmin } from './admin.js';
 import { CLIENT_EVENTS, markLeadSignedUp, saveLead, trackPayment, trackSafe, type FunnelEvent } from './analytics.js';
 import { addReminder, listReminders, sendDueReminders } from './reminders.js';
@@ -53,10 +55,11 @@ const COOKIE = 'kaalera_session';
 const MAX_THREADS = 20;
 
 const pricing = async (db: D1Database) => {
-  const p = await getPrices(db);
+  const p = await chatPrices(db);
   return {
     freeQuestions: p.freeQuestions, packQuestions: p.chatPackQuestions, packCents: p.chatPackCents, extraQuestionCents: p.extraQuestionCents,
     consultationDays: env.chat.consultationDays, currency: env.stripe.currency, taxFeePercent: p.taxFeePercent,
+    deal: p.deal, fullPackCents: p.fullPackCents, fullExtraQuestionCents: p.fullExtraQuestionCents,
   };
 };
 
@@ -131,8 +134,9 @@ const agreedIn = (body: unknown): boolean => !!body && typeof body === 'object' 
 async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadId?: string; credits: number; cents: number; name: string; returnPath: string }): Promise<string> {
   const area = o.kind === 'api_credits' ? 'api' : 'chat';
   const consentId = crypto.randomUUID();
-  const prices = await getPrices(c.env.DB);
+  const prices = await chatPrices(c.env.DB);
   const tax = prices.taxFeePercent;
+  const name = area === 'chat' && prices.deal ? `${o.name} (${prices.deal.name} ${prices.deal.percent}% off)` : o.name;
   await c.env.DB.prepare(
     `INSERT INTO purchase_consents (id, user_id, kind, thread_id, disclaimer, ip, user_agent, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(consentId, user.id, o.kind, o.threadId ?? null, disclaimer(area, prices), c.req.header('cf-connecting-ip') ?? null,
@@ -143,7 +147,7 @@ async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadI
     customer: await ensureCustomer(c.env.DB, user),
     payment_intent_data: { setup_future_usage: 'off_session' },
     line_items: [
-      { quantity: 1, price_data: { currency: env.stripe.currency, unit_amount: o.cents, product_data: { name: o.name } } },
+      { quantity: 1, price_data: { currency: env.stripe.currency, unit_amount: o.cents, product_data: { name } } },
       ...(tax > 0 ? [{
         quantity: 1,
         price_data: { currency: env.stripe.currency, unit_amount: taxesAndFees(o.cents, tax), product_data: { name: `Taxes & fees (${tax}%)` } },
@@ -500,7 +504,7 @@ app.post('/api/threads', async (c) => {
   if ((user.free_used || blocked) && !body.data.agreed && (await chatCredits(c)) < 1)
     return c.json(blocked ? FREE_BLOCKED : CONSENT_REQUIRED, 400);
   const db = c.env.DB;
-  const pr = await getPrices(db);
+  const pr = await chatPrices(db);
   const k = await getKundli(db, user.id, body.data.kundliId);
   if (!k) return c.json({ error: 'Choose or add a Kundli first.' }, 400);
   const p = { data: { ...kundliInput(k), language: body.data.language, question: body.data.question } };
@@ -549,7 +553,7 @@ app.post('/api/threads/:id/checkout', async (c) => {
   if (isExpired(t)) return c.json({ error: 'This consultation has closed. Start a new one.' }, 409);
   if (!agreedIn(await c.req.json().catch(() => null))) return c.json(CONSENT_REQUIRED, 400);
   const kind: CheckoutKind = t.status === 'awaiting_payment' ? 'consultation' : 'topup';
-  const pr = await getPrices(c.env.DB);
+  const pr = await chatPrices(c.env.DB);
   const url = await createCheckout(c, user, {
     kind, threadId: t.id,
     credits: kind === 'topup' ? 1 : pr.chatPackQuestions,
@@ -896,7 +900,7 @@ app.route('/api/admin', admin);
 /* ---------- public SEO pages: server-rendered, edge-cached, refreshed on every blog change ---------- */
 
 /** Bump when public page HTML or headers change so cached copies are replaced. */
-const PUBLIC_CACHE_REV = '2026-10-blog-design-2';
+const PUBLIC_CACHE_REV = '2026-10-no-vedic-1';
 const PUBLIC_CSP = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'";
 const CONTENT_TYPE = { html: 'text/html; charset=utf-8', xml: 'application/xml; charset=utf-8', rss: 'application/rss+xml; charset=utf-8', text: 'text/plain; charset=utf-8' } as const;
 const edgeCache = (): Cache | undefined => (typeof caches === 'undefined' ? undefined : (caches as unknown as { default: Cache }).default);
@@ -933,6 +937,21 @@ app.get('/blog/:slug', (c) => publicPage(c, 'html', async () => {
   return blogPostPage(env.siteUrl, p, (await published(c)).filter((x) => x.slug !== p.slug).slice(0, 3));
 }));
 app.get('/terms', (c) => publicPage(c, 'html', async () => termsPage(env.siteUrl)));
+
+const unsubPage = (c: C, lead: string, form = '') => c.html(layout(
+  { site: env.siteUrl, path: '/unsubscribe', title: 'Email preferences | Kaalera', description: 'Manage Kaalera emails.' },
+  `<section class="w-hero"><h1>Email preferences</h1><p class="w-lead">${lead}</p>${form}</section>`,
+), 200, { 'Content-Security-Policy': PUBLIC_CSP, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+app.get('/unsubscribe', (c) => {
+  const t = c.req.query('t') ?? '';
+  if (!validUnsubToken(t)) return unsubPage(c, 'This unsubscribe link is not valid.');
+  return unsubPage(c, 'Stop offers, festival deals and influencer updates from Kaalera? Sign-in links, receipts and expiry notices about your purchases still arrive.',
+    `<form method="post" action="/unsubscribe?t=${t}"><button class="w-cta big" type="submit">Unsubscribe</button></form>`);
+});
+app.post('/unsubscribe', async (c) => {
+  const ok = await unsubscribe(c.env.DB, c.req.query('t') ?? '');
+  return unsubPage(c, ok ? 'Done. You won\'t get offers or influencer updates from Kaalera any more.' : 'This unsubscribe link is not valid.');
+});
 app.get('/privacy', (c) => publicPage(c, 'html', async () => privacyPage(env.siteUrl)));
 app.get('/affiliates', (c) => publicPage(c, 'html', async () => affiliatesPage(env.siteUrl)));
 app.get('/influencers', (c) => publicPage(c, 'html', async () => influencersPage(env.siteUrl)));
@@ -953,6 +972,9 @@ export default {
   fetch: app.fetch,
   async scheduled(_event: { cron: string }, bindings: { DB: D1Database }, ctx: { waitUntil(p: Promise<unknown>): void }) {
     ctx.waitUntil(sendDueReminders(bindings.DB).then((n) => console.log('Reminders sent:', n)));
+    ctx.waitUntil(sendExpiryReminders(bindings.DB).then((n) => console.log('Expiry notices sent:', n)).catch((err) => console.error('Expiry notices failed:', err)));
+    ctx.waitUntil(sendInfluencerDigests(bindings.DB).then((n) => console.log('Influencer emails sent:', n)).catch((err) => console.error('Influencer emails failed:', err)));
+    ctx.waitUntil(sendFestivalEmails(bindings.DB).then((n) => console.log('Festival emails sent:', n)).catch((err) => console.error('Festival emails failed:', err)));
     ctx.waitUntil(bindings.DB.prepare("DELETE FROM email_leads WHERE signed_up = 0 AND created_at < ?")
       .bind(new Date(Date.now() - 90 * 86_400_000).toISOString()).run().catch((err) => console.error('Lead cleanup failed:', err)));
   },
