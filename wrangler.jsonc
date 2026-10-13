@@ -10,16 +10,27 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/auth/*", "/v1/*"]
   },
-  // Create with `wrangler d1 create kaalera` and paste the id here.
   "d1_databases": [
-    { "binding": "DB", "database_name": "kaalera", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+    { "binding": "DB", "database_name": "kaalera", "database_id": "fb199303-e7a8-4e26-a823-a53fe7e8bb40", "migrations_dir": "migrations" }
+  ],
+  "routes": [
+    { "pattern": "kaalera.com", "custom_domain": true },
+    { "pattern": "www.kaalera.com", "custom_domain": true }
   ],
   "observability": { "enabled": true },
+  // Runs the Worker next to the D1 database instead of next to the visitor: fewer slow round trips per request.
+  "placement": { "mode": "smart" },
+  // Per-IP / per-key limits (Workers Rate Limiting). namespace_id just has to be unique in the account.
+  "ratelimits": [
+    { "name": "RL_AUTH", "namespace_id": "4101", "simple": { "limit": 5, "period": 60 } },
+    { "name": "RL_WEB", "namespace_id": "4102", "simple": { "limit": 60, "period": 60 } },
+    { "name": "RL_API", "namespace_id": "4103", "simple": { "limit": 120, "period": 60 } }
+  ],
   // Secrets (wrangler secret put / .dev.vars): DEVIN_API_KEY, DEVIN_ORG_ID,
   // STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, RESEND_API_KEY.
   "vars": {
-    "SITE_URL": "http://localhost:8787",
-    "EMAIL_FROM": "Kaalera <hello@askkaali.com>",
+    "SITE_URL": "https://kaalera.com",
+    "EMAIL_FROM": "Kaalera <hello@kaalera.com>",
     "DEV_LOGIN_LINKS": "false",
     "SUPPORT_EMAIL": "amsinghnavdeep@gmail.com"
   }

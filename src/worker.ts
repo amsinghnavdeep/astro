@@ -165,6 +165,39 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
   return { kind, threadId: m.threadId };
 }
 
+/* ---------- security headers + rate limits ---------- */
+
+app.use('*', async (c, next) => {
+  await next();
+  const h = c.res.headers;
+  h.set('X-Content-Type-Options', 'nosniff');
+  h.set('X-Frame-Options', 'DENY');
+  h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  h.set('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  if (!h.has('Cache-Control')) h.set('Cache-Control', 'no-store');
+});
+
+type Limiter = keyof Pick<AppEnv['Bindings'], 'RL_AUTH' | 'RL_WEB' | 'RL_API'>;
+const limited = async (c: C, name: Limiter, key: string): Promise<boolean> => {
+  const rl = c.env[name];
+  if (!rl) return false;
+  try {
+    return !(await rl.limit({ key })).success;
+  } catch (err) {
+    console.error('Rate limiter failed:', err);
+    return false;
+  }
+};
+const ip = (c: C) => c.req.header('cf-connecting-ip') ?? 'unknown';
+const tooMany = (c: C) => c.json({ error: 'Too many requests. Please wait a minute and try again.' }, 429);
+
+app.use('/api/login', async (c, next) => ((await limited(c, 'RL_AUTH', ip(c))) ? tooMany(c) : next()));
+app.use('/auth/*', async (c, next) => ((await limited(c, 'RL_AUTH', ip(c))) ? tooMany(c) : next()));
+app.use('/api/*', async (c, next) => {
+  if (c.req.method === 'GET' || c.req.path === '/api/stripe/webhook') return next();
+  return (await limited(c, 'RL_WEB', ip(c))) ? tooMany(c) : next();
+});
+
 /* ---------- web session ---------- */
 
 app.use('/api/*', async (c, next) => {
@@ -477,7 +510,11 @@ app.use('/v1/*', async (c, next) => {
   if (c.req.method === 'OPTIONS') return next();
   const raw = c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
   const auth = raw ? await authenticateApiKey(c.env.DB, raw) : null;
-  if (!auth) return apiError(c, 401, 'invalid_api_key', 'Missing or invalid API key.');
+  if (!auth) {
+    if (await limited(c, 'RL_AUTH', `v1:${ip(c)}`)) return apiError(c, 429, 'rate_limited', 'Too many requests.');
+    return apiError(c, 401, 'invalid_api_key', 'Missing or invalid API key.');
+  }
+  if (await limited(c, 'RL_API', auth.keyId)) return apiError(c, 429, 'rate_limited', 'Rate limit exceeded (120 requests per minute per key).');
   c.set('api', auth);
   await next();
 });
