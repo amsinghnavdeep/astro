@@ -9,7 +9,7 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/auth/*", "/v1/*", "/blog", "/blog/*", "/robots.txt", "/sitemap.xml", "/llms.txt", "/llms-full.txt",
-      "/kundli", "/marriage-prediction", "/career-astrology", "/sade-sati", "/manglik-dosha", "/ai-astrologer", "/kaal-vs-chatgpt", "/astrology-api", "/contact", "/terms", "/affiliates", "/influencers", "/privacy", "/unsubscribe", "/admin"]
+      "/kundli", "/marriage-prediction", "/career-astrology", "/sade-sati", "/manglik-dosha", "/ai-astrologer", "/kaal-vs-chatgpt", "/astrology-api", "/contact", "/terms", "/affiliates", "/influencers", "/privacy", "/unsubscribe", "/admin", "/admin/*"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "kaalera", "database_id": "fb199303-e7a8-4e26-a823-a53fe7e8bb40", "migrations_dir": "migrations" }

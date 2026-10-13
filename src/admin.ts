@@ -27,7 +27,7 @@ admin.get('/funnel', async (c) => {
 });
 
 const int = (k: keyof Prices) => z.number().int().min(PRICE_LIMITS[k][0]).max(PRICE_LIMITS[k][1]);
-const pricesSchema = z.object({
+export const pricesSchema = z.object({
   chatPackCents: int('chatPackCents'), extraQuestionCents: int('extraQuestionCents'), chatPackQuestions: int('chatPackQuestions'), freeQuestions: int('freeQuestions'),
   apiCreditCents: int('apiCreditCents'), apiMinRechargeCents: int('apiMinRechargeCents'), taxFeePercent: int('taxFeePercent'),
 }).partial().strict();
@@ -42,7 +42,7 @@ admin.put('/prices', async (c) => {
   return c.json({ prices, history: await priceHistory(c.env.DB) });
 });
 
-const postSchema = z.object({
+export const postSchema = z.object({
   title: z.string().trim().min(3).max(160),
   slug: z.string().trim().max(80).default(''),
   summary: z.string().trim().max(300).default(''),
@@ -68,7 +68,7 @@ admin.put('/posts/:id', (c) => upsert(c, c.req.param('id')));
 admin.delete('/posts/:id', async (c) =>
   ((await deletePost(c.env.DB, c.req.param('id'))) ? c.json({ ok: true }) : c.json({ error: 'Not found' }, 404)));
 
-const festivalSchema = z.object({
+export const festivalSchema = z.object({
   enabled: z.boolean(), percent: z.number().int().min(0).max(50), festivalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 }).partial().strict();
 

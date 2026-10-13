@@ -24,21 +24,21 @@ import {
 
 import { support } from './support.js';
 import { checkoutNote, disclaimer } from './disclaimer.js';
-import { API_DISCOUNT_PERCENT, apiActivated, apiPrice, apiPacks, getPrices, taxesAndFees } from './settings.js';
+import { API_DISCOUNT_PERCENT, apiActivated, apiPrice, apiPacks, getPrices, priceHistory, setPrices, taxesAndFees } from './settings.js';
 
 const usdCents = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 import { admin } from './admin.js';
 import { autoChargeQuestion, autoRechargeApi, CHAT_RELOAD_QUESTIONS, ensureCustomer, getBilling, publicBilling, RECEIPT_ITEM, saveCardFromCheckout, sendReceipt } from './autocharge.js';
 import { CONTACT_TOPICS, contactPage, privacyPage, termsPage } from './legal.js';
 import { affiliatesPage, influencersPage } from './programs.js';
-import { chatPrices } from './festivals.js';
+import { chatPrices, listFestivals, updateFestival } from './festivals.js';
 import { sendExpiryReminders, sendFestivalEmails, sendInfluencerDigests, unsubscribe, validUnsubToken } from './engagement.js';
-import { isAdmin } from './admin.js';
-import { adminPage, type Person } from './adminPage.js';
+import { festivalSchema, isAdmin, postSchema, pricesSchema } from './admin.js';
+import { adminPage, blogTab, festivalsTab, filterRows, FILTER_KEYS, noticeHtml, peopleCsv, pricesTab, PRICE_FIELDS, toRows, type Filters, type Person } from './adminPage.js';
 import { CLIENT_EVENTS, funnel, markLeadSignedUp, saveLead, trackPayment, trackSafe, type FunnelEvent } from './analytics.js';
 import { addReminder, listReminders, sendDueReminders } from './reminders.js';
 import { attributeSignup, captureReferral, createInfluencer, getPayout, grantFriendBonus, markPayoutPaid, partnerState, PAYOUT_METHODS, payoutsCsv, requestPayout, validateCode, type PayoutMethod } from './partners.js';
-import { blogIndexPage, blogPostPage, blogVersion, getPublishedPost, listPosts, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
+import { blogIndexPage, blogPostPage, blogVersion, deletePost, getPost, getPublishedPost, listPosts, savePost, slugify, llmsTxt, robotsTxt, rssXml, sitemapXml } from './blog.js';
 import { layout } from './seo/layout.js';
 import { TOPICS, topicPage } from './seo/topics.js';
 import { creditBalance, creditLots, grantCredits, spendCredit } from './credits.js';
@@ -373,33 +373,116 @@ const ownerHtml = (title: string, inner: string): string =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)} · Kaalera</title></head>`
   + `<body style="font-family:system-ui,sans-serif;max-width:520px;margin:40px auto;padding:0 16px"><h2>${escapeHtml(title)}</h2>${inner}</body></html>`;
 
-/** Owner-only dashboard: funnel, revenue and people. Never shows chat text or birth details. */
-app.get('/admin', async (c) => {
+/** Owner-only admin: overview and people, blog, prices, festivals. Never shows chat text or birth details. */
+const adminUser = async (c: C) => {
+  const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
   c.header('Cache-Control', 'no-store');
   c.header('X-Robots-Tag', 'noindex');
-  const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
   if (!user) return c.html(ownerHtml('Sign in first', '<p>Sign in to Kaalera with the owner email, then open this page again.</p><p><a href="/?app=1">Sign in</a></p>'), 401);
   if (!isAdmin(user.email)) return c.html(ownerHtml('Not found', ''), 404);
+  return user;
+};
+const adminFilters = (c: C): Filters => Object.fromEntries(FILTER_KEYS.map((k) => [k, (c.req.query(k) ?? '').trim().slice(0, 100)])) as Filters;
+const loadPeople = async (db: D1Database) => (await db.prepare(`SELECT u.name, u.email, u.account_type, u.business_name, u.created_at, u.last_seen_at,
+    (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'web') AS web,
+    (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'api') AS api,
+    (SELECT COALESCE(SUM(amount_cents), 0) FROM payments p WHERE p.user_id = u.id) AS cents,
+    (SELECT substr(group_concat(m.body, ' '), 1, 6000) FROM messages m JOIN threads t ON t.id = m.thread_id WHERE t.user_id = u.id AND m.role = 'user') AS asked
+  FROM users u ORDER BY COALESCE(u.last_seen_at, u.created_at) DESC LIMIT 5000`).all<Person>()).results;
+const back = (c: C, tab: string, ok: string, err = '', extra = '') =>
+  c.redirect(`/admin?tab=${tab}${extra}&${new URLSearchParams(err ? { err } : { ok }).toString()}`, 303);
+
+app.get('/admin', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  const db = c.env.DB;
+  const notice = noticeHtml(c.req.query('ok') ?? '', c.req.query('err') ?? '');
+  const tab = c.req.query('tab') ?? 'people';
+  if (tab === 'blog') {
+    const posts = await listPosts(db, false);
+    const e = c.req.query('edit');
+    const edit = e === 'new' ? 'new' : e ? (await getPost(db, e)) ?? null : null;
+    return c.html(blogTab(posts, edit, notice));
+  }
+  if (tab === 'prices') return c.html(pricesTab({ ...(await getPrices(db)) }, await priceHistory(db), notice));
+  if (tab === 'festivals') return c.html(festivalsTab(await listFestivals(db), notice));
   const days = Math.min(365, Math.max(1, Number(c.req.query('days')) || 30));
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
-  const db = c.env.DB;
   const [f, revenue, all, people] = await Promise.all([
     funnel(db, days),
     db.prepare('SELECT substr(created_at, 1, 10) AS day, SUM(amount_cents) AS cents, COUNT(*) AS n FROM payments WHERE created_at >= ? GROUP BY day')
       .bind(since).all<{ day: string; cents: number; n: number }>(),
     db.prepare('SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM payments) AS payments, (SELECT COALESCE(SUM(amount_cents), 0) FROM payments) AS cents')
       .first<{ users: number; payments: number; cents: number }>(),
-    db.prepare(`SELECT u.name, u.email, u.account_type, u.business_name, u.created_at, u.last_seen_at,
-        (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'web') AS web,
-        (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'api') AS api,
-        (SELECT COALESCE(SUM(amount_cents), 0) FROM payments p WHERE p.user_id = u.id) AS cents,
-        (SELECT substr(group_concat(m.body, ' '), 1, 6000) FROM messages m JOIN threads t ON t.id = m.thread_id WHERE t.user_id = u.id AND m.role = 'user') AS asked
-      FROM users u ORDER BY COALESCE(u.last_seen_at, u.created_at) DESC LIMIT 1000`).all<Person>(),
+    loadPeople(db),
   ]);
-  return c.html(adminPage({
-    days, q: (c.req.query('q') ?? '').trim().slice(0, 100), pain: (c.req.query('pain') ?? '').slice(0, 40), totals: f.totals,
-    revenue: revenue.results, all: all ?? { users: 0, payments: 0, cents: 0 }, people: people.results,
-  }));
+  return c.html(adminPage({ days, f: adminFilters(c), totals: f.totals, revenue: revenue.results, all: all ?? { users: 0, payments: 0, cents: 0 }, people }, notice));
+});
+
+app.get('/admin/people.csv', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  const rows = filterRows(toRows(await loadPeople(c.env.DB)), adminFilters(c));
+  return c.body(peopleCsv(rows), 200, {
+    'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store',
+    'Content-Disposition': `attachment; filename="kaalera-people-${new Date().toISOString().slice(0, 10)}.csv"`,
+  });
+});
+
+const formOf = async (c: C) => Object.fromEntries(Object.entries(await c.req.parseBody()).map(([k, v]) => [k, typeof v === 'string' ? v : '']));
+const issues = (e: z.ZodError) => e.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
+
+const saveBlog = async (c: C, id: string | null) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const p = postSchema.safeParse(await formOf(c));
+  const again = id ? `&edit=${encodeURIComponent(id)}` : '&edit=new';
+  if (!p.success) return back(c, 'blog', '', issues(p.error), again);
+  const slug = slugify(p.data.slug || p.data.title);
+  if (!slug) return back(c, 'blog', '', 'Add a title or link made of letters or numbers.', again);
+  const r = await savePost(c.env.DB, id, { ...p.data, slug, coverUrl: p.data.coverUrl || null });
+  if (r.error === 'slug_taken') return back(c, 'blog', '', `Another post already uses the link /blog/${slug}.`, again);
+  if (r.error) return back(c, 'blog', '', 'Post not found.');
+  return back(c, 'blog', p.data.status === 'published' ? `Published: kaalera.com/blog/${slug}` : 'Draft saved.');
+};
+app.post('/admin/blog', (c) => saveBlog(c, null));
+app.post('/admin/blog/:id', (c) => saveBlog(c, c.req.param('id')));
+app.post('/admin/blog/:id/delete', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  return (await deletePost(c.env.DB, c.req.param('id'))) ? back(c, 'blog', 'Post deleted.') : back(c, 'blog', '', 'Post not found.');
+});
+
+app.post('/admin/prices', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const form = await formOf(c);
+  const patch: Record<string, number> = {};
+  for (const x of PRICE_FIELDS) {
+    const v = form[x.key];
+    if (v === undefined || v.trim() === '') continue;
+    patch[x.key] = x.money ? Math.round(Number(v) * 100) : Number(v);
+  }
+  const p = pricesSchema.safeParse(patch);
+  if (!p.success) return back(c, 'prices', '', issues(p.error));
+  const cur = await getPrices(c.env.DB);
+  const changed = Object.fromEntries(Object.entries(p.data).filter(([k, v]) => cur[k as keyof typeof cur] !== v));
+  if (!Object.keys(changed).length) return back(c, 'prices', 'Nothing changed.');
+  await setPrices(c.env.DB, changed, user.email);
+  return back(c, 'prices', 'Prices saved.');
+});
+
+app.post('/admin/festivals/:id', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const form = await formOf(c);
+  const p = festivalSchema.safeParse({ enabled: form.enabled === '1', percent: Number(form.percent) });
+  if (!p.success) return back(c, 'festivals', '', issues(p.error));
+  return (await updateFestival(c.env.DB, c.req.param('id'), p.data)) ? back(c, 'festivals', 'Festival saved.') : back(c, 'festivals', '', 'Festival not found.');
 });
 
 /** Owner-only page from the payout-request email: shows where to send the money and marks it paid. */
