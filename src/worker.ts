@@ -34,7 +34,8 @@ import { affiliatesPage, influencersPage } from './programs.js';
 import { chatPrices, listFestivals, updateFestival } from './festivals.js';
 import { sendExpiryReminders, sendFestivalEmails, sendInfluencerDigests, unsubscribe, validUnsubToken } from './engagement.js';
 import { festivalSchema, isAdmin, postSchema, pricesSchema } from './admin.js';
-import { adminPage, blogTab, festivalsTab, filterRows, FILTER_KEYS, noticeHtml, peopleCsv, pricesTab, PRICE_FIELDS, toRows, type Filters, type Person } from './adminPage.js';
+import { isKaalKey, KAAL_FIELDS, KAAL_MAX_CHARS, KAAL_MIN_CHARS, kaalFields, kaalHistory, kaalVersion, setKaalPrompt } from './kaalPrompt.js';
+import { adminPage, blogTab, festivalsTab, filterRows, FILTER_KEYS, noticeHtml, peopleCsv, kaalTab, pricesTab, PRICE_FIELDS, toRows, type Filters, type Person } from './adminPage.js';
 import { CLIENT_EVENTS, funnel, markLeadSignedUp, saveLead, trackPayment, trackSafe, type FunnelEvent } from './analytics.js';
 import { addReminder, listReminders, sendDueReminders } from './reminders.js';
 import { attributeSignup, captureReferral, createInfluencer, getPayout, grantFriendBonus, markPayoutPaid, partnerState, PAYOUT_METHODS, payoutsCsv, requestPayout, validateCode, type PayoutMethod } from './partners.js';
@@ -406,6 +407,11 @@ app.get('/admin', async (c) => {
   }
   if (tab === 'prices') return c.html(pricesTab({ ...(await getPrices(db)) }, await priceHistory(db), notice));
   if (tab === 'festivals') return c.html(festivalsTab(await listFestivals(db), notice));
+  if (tab === 'kaal') {
+    const load = Number(c.req.query('load'));
+    const [fields, history, loaded] = await Promise.all([kaalFields(db), kaalHistory(db), Number.isInteger(load) && load > 0 ? kaalVersion(db, load) : Promise.resolve(null)]);
+    return c.html(kaalTab(fields, history, notice, loaded));
+  }
   const days = Math.min(365, Math.max(1, Number(c.req.query('days')) || 30));
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
   const [f, revenue, all, people] = await Promise.all([
@@ -483,6 +489,31 @@ app.post('/admin/festivals/:id', async (c) => {
   const p = festivalSchema.safeParse({ enabled: form.enabled === '1', percent: Number(form.percent) });
   if (!p.success) return back(c, 'festivals', '', issues(p.error));
   return (await updateFestival(c.env.DB, c.req.param('id'), p.data)) ? back(c, 'festivals', 'Festival saved.') : back(c, 'festivals', '', 'Festival not found.');
+});
+
+const kaalLabel = (k: string) => KAAL_FIELDS.find((f) => f.key === k)?.label ?? k;
+app.post('/admin/kaal/restore/:id', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const v = await kaalVersion(c.env.DB, Number(c.req.param('id')) || 0);
+  if (!v || !isKaalKey(v.key)) return back(c, 'kaal', '', 'Version not found.');
+  const changed = await setKaalPrompt(c.env.DB, v.key, v.body || null, user.email);
+  return back(c, 'kaal', changed ? `${kaalLabel(v.key)}: restored the version from ${v.changed_at.slice(0, 16).replace('T', ' ')} UTC. New consultations use it now.` : 'That version is already live.');
+});
+app.post('/admin/kaal/:key', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const key = c.req.param('key');
+  if (!isKaalKey(key)) return back(c, 'kaal', '', 'Unknown section.');
+  const form = await formOf(c);
+  if (form.action === 'original') {
+    return back(c, 'kaal', (await setKaalPrompt(c.env.DB, key, null, user.email)) ? `${kaalLabel(key)}: original restored.` : 'Already the original.');
+  }
+  const body = (form.body ?? '').replace(/\r\n?/g, '\n').trim();
+  if (body.length < KAAL_MIN_CHARS || body.length > KAAL_MAX_CHARS) return back(c, 'kaal', '', `Keep it between ${KAAL_MIN_CHARS} and ${KAAL_MAX_CHARS} characters.`);
+  return back(c, 'kaal', (await setKaalPrompt(c.env.DB, key, body, user.email)) ? `${kaalLabel(key)} saved. New consultations use it now.` : 'Nothing changed.');
 });
 
 /** Owner-only page from the payout-request email: shows where to send the money and marks it paid. */

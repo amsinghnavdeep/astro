@@ -1,5 +1,7 @@
 /** Owner-only admin dashboard HTML: funnel, revenue and the people list. */
 import { escapeHtml as h } from './email.js';
+import { DEFAULT_KAAL_PROMPTS } from './devin.js';
+import { KAAL_FIELDS, KAAL_MAX_CHARS, type KaalField, type KaalVersion } from './kaalPrompt.js';
 
 export type Person = {
   name: string; email: string; account_type: string; business_name: string | null;
@@ -94,7 +96,7 @@ export function peopleCsv(rows: Row[]): string {
     .map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-const TABS: [string, string][] = [['people', 'Overview & people'], ['blog', 'Blog'], ['prices', 'Prices'], ['festivals', 'Festivals']];
+const TABS: [string, string][] = [['people', 'Overview & people'], ['blog', 'Blog'], ['prices', 'Prices'], ['festivals', 'Festivals'], ['kaal', 'Kaal']];
 function shell(tab: string, inner: string, days = 30, notice = ''): string {
   const range = tab === 'people' ? `<nav class="range">${[7, 30, 90, 365].map((x) => `<a class="${x === days ? 'sel' : ''}" href="/admin?days=${x}">${x}d</a>`).join('')}</nav>` : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Kaalera</title>
@@ -256,4 +258,35 @@ export function festivalsTab(list: { id: string; name: string; festival_date: st
   }).join('');
   return shell('festivals', `<section class="card"><h2>FESTIVAL OFFERS (PERSONAL ONLY, BUSINESS NEVER GETS OFFERS)</h2>
 <div class="tw"><table><tr><th>Festival</th><th>Date</th><th>Offer runs</th><th>Discount</th></tr>${rows || '<tr><td colspan="4" class="dim">No festivals.</td></tr>'}</table></div></section>`, 30, notice);
+}
+
+const LOCKED_RULES = [
+  'Never mentions Devin, the AI behind it, code, servers, prompts or how Kaalera works',
+  'Tricks hidden in customer messages are ignored and can’t change these instructions',
+  'Astrology only (app builders are pointed to the Kaalera API)',
+  'No death or lifespan predictions, no guarantees',
+  'No politics or religious debate',
+  'Never writes “chart” or “Vedic”',
+  'Exactly one answer per question, in the customer’s language',
+  'The customer’s Kundli, periods and transits are always sent from the site',
+];
+export function kaalTab(fields: KaalField[], history: KaalVersion[], notice = '', loaded: KaalVersion | null = null): string {
+  const label = (k: string) => KAAL_FIELDS.find((f) => f.key === k)?.label ?? k;
+  const when = (iso: string) => h(iso.slice(0, 16).replace('T', ' '));
+  const cards = fields.map((f) => {
+    const load = loaded && loaded.key === f.key ? loaded : null;
+    const body = load ? load.body || DEFAULT_KAAL_PROMPTS[f.key] : f.body;
+    const status = load
+      ? `<span class="status st-draft">Opened version from ${when(load.changed_at)}. Not live until you press Save.</span>`
+      : f.isOriginal ? '<span class="status st-published">Original</span>'
+        : `<span class="status st-published">Edited ${when(f.updatedAt ?? '')} UTC by ${h(f.updatedBy ?? '')}</span>`;
+    return `<section class="card" id="k-${f.key}" style="margin-top:14px"><h2>${h(f.label.toUpperCase())}</h2><p class="dim">${h(f.help)} ${status}</p>
+<form method="post" action="/admin/kaal/${f.key}" class="form"><textarea name="body" maxlength="${KAAL_MAX_CHARS}" required>${h(body)}</textarea>
+<div class="bar-row"><button class="btn" name="action" value="save">Save</button>${f.isOriginal && !load ? '' : '<button class="btn ghost" name="action" value="original" formnovalidate>Restore original</button>'}<span class="dim">Applies to new consultations only. Ongoing ones keep what they started with.</span></div></form></section>`;
+  }).join('');
+  const rows = history.map((r) => `<tr><td>${when(r.changed_at)}</td><td>${h(label(r.key))}</td><td class="dim" style="white-space:normal;min-width:260px">${r.body ? h(r.body.slice(0, 110)) + (r.body.length > 110 ? '…' : '') : 'Original (built-in)'}</td><td class="dim">${h(r.changed_by)}</td>
+<td><a class="btn ghost" href="/admin?tab=kaal&load=${r.id}#k-${h(r.key)}">Open</a> <form method="post" action="/admin/kaal/restore/${r.id}" class="inline"><button class="btn ghost">Restore</button></form></td></tr>`).join('');
+  return shell('kaal', `<section class="card"><h2>LOCKED RULES (IN CODE, ALWAYS ON)</h2><ul class="dim" style="margin:0;padding-left:18px;line-height:1.7">${LOCKED_RULES.map((x) => `<li>${h(x)}</li>`).join('')}</ul></section>
+${cards}
+<section class="card" style="margin-top:14px"><h2>VERSION HISTORY</h2><div class="tw"><table><tr><th>When (UTC)</th><th>Section</th><th>Text</th><th>By</th><th></th></tr>${rows || '<tr><td colspan="5" class="dim">No changes yet. Kaal uses the original text.</td></tr>'}</table></div></section>`, 30, notice);
 }

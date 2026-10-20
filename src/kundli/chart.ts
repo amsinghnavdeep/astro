@@ -473,6 +473,7 @@ export async function computeTransits(
   chart: ChartData,
   months = 36,
   fromMs = Date.now(),
+  stepDays = 1,
 ): Promise<string[]> {
   const swe = await getEphemeris();
   swe.set_sid_mode(swe.SE_SIDM_LAHIRI, 0, 0);
@@ -500,8 +501,9 @@ export async function computeTransits(
     let prev = signAt(fromMs, body);
     const label = name === 'Rahu' ? 'Rahu/Ketu' : name;
     const ketu = (s: number): string => (name === 'Rahu' ? ` / Ketu in ${SIGNS[(s + 6) % 12]}` : '');
-    lines.push(`  ${label}: now in ${where(prev.sign)}${ketu(prev.sign)}${prev.retro && name !== 'Rahu' ? ', retrograde' : ''}.`);
-    for (let ms = fromMs + dayMs; ms <= endMs; ms += dayMs) {
+    const at = fromMs < Date.now() - dayMs ? `on ${isoDate(fromMs)} in` : 'now in';
+    lines.push(`  ${label}: ${at} ${where(prev.sign)}${ketu(prev.sign)}${prev.retro && name !== 'Rahu' ? ', retrograde' : ''}.`);
+    for (let ms = fromMs + stepDays * dayMs; ms <= endMs; ms += stepDays * dayMs) {
       const cur = signAt(ms, body);
       if (cur.sign !== prev.sign) {
         lines.push(`    ${isoDate(ms)} → enters ${where(cur.sign)}${ketu(cur.sign)}${cur.retro && name !== 'Rahu' ? ' (retrograde)' : ''}.`);
@@ -533,7 +535,28 @@ export async function chartToChatContext(c: ChartData): Promise<string> {
     lines.push('  (transit computation unavailable)');
     console.error('Transit computation failed:', err);
   }
+  lines.push('', ...(await pastContext(c, nowMs)));
   return lines.join('\n');
+}
+
+const PAST_YEARS = 15;
+
+/** Past dashas and slow transits, so past-event readings are tied to real periods. */
+async function pastContext(c: ChartData, nowMs: number): Promise<string[]> {
+  const fromMs = Math.max(Date.parse(c.dasha.timeline[0].start), nowMs - PAST_YEARS * YEAR_MS);
+  const lines = [`PAST periods (${isoDate(fromMs)} → today), the ONLY basis for past events:`];
+  for (const maha of c.dasha.timeline.filter((d) => Date.parse(d.end) > fromMs && Date.parse(d.start) <= nowMs)) {
+    const subs = buildAntardashas(maha).filter((a) => Date.parse(a.end) > fromMs && Date.parse(a.start) <= nowMs);
+    lines.push(`  ${maha.lord} Mahadasha (${maha.start} → ${maha.end}): ` + subs.map((a) => `${a.lord} ${a.start}→${a.end}`).join('; ') + '.');
+  }
+  lines.push(`Past slow-planet transits (${isoDate(fromMs)} → today, dates ±3 days):`);
+  try {
+    lines.push(...(await computeTransits(c, (nowMs - fromMs) / (30.44 * 86_400_000), fromMs, 3)));
+  } catch (err) {
+    lines.push('  (past transits unavailable)');
+    console.error('Past transit computation failed:', err);
+  }
+  return lines;
 }
 
 export interface SkyPlanet {
