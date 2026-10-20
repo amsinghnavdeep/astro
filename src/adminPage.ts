@@ -323,7 +323,7 @@ export function emailTab(o: EmailTabOpts): string {
 <label class="switch" style="flex-direction:row;margin-left:auto"><input type="checkbox" name="confirm"> I checked the preview</label><button class="btn" name="action" value="send">Send</button></div>
 </form></section>${pv}
 <section class="card" style="margin-top:14px"><h2>SENT EMAILS</h2><div class="tw"><table><tr><th>When (UTC)</th><th>Subject</th><th>Type</th><th>To</th><th class="num">Sent</th><th>By</th></tr>${log || '<tr><td colspan="6" class="dim">Nothing sent yet.</td></tr>'}</table></div></section>
-<section class="card" style="margin-top:14px"><h2>EMAIL API</h2>
+<section class="card" style="margin-top:14px"><h2>OWNER TOKEN · EMAIL API</h2><p class="dim">The same token also opens every admin page and action (header <code>Authorization: Bearer …</code>), so Devin can run admin for you. Make a new one to cut off the old one.</p>
 <p class="dim">Send the same emails from your own tools: <code>POST https://kaalera.com/api/owner/email</code> with header <code>Authorization: Bearer YOUR_TOKEN</code> and JSON <code>{"from":"kaal","kind":"service","to":["name@example.com"],"subject":"Hi {{name}}","body":"Hello **{{name}}**"}</code>. Use <code>"audience":"paid"</code> (all, paid, free, business, optin) instead of <code>to</code> for a list, and <code>"dryRun":true</code> to only count.</p>
 ${token}<form method="post" action="/admin/email/token" class="inline"><button class="btn ghost">${o.tokenInfo ? 'Make a new token' : 'Create API token'}</button></form></section>`, 30, o.notice ?? '');
 }

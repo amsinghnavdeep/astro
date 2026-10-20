@@ -290,7 +290,10 @@ app.post('/api/login', async (c) => {
   return c.json({ sent: true });
 });
 
+/** Requests signed with the owner admin token (no cookies, so no cross-site risk). */
+const ownerTokenReqs = new WeakSet<Request>();
 const sameSite = (c: C): boolean => {
+  if (ownerTokenReqs.has(c.req.raw)) return true;
   const origin = c.req.header('origin');
   return !!origin && (origin === new URL(env.siteUrl).origin || origin === new URL(c.req.url).origin);
 };
@@ -377,6 +380,15 @@ const ownerHtml = (title: string, inner: string): string =>
 
 /** Owner-only admin: overview and people, blog, prices, festivals. Never shows chat text or birth details. */
 const adminUser = async (c: C) => {
+  const bearer = /^Bearer\s+(\S+)$/i.exec(c.req.header('Authorization') ?? '')?.[1];
+  if (bearer) {
+    const owner = (await checkApiToken(c.env.DB, bearer))
+      ? await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(env.adminEmails[0]).first<User>() : null;
+    c.header('Cache-Control', 'no-store');
+    if (!owner) return c.html(ownerHtml('Not allowed', ''), 401);
+    ownerTokenReqs.add(c.req.raw);
+    return owner;
+  }
   const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
   c.header('Cache-Control', 'no-store');
   c.header('X-Robots-Tag', 'noindex');
