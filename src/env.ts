@@ -13,6 +13,8 @@ const int = (name: string, fallback: number): number => {
 export const env = {
   get siteUrl() { return (process.env.SITE_URL || 'http://localhost:8787').replace(/\/$/, ''); },
   get devLoginLinks() { return process.env.DEV_LOGIN_LINKS === 'true'; },
+  /** Emails allowed into /admin (comma separated). */
+  get adminEmails() { return (process.env.ADMIN_EMAILS || 'amsinghnavdeep@gmail.com').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean); },
   devin: {
     get apiKey() { return required('DEVIN_API_KEY'); },
     get orgId() { return required('DEVIN_ORG_ID'); },
@@ -23,7 +25,7 @@ export const env = {
   stripe: {
     get secretKey() { return required('STRIPE_SECRET_KEY'); },
     get webhookSecret() { return required('STRIPE_WEBHOOK_SECRET'); },
-    get currency() { return process.env.STRIPE_CURRENCY || 'usd'; },
+    get currency() { return 'usd'; },
   },
   email: {
     get apiKey() { return optional('RESEND_API_KEY'); },

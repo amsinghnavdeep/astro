@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Account &amp; billing — Kaalera</title>
+  <link rel="icon" href="/kaal-mark.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/developers.css">
+  <link rel="stylesheet" href="/support.css">
+  <link rel="stylesheet" href="/account.css">
+</head>
+<body>
+  <div class="s-wrap">
+    <header class="s-top">
+      <a class="d-brand" href="/"><span class="d-logo"></span> Kaalera <span class="d-tag">Account</span></a>
+      <nav class="s-nav"><a href="/">App</a><a href="/developers">Developers</a><a href="/support">Support</a></nav>
+    </header>
+    <main class="s-main">
+      <h1>Account &amp; billing</h1>
+      <p id="a-signin" class="d-muted" hidden><a href="/">Sign in</a> to see your account.</p>
+      <section id="a-body" hidden>
+        <div class="d-card">
+          <h2>Account</h2>
+          <p><strong id="a-name"></strong><br><span class="d-muted" id="a-email"></span></p>
+          <p class="d-small d-muted" id="a-type"></p>
+        </div>
+        <div class="d-card" id="a-reload">
+          <h2>Auto-reload</h2>
+          <p id="a-reload-text"></p>
+          <p class="d-small d-muted" id="a-reload-note"></p>
+          <div class="a-actions">
+            <button class="d-btn primary" id="a-on" type="button" hidden>Turn auto-reload on</button>
+            <button class="a-link" id="a-off" type="button" hidden>Turn off auto-reload</button>
+          </div>
+          <p class="d-error" id="a-error" role="alert"></p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/account.js"></script>
+</body>
+</html>

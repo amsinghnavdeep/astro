@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Get balance — Kaalera API</title>
-<meta name="description" content="GET /v1/balance — your remaining API credits.">
+<meta name="description" content="GET /v1/balance — your remaining API wallet balance in USD.">
 <link rel="stylesheet" href="/docs/docs.css">
 <script src="/docs/docs.js" defer></script>
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
@@ -12,7 +12,7 @@
 <body data-page="balance">
 <article class="d-article">
 <h1>Get balance</h1>
-<p class="lead">Returns the number of credits left on your account. Free.</p>
+<p class="lead">Returns the USD balance left in your API wallet. Free.</p>
 <div class="endpoint"><span class="m get">GET</span><span class="path"><span class="base"></span>/v1/balance</span></div>
 
 <h2>Request</h2>
@@ -31,9 +31,11 @@ print(res.status_code, res.json())</code></pre></div>
 
 <h2>Response</h2>
 <div class="code"><pre data-lang="200 OK"><code>{
-  &quot;credits&quot;: 3
+  &quot;balance_cents&quot;: 4370,
+  &quot;balance_usd&quot;: &quot;43.70&quot;,
+  &quot;currency&quot;: &quot;usd&quot;
 }</code></pre></div>
-<div class="params"><div class="param"><div class="param-head"><span class="param-name">credits</span><span class="param-type">integer</span></div><p>Credits available. 1 credit = 1 question.</p></div></div>
+<div class="params"><div class="param"><div class="param-head"><span class="param-name">balance_cents</span><span class="param-type">integer</span></div><p>Wallet balance in US cents. Starting a consultation costs $9.00 (900); each follow-up costs $6.30 (630).</p></div></div>
 <p>The balance is shared by all API keys on your account. Buy more in the <a href="/developers">developer dashboard</a>.</p>
 
 <h2>Errors</h2>

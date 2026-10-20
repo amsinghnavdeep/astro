@@ -15,6 +15,7 @@ function inline(s: string): string {
   return escapeHtml(s)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/\[([^\]]+)\]\((\/(?!\/)[^\s)]*)\)/g, '<a href="$2">$1</a>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/__([^_]+)__/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>');
@@ -24,7 +25,7 @@ const isTableRow = (l: string): boolean => /^\s*\|.*\|\s*$/.test(l);
 const isTableSep = (l: string): boolean => /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(l);
 const cells = (l: string): string[] => l.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
 
-export function renderMarkdown(src: string): string {
+export function renderMarkdown(src: string, headingShift = 2): string {
   const lines = src.replace(/\r\n?/g, '\n').split('\n');
   const out: string[] = [];
   let para: string[] = [];
@@ -40,7 +41,7 @@ export function renderMarkdown(src: string): string {
       flush();
     } else if (heading) {
       flush();
-      const level = Math.min(heading[1].length + 2, 6);
+      const level = Math.min(Math.max(heading[1].length + headingShift, 2), 6);
       out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
     } else if (/^\s*(---|\*\*\*|___)\s*$/.test(line)) {
       flush();

@@ -147,3 +147,13 @@ label { display: flex; flex-direction: column; gap: 6px; font-weight: 500; font-
 .consent-dialog label.consent-check { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 10px; }
 .consent-dialog .consent-check input { width: 16px !important; height: 16px; padding: 0 !important; margin: 3px 0 0 !important; flex: none; display: inline-block !important; }
 .consent-dialog .consent-check span { font-weight: 500; }
+.d-ar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: end; }
+.d-ar label { display: grid; gap: 4px; font-size: 13px; }
+.d-ar input[type=number] { width: 120px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line, #d6d3cf); background: transparent; color: inherit; font: inherit; }
+.d-ar .d-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.is-busy { pointer-events: none; opacity: .8; }
+.is-busy::before { content: ""; display: inline-block; width: 1em; height: 1em; margin-right: .5em; vertical-align: -.15em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: k-spin .7s linear infinite; }
+@keyframes k-spin { to { transform: rotate(360deg); } }
+.consent-links { font-size: 13px; margin: 6px 0 0; }
+
+[data-theme='dark'] .d-logo { background-image: url("/kaal-mark-dark.svg") !important; }

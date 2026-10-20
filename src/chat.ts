@@ -1,4 +1,6 @@
 /** D1 persistence for consultations plus the Devin bridge (create / deliver / sync). */
+import { chatPrices } from './festivals.js';
+import { useCoupon } from './coupons.js';
 import type { D1Database } from '@cloudflare/workers-types';
 import { env } from './env.js';
 import {
@@ -6,7 +8,11 @@ import {
   type ChatPersona,
 } from './devin.js';
 import { refundApiCredit, spendApiCredit } from './api.js';
+import { apiPrice, getPrices } from './settings.js';
+import { getKaalPrompts } from './kaalPrompt.js';
 import { grantCredits, refundCredit, spendCredit } from './credits.js';
+import { onChatPayment } from './partners.js';
+import { notifyEarned } from './engagement.js';
 
 export interface Thread {
   id: string; user_id: string; full_name: string; gender: string; date_of_birth: string;
@@ -87,7 +93,7 @@ export async function startThreadSession(db: D1Database, t: Thread): Promise<Thr
   if ((claim.meta?.changes ?? 0) === 0 && t.status !== 'starting') return (await getThreadById(db, t.id)) ?? t;
   try {
     const s = await createChatSession(personaOf(t), {
-      threadId: t.id, userId: t.user_id, firstQuestion: t.first_question ?? undefined, isFree: !!t.is_free,
+      threadId: t.id, userId: t.user_id, firstQuestion: t.first_question ?? undefined, isFree: !!t.is_free, prompts: await getKaalPrompts(db),
     });
     const expiresAt = Date.now() + env.chat.consultationDays * DAY_MS;
     await db.prepare("UPDATE threads SET devin_session_id = ?, status = 'active', expires_at = ? WHERE id = ?")
@@ -117,7 +123,7 @@ export async function sendCustomerMessage(
   const ref = `question:${id}`;
   let fromCredits = false;
   let spent = t.source === 'api'
-    ? await spendApiCredit(db, t.user_id, ref, t.api_key_id, t.id)
+    ? await spendApiCredit(db, t.user_id, ref, t.api_key_id, t.id, apiPrice(await getPrices(db)).questionCents)
     : ((await db.prepare(
         "UPDATE threads SET questions_used = questions_used + 1 WHERE id = ? AND status = 'active' AND questions_used < questions_allowed AND (expires_at IS NULL OR expires_at > ?)",
       ).bind(t.id, Date.now()).run()).meta?.changes ?? 0) > 0;
@@ -178,6 +184,7 @@ export async function syncThread(db: D1Database, t: Thread): Promise<void> {
 
 export interface PaymentInfo {
   stripeSessionId: string; userId: string; threadId: string; kind: 'consultation' | 'topup';
+  credits: number;
   amountCents: number; currency: string;
 }
 
@@ -193,7 +200,12 @@ export async function applyPayment(db: D1Database, p: PaymentInfo): Promise<Thre
      VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(stripe_session_id) DO NOTHING`,
   ).bind(p.stripeSessionId, p.userId, p.threadId, p.kind, p.amountCents, p.currency, nowIso()).run();
   if ((ins.meta?.changes ?? 0) === 0) return null;
-  await grantCredits(db, 'chat', p.userId, env.chat.packQuestions, `stripe:${p.stripeSessionId}`);
+  await grantCredits(db, 'chat', p.userId, p.credits, `stripe:${p.stripeSessionId}`);
+  const deal = (await chatPrices(db, p.userId)).deal;
+  if (deal?.id.startsWith('coupon:')) await useCoupon(db, p.userId, deal.id.slice(7));
+  const earned = await onChatPayment(db, p, (await getPrices(db)).taxFeePercent)
+    .catch((err) => { console.error('Partner attribution failed:', err); return null; });
+  if (earned) await notifyEarned(db, earned.code, earned.feeCents).catch((err) => console.error('Earned email failed:', err));
   if (p.kind === 'consultation' && t.questions_allowed < 1
     && (await spendCredit(db, 'chat', p.userId, `first:${t.id}`, { threadId: t.id }))) {
     await db.prepare('UPDATE threads SET questions_allowed = 1 WHERE id = ?').bind(t.id).run();
