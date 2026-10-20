@@ -1,11 +1,12 @@
 /** Owner-only admin dashboard HTML: funnel, revenue and the people list. */
 import { escapeHtml as h } from './email.js';
 import { DEFAULT_KAAL_PROMPTS } from './devin.js';
+import { AUDIENCES, FROM_IDS, fromAddress, MAX_RECIPIENTS, type BroadcastRow, type Draft } from './broadcast.js';
 import { KAAL_FIELDS, KAAL_MAX_CHARS, type KaalField, type KaalVersion } from './kaalPrompt.js';
 
 export type Person = {
   name: string; email: string; account_type: string; business_name: string | null;
-  created_at: string; last_seen_at: string | null; web: number; api: number; cents: number; asked: string | null;
+  created_at: string; last_seen_at: string | null; web: number; api: number; cents: number; asked: string | null; chats_left?: number;
 };
 export type Filters = { q: string; pain: string; via: string; acct: string; chats: string; paid: string; active: string; sort: string; dir: string };
 export type AdminData = {
@@ -96,7 +97,7 @@ export function peopleCsv(rows: Row[]): string {
     .map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-const TABS: [string, string][] = [['people', 'Overview & people'], ['blog', 'Blog'], ['prices', 'Prices'], ['festivals', 'Festivals'], ['kaal', 'Kaal']];
+const TABS: [string, string][] = [['people', 'Overview & people'], ['blog', 'Blog'], ['prices', 'Prices'], ['festivals', 'Festivals'], ['kaal', 'Kaal'], ['email', 'Email']];
 function shell(tab: string, inner: string, days = 30, notice = ''): string {
   const range = tab === 'people' ? `<nav class="range">${[7, 30, 90, 365].map((x) => `<a class="${x === days ? 'sel' : ''}" href="/admin?days=${x}">${x}d</a>`).join('')}</nav>` : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Kaalera</title>
@@ -181,7 +182,8 @@ export function adminPage(d: AdminData, notice = ''): string {
 <td>${r.via === 'None' ? '<span class="dim">–</span>' : `<span class="via via-${r.via === 'API' ? 'api' : r.via === 'Both' ? 'both' : 'web'}">${r.via}</span>`}</td>
 <td class="num">${r.chats}</td>
 <td class="num">${r.cents ? `<b class="paid">${usd(r.cents)}</b>` : '<span class="dim">free only</span>'}</td>
-<td title="${h(r.last_seen_at ?? '')}">${h(ago(r.last_seen_at ?? r.created_at))}</td></tr>`;
+<td title="${h(r.last_seen_at ?? '')}">${h(ago(r.last_seen_at ?? r.created_at))}</td>
+<td><form method="post" action="/admin/people/gift" class="switch"><input type="hidden" name="email" value="${h(r.email)}"><span class="dim" title="Chats left">${r.chats_left ?? 0} left</span><input name="n" type="number" min="1" max="20" value="1" style="width:58px;padding:6px"><button class="btn ghost" style="padding:6px 10px">Give</button></form></td></tr>`;
   }).join('');
   const th = (key: string, label: string, cls = '') => {
     const on = f.sort === key;
@@ -207,7 +209,7 @@ export function adminPage(d: AdminData, notice = ''): string {
 <section class="card" style="margin-top:14px"><h2>PEOPLE · ${shown.length}${shown.length !== rows.length ? ` of ${rows.length}` : ''}</h2>
 <div class="chips">${painChips}</div>${filters}
 <div class="bar-row"><a class="btn ghost" href="${h(csvHref)}">⬇ Export CSV (${shown.length})</a>${shown.length !== rows.length || f.sort ? `<a class="btn ghost" href="/admin?days=${d.days}">Clear filters</a>` : ''}</div>
-<div class="tw"><table><tr>${th('pain', 'Pain point')}${th('name', 'Name')}${th('via', 'Via')}${th('chats', 'Chats', 'num')}${th('paid', 'Money paid', 'num')}${th('active', 'Last active')}</tr>${people || '<tr><td colspan="6" class="dim">No one matches.</td></tr>'}</table></div>
+<div class="tw"><table><tr>${th('pain', 'Pain point')}${th('name', 'Name')}${th('via', 'Via')}${th('chats', 'Chats', 'num')}${th('paid', 'Money paid', 'num')}${th('active', 'Last active')}<th>Free chats</th></tr>${people || '<tr><td colspan="7" class="dim">No one matches.</td></tr>'}</table></div>
 <p class="foot">Pain point is worked out from the words in each person's questions. Chat text and birth details are not shown here. The export has emails, so keep the file private.</p></section>`, d.days, notice);
 }
 
@@ -289,4 +291,39 @@ export function kaalTab(fields: KaalField[], history: KaalVersion[], notice = ''
   return shell('kaal', `<section class="card"><h2>LOCKED RULES (IN CODE, ALWAYS ON)</h2><ul class="dim" style="margin:0;padding-left:18px;line-height:1.7">${LOCKED_RULES.map((x) => `<li>${h(x)}</li>`).join('')}</ul></section>
 ${cards}
 <section class="card" style="margin-top:14px"><h2>VERSION HISTORY</h2><div class="tw"><table><tr><th>When (UTC)</th><th>Section</th><th>Text</th><th>By</th><th></th></tr>${rows || '<tr><td colspan="5" class="dim">No changes yet. Kaal uses the original text.</td></tr>'}</table></div></section>`, 30, notice);
+}
+
+export interface EmailTabOpts {
+  draft?: Draft; log: BroadcastRow[]; tokenInfo: { updated_at: string } | null; newToken?: string; notice?: string;
+  preview?: { html: string; subject: string; count: number; skipped: number; sample: string } | null;
+}
+const EMAIL_HELP = '## Heading · **bold** · - list item · [text](https://link) · [button: Open Kaalera](https://kaalera.com) · {{name}} = first name';
+export function emailTab(o: EmailTabOpts): string {
+  const d: Draft = o.draft ?? { from: 'kaal', kind: 'service', audience: 'emails', emails: '', subject: '', body: 'Hi {{name}},\n\n\n\n[button: Open Kaalera](https://kaalera.com/?app=1)\n\nWarm regards,\nKaal' };
+  const radio = (v: string, label: string, help: string) => `<label class="switch" style="flex-direction:row;color:var(--text)"><input type="radio" name="kind" value="${v}"${d.kind === v ? ' checked' : ''}> ${h(label)} <small class="dim">${h(help)}</small></label>`;
+  const pv = o.preview
+    ? `<section class="card" style="margin-top:14px"><h2>PREVIEW · WILL SEND TO ${o.preview.count}${o.preview.skipped ? ` · ${o.preview.skipped} SKIPPED` : ''}</h2>
+<p class="dim">Subject: <b style="color:var(--text)">${h(o.preview.subject)}</b> · shown as it looks for ${h(o.preview.sample)}.${o.preview.skipped ? ' Skipped people have no marketing consent, unsubscribed, are Business accounts or aren\u2019t Kaalera users (promotions only).' : ''}</p>
+<iframe sandbox srcdoc="${h(o.preview.html)}" style="width:100%;height:720px;border:0;border-radius:14px;background:#f4efe6"></iframe></section>` : '';
+  const log = o.log.map((r) => `<tr><td>${h(r.created_at.slice(0, 16).replace('T', ' '))}</td><td style="white-space:normal;min-width:220px"><b>${h(r.subject)}</b><small class="dim" style="display:block">${h(r.from_addr)}</small></td>
+<td><span class="status ${r.kind === 'promo' ? 'st-draft' : 'st-published'}">${r.kind === 'promo' ? 'Promotion' : 'Service'}</span></td><td>${h(AUDIENCES[r.audience as keyof typeof AUDIENCES] ?? r.audience)}</td>
+<td class="num">${r.sent}/${r.total}${r.failed ? ` <span style="color:#ff8a80" title="${h(r.error ?? '')}">${r.failed} failed</span>` : ''}</td><td class="dim">${h(r.via === 'api' ? 'API' : r.created_by)}</td></tr>`).join('');
+  const token = o.newToken
+    ? `<div class="note ok">New API token (shown only now, copy it): <code style="user-select:all;word-break:break-all">${h(o.newToken)}</code></div>`
+    : `<p class="dim">${o.tokenInfo ? `Token created ${h(o.tokenInfo.updated_at.slice(0, 16).replace('T', ' '))} UTC. Making a new one stops the old one.` : 'No API token yet.'}</p>`;
+  return shell('email', `<section class="card"><h2>WRITE AN EMAIL</h2>
+<form method="post" action="/admin/email" class="form">
+<div class="two"><label>From<select name="from">${FROM_IDS.map((f) => opt(f, d.from, fromAddress(f))).join('')}</select></label>
+<label>To<select name="audience">${Object.entries(AUDIENCES).map(([k, v]) => opt(k, d.audience, v)).join('')}</select></label></div>
+<label>Emails (only for \u201cEmails I type below\u201d): separate with commas or new lines, up to ${MAX_RECIPIENTS}<textarea name="emails" style="min-height:70px">${h(d.emails)}</textarea></label>
+<div style="display:grid;gap:6px">${radio('service', 'Service message', 'a correction, account or order news. Goes to anyone you pick.')}${radio('promo', 'Promotion', 'offers, news, deals. Only Personal accounts with consent; adds an Unsubscribe link.')}</div>
+<label>Subject<input name="subject" required maxlength="200" value="${h(d.subject)}"></label>
+<label>Body <small class="dim">${h(EMAIL_HELP)}</small><textarea name="body" required maxlength="50000">${h(d.body)}</textarea></label>
+<div class="bar-row"><button class="btn ghost" name="action" value="preview">Preview</button><button class="btn ghost" name="action" value="test">Send test to me</button>
+<label class="switch" style="flex-direction:row;margin-left:auto"><input type="checkbox" name="confirm"> I checked the preview</label><button class="btn" name="action" value="send">Send</button></div>
+</form></section>${pv}
+<section class="card" style="margin-top:14px"><h2>SENT EMAILS</h2><div class="tw"><table><tr><th>When (UTC)</th><th>Subject</th><th>Type</th><th>To</th><th class="num">Sent</th><th>By</th></tr>${log || '<tr><td colspan="6" class="dim">Nothing sent yet.</td></tr>'}</table></div></section>
+<section class="card" style="margin-top:14px"><h2>EMAIL API</h2>
+<p class="dim">Send the same emails from your own tools: <code>POST https://kaalera.com/api/owner/email</code> with header <code>Authorization: Bearer YOUR_TOKEN</code> and JSON <code>{"from":"kaal","kind":"service","to":["name@example.com"],"subject":"Hi {{name}}","body":"Hello **{{name}}**"}</code>. Use <code>"audience":"paid"</code> (all, paid, free, business, optin) instead of <code>to</code> for a list, and <code>"dryRun":true</code> to only count.</p>
+${token}<form method="post" action="/admin/email/token" class="inline"><button class="btn ghost">${o.tokenInfo ? 'Make a new token' : 'Create API token'}</button></form></section>`, 30, o.notice ?? '');
 }

@@ -34,8 +34,9 @@ import { affiliatesPage, influencersPage } from './programs.js';
 import { chatPrices, listFestivals, updateFestival } from './festivals.js';
 import { sendExpiryReminders, sendFestivalEmails, sendInfluencerDigests, unsubscribe, validUnsubToken } from './engagement.js';
 import { festivalSchema, isAdmin, postSchema, pricesSchema } from './admin.js';
+import { apiTokenInfo, AUDIENCES, broadcastLog, checkApiToken, FROM_IDS, renderEmail, resolveRecipients, rotateApiToken, sendBroadcast, sendTest, type AudienceId, type Draft } from './broadcast.js';
 import { isKaalKey, KAAL_FIELDS, KAAL_MAX_CHARS, KAAL_MIN_CHARS, kaalFields, kaalHistory, kaalVersion, setKaalPrompt } from './kaalPrompt.js';
-import { adminPage, blogTab, festivalsTab, filterRows, FILTER_KEYS, noticeHtml, peopleCsv, kaalTab, pricesTab, PRICE_FIELDS, toRows, type Filters, type Person } from './adminPage.js';
+import { adminPage, blogTab, festivalsTab, filterRows, FILTER_KEYS, noticeHtml, peopleCsv, emailTab, kaalTab, pricesTab, PRICE_FIELDS, toRows, type Filters, type Person } from './adminPage.js';
 import { CLIENT_EVENTS, funnel, markLeadSignedUp, saveLead, trackPayment, trackSafe, type FunnelEvent } from './analytics.js';
 import { addReminder, listReminders, sendDueReminders } from './reminders.js';
 import { attributeSignup, captureReferral, createInfluencer, getPayout, grantFriendBonus, markPayoutPaid, partnerState, PAYOUT_METHODS, payoutsCsv, requestPayout, validateCode, type PayoutMethod } from './partners.js';
@@ -388,6 +389,7 @@ const loadPeople = async (db: D1Database) => (await db.prepare(`SELECT u.name, u
     (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'web') AS web,
     (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'api') AS api,
     (SELECT COALESCE(SUM(amount_cents), 0) FROM payments p WHERE p.user_id = u.id) AS cents,
+    (SELECT COALESCE(SUM(delta), 0) FROM chat_credit_ledger l WHERE l.user_id = u.id) AS chats_left,
     (SELECT substr(group_concat(m.body, ' '), 1, 6000) FROM messages m JOIN threads t ON t.id = m.thread_id WHERE t.user_id = u.id AND m.role = 'user') AS asked
   FROM users u ORDER BY COALESCE(u.last_seen_at, u.created_at) DESC LIMIT 5000`).all<Person>()).results;
 const back = (c: C, tab: string, ok: string, err = '', extra = '') =>
@@ -407,6 +409,7 @@ app.get('/admin', async (c) => {
   }
   if (tab === 'prices') return c.html(pricesTab({ ...(await getPrices(db)) }, await priceHistory(db), notice));
   if (tab === 'festivals') return c.html(festivalsTab(await listFestivals(db), notice));
+  if (tab === 'email') return c.html(emailTab({ log: await broadcastLog(db), tokenInfo: await apiTokenInfo(db), notice }));
   if (tab === 'kaal') {
     const load = Number(c.req.query('load'));
     const [fields, history, loaded] = await Promise.all([kaalFields(db), kaalHistory(db), Number.isInteger(load) && load > 0 ? kaalVersion(db, load) : Promise.resolve(null)]);
@@ -489,6 +492,97 @@ app.post('/admin/festivals/:id', async (c) => {
   const p = festivalSchema.safeParse({ enabled: form.enabled === '1', percent: Number(form.percent) });
   if (!p.success) return back(c, 'festivals', '', issues(p.error));
   return (await updateFestival(c.env.DB, c.req.param('id'), p.data)) ? back(c, 'festivals', 'Festival saved.') : back(c, 'festivals', '', 'Festival not found.');
+});
+
+/** Owner gives free chats (questions) to a person; logged in the credit ledger and settings audit. */
+app.post('/admin/people/gift', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const form = await formOf(c);
+  const n = Number(form.n);
+  if (!Number.isInteger(n) || n < 1 || n > 20) return back(c, 'people', '', 'Give between 1 and 20 chats.');
+  const db = c.env.DB;
+  const u = await db.prepare('SELECT id, email FROM users WHERE email = ?').bind((form.email ?? '').trim().toLowerCase()).first<{ id: string; email: string }>();
+  if (!u) return back(c, 'people', '', 'Person not found.');
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare("INSERT INTO chat_credit_ledger (id, user_id, delta, reason, ref, created_at) VALUES (?, ?, ?, 'gift', ?, ?)")
+      .bind(crypto.randomUUID(), u.id, n, `gift:${crypto.randomUUID()}`, now),
+    db.prepare('INSERT INTO settings_audit (key, old_value, new_value, changed_by, changed_at) VALUES (?, NULL, ?, ?, ?)')
+      .bind(`gift_chats:${u.email}`, String(n), user.email, now),
+  ]);
+  return back(c, 'people', `Gave ${n} free ${n === 1 ? 'chat' : 'chats'} to ${u.email}.`);
+});
+
+const AUDIENCE_IDS = Object.keys(AUDIENCES) as [AudienceId, ...AudienceId[]];
+const draftSchema = z.object({
+  from: z.enum(FROM_IDS).default('kaal'),
+  kind: z.enum(['service', 'promo']).default('service'),
+  audience: z.enum(AUDIENCE_IDS).default('emails'),
+  emails: z.string().max(100_000).default(''),
+  subject: z.string().trim().min(1, 'Write a subject.').max(200),
+  body: z.string().trim().min(1, 'Write the email body.').max(50_000),
+});
+const firstIssue = (e: z.ZodError) => e.issues[0]?.message ?? 'Check the form.';
+const emailTabHtml = async (c: C, o: Omit<Parameters<typeof emailTab>[0], 'log' | 'tokenInfo'>) =>
+  c.html(emailTab({ ...o, log: await broadcastLog(c.env.DB), tokenInfo: await apiTokenInfo(c.env.DB) }));
+
+app.post('/admin/email', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const form = await formOf(c);
+  const p = draftSchema.safeParse({ ...form, body: (form.body ?? '').replace(/\r\n?/g, '\n') });
+  const raw = { from: 'kaal', kind: 'service', audience: 'emails', emails: '', subject: '', body: '', ...form } as Draft;
+  if (!p.success) return emailTabHtml(c, { draft: raw, notice: noticeHtml('', firstIssue(p.error)) });
+  const d: Draft = p.data;
+  const db = c.env.DB;
+  const { to, skipped } = await resolveRecipients(db, d);
+  if (form.action === 'test') {
+    const err = await sendTest(d, user.email, to[0]?.name || user.name || '');
+    return emailTabHtml(c, { draft: d, notice: noticeHtml(err ? '' : `Test sent to ${user.email}.`, err ? `Test failed: ${err}` : '') });
+  }
+  if (form.action === 'send') {
+    if (!to.length) return emailTabHtml(c, { draft: d, notice: noticeHtml('', `Nobody to send to${skipped ? ` (${skipped} skipped: no consent, unsubscribed or not users)` : ''}.`) });
+    if (form.confirm !== 'on') return emailTabHtml(c, { draft: d, notice: noticeHtml('', 'Tick \u201cI checked the preview\u201d, then press Send.') });
+    const r = await sendBroadcast(db, d, to, user.email, 'admin');
+    return r.failed
+      ? back(c, 'email', '', `Sent ${r.sent} of ${to.length}. ${r.failed} failed: ${r.error ?? ''}`)
+      : back(c, 'email', `Sent to ${r.sent} ${r.sent === 1 ? 'person' : 'people'}${skipped ? ` (${skipped} skipped)` : ''}.`);
+  }
+  const sample = to[0] ?? { id: null, email: user.email, name: user.name || '' };
+  const e = renderEmail(d, { name: sample.name, unsub: d.kind === 'promo' ? `${env.siteUrl}/unsubscribe` : undefined });
+  return emailTabHtml(c, { draft: d, preview: { html: e.html, subject: e.subject, count: to.length, skipped, sample: sample.name || sample.email } });
+});
+app.post('/admin/email/token', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  return emailTabHtml(c, { newToken: await rotateApiToken(c.env.DB, user.email) });
+});
+
+/** Owner email API: Bearer token from admin Email tab (or the owner's signed-in session). */
+app.post('/api/owner/email', async (c) => {
+  c.header('Cache-Control', 'no-store');
+  const db = c.env.DB;
+  const bearer = /^Bearer\s+(\S+)$/i.exec(c.req.header('Authorization') ?? '')?.[1];
+  let by: string | null = null;
+  if (bearer) by = (await checkApiToken(db, bearer)) ? 'api' : null;
+  else {
+    const u = await userForSession(db, getCookie(c, COOKIE));
+    by = u && isAdmin(u.email) && sameSite(c) ? u.email : null;
+  }
+  if (!by) return c.json({ error: 'Not authorized' }, 401);
+  const json = await c.req.json().catch(() => null) as Record<string, unknown> | null;
+  const to = Array.isArray(json?.to) ? (json.to as unknown[]).filter((x) => typeof x === 'string').join('\n') : typeof json?.to === 'string' ? json.to : '';
+  const p = draftSchema.safeParse({ ...json, emails: to, audience: json?.audience ?? 'emails' });
+  if (!p.success) return c.json({ error: firstIssue(p.error) }, 400);
+  const { to: list, skipped } = await resolveRecipients(db, p.data);
+  if (json?.dryRun === true) return c.json({ count: list.length, skipped });
+  if (!list.length) return c.json({ error: 'Nobody to send to.', skipped }, 400);
+  const r = await sendBroadcast(db, p.data, list, by, bearer ? 'api' : 'admin');
+  return c.json({ id: r.id, sent: r.sent, failed: r.failed, skipped, ...(r.error ? { error: r.error } : {}) }, r.failed && !r.sent ? 502 : 200);
 });
 
 const kaalLabel = (k: string) => KAAL_FIELDS.find((f) => f.key === k)?.label ?? k;
