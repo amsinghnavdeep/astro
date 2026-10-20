@@ -1,4 +1,6 @@
 /** D1 persistence for consultations plus the Devin bridge (create / deliver / sync). */
+import { chatPrices } from './festivals.js';
+import { useCoupon } from './coupons.js';
 import type { D1Database } from '@cloudflare/workers-types';
 import { env } from './env.js';
 import {
@@ -199,6 +201,8 @@ export async function applyPayment(db: D1Database, p: PaymentInfo): Promise<Thre
   ).bind(p.stripeSessionId, p.userId, p.threadId, p.kind, p.amountCents, p.currency, nowIso()).run();
   if ((ins.meta?.changes ?? 0) === 0) return null;
   await grantCredits(db, 'chat', p.userId, p.credits, `stripe:${p.stripeSessionId}`);
+  const deal = (await chatPrices(db, p.userId)).deal;
+  if (deal?.id.startsWith('coupon:')) await useCoupon(db, p.userId, deal.id.slice(7));
   const earned = await onChatPayment(db, p, (await getPrices(db)).taxFeePercent)
     .catch((err) => { console.error('Partner attribution failed:', err); return null; });
   if (earned) await notifyEarned(db, earned.code, earned.feeCents).catch((err) => console.error('Earned email failed:', err));

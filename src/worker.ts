@@ -34,9 +34,10 @@ import { affiliatesPage, influencersPage } from './programs.js';
 import { chatPrices, listFestivals, updateFestival } from './festivals.js';
 import { sendExpiryReminders, sendFestivalEmails, sendInfluencerDigests, unsubscribe, validUnsubToken } from './engagement.js';
 import { festivalSchema, isAdmin, postSchema, pricesSchema } from './admin.js';
+import { CODE_RE, createCoupon, listCoupons, normCode, redeemCoupon, setCouponEnabled } from './coupons.js';
 import { apiTokenInfo, AUDIENCES, broadcastLog, checkApiToken, FROM_IDS, renderEmail, resolveRecipients, rotateApiToken, sendBroadcast, sendTest, type AudienceId, type Draft } from './broadcast.js';
 import { isKaalKey, KAAL_FIELDS, KAAL_MAX_CHARS, KAAL_MIN_CHARS, kaalFields, kaalHistory, kaalVersion, setKaalPrompt } from './kaalPrompt.js';
-import { adminPage, blogTab, festivalsTab, filterRows, FILTER_KEYS, noticeHtml, peopleCsv, emailTab, kaalTab, pricesTab, PRICE_FIELDS, toRows, type Filters, type Person } from './adminPage.js';
+import { adminPage, blogTab, festivalsTab, filterRows, FILTER_KEYS, noticeHtml, peopleCsv, couponsTab, emailTab, kaalTab, pricesTab, PRICE_FIELDS, toRows, type Filters, type Person } from './adminPage.js';
 import { CLIENT_EVENTS, funnel, markLeadSignedUp, saveLead, trackPayment, trackSafe, type FunnelEvent } from './analytics.js';
 import { addReminder, listReminders, sendDueReminders } from './reminders.js';
 import { attributeSignup, captureReferral, createInfluencer, getPayout, grantFriendBonus, markPayoutPaid, partnerState, PAYOUT_METHODS, payoutsCsv, requestPayout, validateCode, type PayoutMethod } from './partners.js';
@@ -421,6 +422,7 @@ app.get('/admin', async (c) => {
   }
   if (tab === 'prices') return c.html(pricesTab({ ...(await getPrices(db)) }, await priceHistory(db), notice));
   if (tab === 'festivals') return c.html(festivalsTab(await listFestivals(db), notice));
+  if (tab === 'coupons') return c.html(couponsTab(await listCoupons(db), env.siteUrl, notice));
   if (tab === 'email') return c.html(emailTab({ log: await broadcastLog(db), tokenInfo: await apiTokenInfo(db), notice }));
   if (tab === 'kaal') {
     const load = Number(c.req.query('load'));
@@ -525,6 +527,54 @@ app.post('/admin/people/gift', async (c) => {
       .bind(`gift_chats:${u.email}`, String(n), user.email, now),
   ]);
   return back(c, 'people', `Gave ${n} free ${n === 1 ? 'chat' : 'chats'} to ${u.email}.`);
+});
+
+app.post('/admin/coupons', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const f = await formOf(c);
+  const code = normCode(f.code ?? '');
+  const kind = f.kind === 'chats' ? 'chats' : 'percent';
+  const value = Number(f.value);
+  const maxUses = f.max_uses ? Number(f.max_uses) : null;
+  const expiresOn = /^\d{4}-\d{2}-\d{2}$/.test(f.expires_on ?? '') ? f.expires_on : null;
+  if (!CODE_RE.test(code)) return back(c, 'coupons', '', 'Code: 3–24 letters, numbers, - or _.');
+  if (!Number.isInteger(value) || value < 1 || value > (kind === 'chats' ? 20 : 90)) return back(c, 'coupons', '', kind === 'chats' ? 'Free chats: 1 to 20.' : '% off: 1 to 90.');
+  if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) return back(c, 'coupons', '', 'Max people must be 1 or more.');
+  const err = await createCoupon(c.env.DB, { code, kind, value, maxUses, expiresOn, note: (f.note ?? '').trim().slice(0, 200) || null }, user.email);
+  return err ? back(c, 'coupons', '', err) : back(c, 'coupons', `Coupon ${code} created.`);
+});
+app.post('/admin/coupons/:code', async (c) => {
+  const user = await adminUser(c);
+  if (user instanceof Response) return user;
+  if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
+  const on = (await formOf(c)).enabled === '1';
+  return (await setCouponEnabled(c.env.DB, c.req.param('code'), on)) ? back(c, 'coupons', `Coupon turned ${on ? 'on' : 'off'}.`) : back(c, 'coupons', '', 'Coupon not found.');
+});
+
+const redeemPage = (c: C, inner: string, status: 200 | 400 = 200) => c.html(layout(
+  { site: env.siteUrl, path: '/redeem', title: 'Redeem a code | Kaalera', description: 'Use a Kaalera coupon code.' },
+  `<section class="w-hero"><h1>Redeem a code</h1>${inner}</section>`,
+), status, { 'Content-Security-Policy': PUBLIC_CSP, 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+const redeemForm = (code: string) => `<form method="post" action="/redeem" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:18px">
+<input name="code" required maxlength="24" value="${escapeHtml(code)}" placeholder="Your code" style="text-transform:uppercase;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.06);color:inherit;font-size:17px;min-width:220px">
+<button class="w-cta big" type="submit">Redeem</button></form>`;
+app.get('/redeem', async (c) => {
+  const code = normCode(c.req.query('code') ?? '').slice(0, 24);
+  const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
+  if (!user) return redeemPage(c, `<p class="w-lead">Sign in first, then open this page again to use ${code ? `code <b>${escapeHtml(code)}</b>` : 'your code'}.</p><p><a class="w-cta big" href="/?app=1">Sign in</a></p>`);
+  return redeemPage(c, `<p class="w-lead">Free chats are added right away. A % code applies to your next purchase.</p>${redeemForm(code)}`);
+});
+app.post('/redeem', async (c) => {
+  if (!sameSite(c)) return redeemPage(c, '<p class="w-lead">Not allowed.</p>', 400);
+  const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
+  if (!user) return redeemPage(c, '<p class="w-lead">Sign in first.</p><p><a class="w-cta big" href="/?app=1">Sign in</a></p>');
+  const code = (await formOf(c)).code ?? '';
+  const r = await redeemCoupon(c.env.DB, user, code);
+  return r.ok
+    ? redeemPage(c, `<p class="w-lead">${escapeHtml(r.message)}</p><p><a class="w-cta big" href="/?app=1">Ask Kaal now</a></p>`)
+    : redeemPage(c, `<p class="w-lead">${escapeHtml(r.message)}</p>${redeemForm(normCode(code).slice(0, 24))}`, 400);
 });
 
 const AUDIENCE_IDS = Object.keys(AUDIENCES) as [AudienceId, ...AudienceId[]];

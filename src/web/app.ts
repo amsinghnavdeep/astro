@@ -11,7 +11,7 @@ type Thread = {
   expired: boolean; expiresAt: string | null; createdAt: string; kundliId: string | null;
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
-type Deal = { name: string; percent: number; endsOn: string };
+type Deal = { id?: string; name: string; percent: number; endsOn: string };
 type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number };
 type Me = { walletCents?: number | null; user: { name: string; email: string; accountType?: string; businessName?: string | null }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
@@ -196,10 +196,10 @@ $<HTMLFormElement>('biz-form').addEventListener('submit', async (e) => {
 
 function showDeal(p: Pricing): void {
   const d = p.deal;
-  const ends = d ? new Date(`${d.endsOn}T00:00:00Z`).toLocaleDateString(undefined, { month: 'long', day: 'numeric', timeZone: 'UTC' }) : '';
+  const ends = d?.endsOn ? new Date(`${d.endsOn}T00:00:00Z`).toLocaleDateString(undefined, { month: 'long', day: 'numeric', timeZone: 'UTC' }) : '';
   document.querySelectorAll<HTMLElement>('.deal-bar').forEach((b) => {
     b.hidden = !d;
-    b.textContent = d ? `${d.name} offer: ${d.percent}% off every consultation and question until ${ends}.` : '';
+    b.textContent = d?.id?.startsWith('coupon:') ? `${d.name}: ${d.percent}% off your next purchase${ends ? ` (until ${ends})` : ''}.` : d ? `${d.name} offer: ${d.percent}% off every consultation and question until ${ends}.` : '';
   });
 }
 

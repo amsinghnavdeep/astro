@@ -1,5 +1,6 @@
 /** Hindu festival deals: a % off chat prices during each festival's window (dates from Drik Panchang, New Delhi). */
 import type { D1Database } from '@cloudflare/workers-types';
+import { activeCoupon } from './coupons.js';
 import { API_DISCOUNT_PERCENT, getPrices, type Prices } from './settings.js';
 
 export interface Deal { id: string; name: string; percent: number; endsOn: string }
@@ -22,7 +23,9 @@ export async function chatPrices(db: D1Database, userId?: string): Promise<ChatP
   const [p, live, acct] = await Promise.all([getPrices(db), activeDeal(db),
     userId ? db.prepare('SELECT account_type FROM users WHERE id = ?').bind(userId).first<{ account_type: string }>() : null]);
   const business = acct?.account_type === 'business';
-  const deal = business ? null : live;
+  let deal = business ? null : live;
+  const cp = !business && userId ? await activeCoupon(db, userId) : null;
+  if (cp && cp.percent > (deal?.percent ?? 0)) deal = { id: `coupon:${cp.code}`, name: `Code ${cp.code}`, percent: cp.percent, endsOn: cp.expiresOn ?? '' };
   const pct = business ? API_DISCOUNT_PERCENT : deal?.percent ?? 0;
   return {
     ...p, deal, business, fullPackCents: p.chatPackCents, fullExtraQuestionCents: p.extraQuestionCents,

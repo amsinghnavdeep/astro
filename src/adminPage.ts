@@ -2,6 +2,7 @@
 import { escapeHtml as h } from './email.js';
 import { DEFAULT_KAAL_PROMPTS } from './devin.js';
 import { AUDIENCES, FROM_IDS, fromAddress, MAX_RECIPIENTS, type BroadcastRow, type Draft } from './broadcast.js';
+import type { Coupon } from './coupons.js';
 import { KAAL_FIELDS, KAAL_MAX_CHARS, type KaalField, type KaalVersion } from './kaalPrompt.js';
 
 export type Person = {
@@ -97,7 +98,7 @@ export function peopleCsv(rows: Row[]): string {
     .map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-const TABS: [string, string][] = [['people', 'Overview & people'], ['blog', 'Blog'], ['prices', 'Prices'], ['festivals', 'Festivals'], ['kaal', 'Kaal'], ['email', 'Email']];
+const TABS: [string, string][] = [['people', 'Overview & people'], ['blog', 'Blog'], ['prices', 'Prices'], ['festivals', 'Festivals'], ['kaal', 'Kaal'], ['email', 'Email'], ['coupons', 'Coupons']];
 function shell(tab: string, inner: string, days = 30, notice = ''): string {
   const range = tab === 'people' ? `<nav class="range">${[7, 30, 90, 365].map((x) => `<a class="${x === days ? 'sel' : ''}" href="/admin?days=${x}">${x}d</a>`).join('')}</nav>` : '';
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Kaalera</title>
@@ -326,4 +327,29 @@ export function emailTab(o: EmailTabOpts): string {
 <section class="card" style="margin-top:14px"><h2>OWNER TOKEN · EMAIL API</h2><p class="dim">The same token also opens every admin page and action (header <code>Authorization: Bearer …</code>), so Devin can run admin for you. Make a new one to cut off the old one.</p>
 <p class="dim">Send the same emails from your own tools: <code>POST https://kaalera.com/api/owner/email</code> with header <code>Authorization: Bearer YOUR_TOKEN</code> and JSON <code>{"from":"kaal","kind":"service","to":["name@example.com"],"subject":"Hi {{name}}","body":"Hello **{{name}}**"}</code>. Use <code>"audience":"paid"</code> (all, paid, free, business, optin) instead of <code>to</code> for a list, and <code>"dryRun":true</code> to only count.</p>
 ${token}<form method="post" action="/admin/email/token" class="inline"><button class="btn ghost">${o.tokenInfo ? 'Make a new token' : 'Create API token'}</button></form></section>`, 30, o.notice ?? '');
+}
+
+export function couponsTab(list: Coupon[], site: string, notice = ''): string {
+  const rows = list.map((c) => {
+    const left = c.max_uses === null ? 'no limit' : `${Math.max(0, c.max_uses - c.uses)} left`;
+    const expired = !!c.expires_on && c.expires_on < new Date().toISOString().slice(0, 10);
+    const link = `${site}/redeem?code=${encodeURIComponent(c.code)}`;
+    return `<tr><td><b style="font-family:ui-monospace,monospace;letter-spacing:.5px">${h(c.code)}</b>${c.note ? `<small class="dim" style="display:block">${h(c.note)}</small>` : ''}</td>
+<td>${c.kind === 'percent' ? `${c.value}% off next purchase` : `${c.value} free ${c.value === 1 ? 'chat' : 'chats'}`}</td>
+<td class="num">${c.uses} used · ${left}</td><td>${c.expires_on ? h(c.expires_on) : '<span class="dim">never</span>'}</td>
+<td><span class="status ${c.enabled && !expired ? 'st-published' : 'st-draft'}">${expired ? 'Expired' : c.enabled ? 'On' : 'Off'}</span></td>
+<td><code style="user-select:all;font-size:12px">${h(link)}</code></td>
+<td><form method="post" action="/admin/coupons/${encodeURIComponent(c.code)}" class="inline"><input type="hidden" name="enabled" value="${c.enabled ? '0' : '1'}"><button class="btn ghost">${c.enabled ? 'Turn off' : 'Turn on'}</button></form></td></tr>`;
+  }).join('');
+  return shell('coupons', `<section class="card"><h2>NEW COUPON</h2>
+<form method="post" action="/admin/coupons" class="form">
+<div class="two"><label>Code (letters, numbers, - or _)<input name="code" required pattern="[A-Za-z0-9][A-Za-z0-9_\\-]{2,23}" maxlength="24" placeholder="DIWALI20" style="text-transform:uppercase"></label>
+<label>Gives<select name="kind">${opt('percent', 'percent', '% off the next purchase')}${opt('chats', 'percent', 'Free chats')}</select></label></div>
+<div class="two"><label>Amount (% off: 1–90 · free chats: 1–20)<input name="value" type="number" min="1" max="90" required value="10"></label>
+<label>Max people (empty = no limit)<input name="max_uses" type="number" min="1" max="100000"></label></div>
+<div class="two"><label>Last day (empty = never ends)<input name="expires_on" type="date"></label><label>Note (only you see it)<input name="note" maxlength="200" placeholder="Influencer X, apology, Diwali..."></label></div>
+<div class="bar-row"><button class="btn">Create coupon</button></div>
+<p class="dim">Each person can use a code once. Business accounts can't use codes. Share the link next to each code, or customers type it at kaalera.com/redeem. A % code is used on their next purchase and doesn't add to a festival offer: they get the bigger of the two.</p>
+</form></section>
+<section class="card" style="margin-top:14px"><h2>COUPONS</h2><div class="tw"><table><tr><th>Code</th><th>Gives</th><th class="num">Used</th><th>Last day</th><th>Status</th><th>Share link</th><th></th></tr>${rows || '<tr><td colspan="7" class="dim">No coupons yet.</td></tr>'}</table></div></section>`, 30, notice);
 }
