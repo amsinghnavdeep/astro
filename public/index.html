@@ -7,7 +7,9 @@
   <meta name="description" content="Ask Kaal, an AI astrologer, about career, marriage, health or money. Dated, to-the-point predictions with simple remedies." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/calm.css" />
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
   <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "f7e133eb76b54c81ab5181bb69473560"}'></script>
 </head>
@@ -27,6 +29,7 @@
         <a href="/docs">Docs</a>
         <a href="/affiliates">Affiliates</a>
         <a href="/influencers">Influencers</a>
+        <button class="theme-toggle icon-btn" type="button" aria-label="Switch day or night mode">☾</button>
         <button class="btn sm" type="button" data-signin>Sign in</button>
         <button class="btn sm primary" type="button" data-signup>Sign up</button>
         <button class="btn sm primary" type="button" data-open-app hidden>Open my chats</button>
@@ -254,6 +257,7 @@
     <aside class="sidebar">
       <div class="side-head">
         <a class="brand" href="/"><span class="logo sm">K</span> Kaalera</a>
+        <button class="theme-toggle icon-btn" type="button" aria-label="Switch day or night mode">☾</button>
         <button id="menu-close" class="icon-btn mobile-only" type="button" aria-label="Close menu">✕</button>
       </div>
       <button id="new-thread" class="btn new" type="button"><span class="plus">+</span> New consultation</button>

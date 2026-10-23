@@ -72,3 +72,38 @@ ${qa}
 </body></html>`);
   w.document.close();
 }
+
+const MON = '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\.?';
+const DAY_MON = `(?:(?:[Ee]arly|[Mm]id|[Ll]ate)[\\s-]+)?(?:\\d{1,2}\\s+)?${MON}`;
+const DATE_RE = new RegExp(
+  `\\b(?:${DAY_MON}(?:\\s+\\d{4})?\\s*(?:[–—-]|to)\\s*${DAY_MON}\\s+\\d{4}|${DAY_MON}\\s+\\d{4}|20\\d{2}\\s*[–—-]\\s*20\\d{2})\\b`,
+  'g',
+);
+
+/** Wraps predicted dates and windows ("Nov 2026 – Jan 2027", "31 Oct 2026") in highlighted chips. */
+export function markDates(root: HTMLElement): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (n) => (n.parentElement?.closest('code, pre, a, .k-date') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+  });
+  const nodes: Text[] = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n as Text);
+  for (const node of nodes) {
+    const text = node.data;
+    DATE_RE.lastIndex = 0;
+    if (!DATE_RE.test(text)) continue;
+    DATE_RE.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let last = 0;
+    for (const m of text.matchAll(DATE_RE)) {
+      const at = m.index ?? 0;
+      if (at > last) frag.append(text.slice(last, at));
+      const chip = document.createElement('span');
+      chip.className = 'k-date';
+      chip.textContent = m[0];
+      frag.append(chip);
+      last = at + m[0].length;
+    }
+    if (last < text.length) frag.append(text.slice(last));
+    node.replaceWith(frag);
+  }
+}

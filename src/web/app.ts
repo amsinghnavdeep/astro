@@ -1,7 +1,7 @@
 import { confirmPurchase } from './consent.js';
 import { allIn, taxFeeNote } from '../disclaimer.js';
 import { renderMarkdown } from '../markdown.js';
-import { isPdfRequest, openReport, parseAnswer } from './extras.js';
+import { isPdfRequest, markDates, openReport, parseAnswer } from './extras.js';
 import { saveBilling, type BillingInfo } from './billing.js';
 
 type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
@@ -1126,6 +1126,7 @@ function messageNode(m: Msg): HTMLElement {
     div.append(who, tl);
   } else div.append(who);
   body.innerHTML = renderMarkdown(parsed.main);
+  markDates(body);
   div.append(body);
   if (parsed.next.length) {
     const next = el('div', 'k-next');
