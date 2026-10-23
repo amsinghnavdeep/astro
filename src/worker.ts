@@ -48,7 +48,7 @@ import { creditBalance, creditLots, grantCredits, spendCredit } from './credits.
 import { checkPhoneVerification, startPhoneVerification, validPhone } from './phone.js';
 import {
   createSubscriptionCheckout, ensurePlanProduct, markTrialIdentity, planFor, plansForPrices, spendSubscriptionConsultation,
-  stripeId, subscriptionForUser, subscriptionIdFromInvoice, syncSubscription, trialEligible, type PlanId,
+  ensureTaxFeeProduct, stripeId, subscriptionForUser, subscriptionIdFromInvoice, syncSubscription, trialEligible, type PlanId,
 } from './subscriptions.js';
 import type { AppEnv } from './types.js';
 
@@ -922,8 +922,7 @@ app.post('/api/subscription/manage', async (c) => {
     const planItem = items.find((item) => stripeId(item.price.product) === oldProduct);
     const taxItem = items.find((item) => item.id !== planItem?.id);
     if (!planItem || !taxItem) return c.json({ error: 'Could not update this subscription. Contact support.' }, 502);
-    const taxProduct = stripeId(taxItem.price.product);
-    if (!taxProduct) return c.json({ error: 'Could not update this subscription. Contact support.' }, 502);
+    const taxProduct = await ensureTaxFeeProduct(c.env.DB);
     const updated = await stripe().subscriptions.update(state.stripe_subscription_id, {
       items: [
         { id: planItem.id, price_data: { currency: env.stripe.currency, unit_amount: plan.cents, recurring: { interval: 'month' }, product: basicProduct } },
