@@ -62,6 +62,22 @@ export async function ensurePlanProduct(db: D1Database, plan: Plan): Promise<str
   return (await db.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>())?.value ?? product.id;
 }
 
+const TAX_PRODUCT_KEY = 'stripe_product_tax_fee';
+
+/** Active product for the recurring taxes & fees line; Checkout's inline product_data creates inactive products that can't be reused on updates. */
+export async function ensureTaxFeeProduct(db: D1Database): Promise<string> {
+  const existing = await db.prepare('SELECT value FROM settings WHERE key = ?').bind(TAX_PRODUCT_KEY).first<{ value: string }>();
+  if (existing?.value) return existing.value;
+  const product = await stripe().products.create(
+    { name: 'Taxes & fees', metadata: { kind: 'tax_fee' } },
+    { idempotencyKey: 'kaalera-subscription-product:tax-fee' },
+  );
+  await db.prepare(
+    'INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?) ON CONFLICT(key) DO NOTHING',
+  ).bind(TAX_PRODUCT_KEY, product.id, new Date().toISOString(), 'subscriptions').run();
+  return (await db.prepare('SELECT value FROM settings WHERE key = ?').bind(TAX_PRODUCT_KEY).first<{ value: string }>())?.value ?? product.id;
+}
+
 export async function createSubscriptionCheckout(
   db: D1Database,
   user: SubscriptionUser,
@@ -106,7 +122,7 @@ export async function createSubscriptionCheckout(
         quantity: 1,
         price_data: {
           currency: o.currency, unit_amount: taxesAndFees(o.plan.cents, tax),
-          recurring: { interval: 'month' as const }, product_data: { name: `Taxes & fees (${tax}%)` },
+          recurring: { interval: 'month' as const }, product: await ensureTaxFeeProduct(db),
         },
       }] : []),
     ],

@@ -93,6 +93,8 @@ async function api<T>(url: string, init?: RequestInit) {
 
 const money = (cents: number, currency = 'usd') =>
   new Intl.NumberFormat(currency === 'inr' ? 'en-IN' : 'en-US', { style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
+const planAllowance = (sub: SubscriptionState) =>
+  sub.status === 'trialing' ? subscriptionInfo?.trialConsults ?? sub.consultations : sub.consultations;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const pauseScheduleText = (startsAt: string | null, returnsAt: string | null) => {
   if (!startsAt || !returnsAt) return '';
@@ -228,7 +230,7 @@ function renderSubscriptionMenu(): void {
   const pending = sub.pendingPlan && sub.renewsAt
     ? ` · Changes to ${sub.pendingPlan[0].toUpperCase()}${sub.pendingPlan.slice(1)} ${new Date(sub.renewsAt).toLocaleDateString()}`
     : '';
-  $('account-plan-detail').textContent = `${sub.consultsLeft} of ${sub.consultations} consultations left · ${until}${pending}`;
+  $('account-plan-detail').textContent = `${sub.consultsLeft} of ${planAllowance(sub)} consultations left · ${until}${pending}`;
   const hasPlan = ['active', 'trialing', 'paused', 'past_due'].includes(sub.status);
   const pauseScheduled = !!(sub.pauseStartsAt && sub.pausedUntil);
   cancel.hidden = !hasPlan || sub.cancelAtPeriodEnd;
@@ -799,7 +801,7 @@ function showProfile(question = ''): void {
     submit.textContent = 'Start consultation';
   } else if (me!.user.accountType !== 'business' && sub && ['active', 'trialing', 'paused'].includes(sub.status)) {
     note.innerHTML = '';
-    note.append(el('strong', '', `${sub.consultsLeft} of ${sub.consultations} consultations left on ${sub.planName}.`),
+    note.append(el('strong', '', `${sub.consultsLeft} of ${planAllowance(sub)} consultations left on ${sub.planName}${sub.status === 'trialing' ? ' trial' : ''}.`),
       ` Each consultation includes ${p.packQuestions} ${p.packQuestions === 1 ? 'question' : 'questions'} and stays open for ${p.consultationDays} days.`);
     submit.textContent = 'Start consultation';
   } else if (me!.user.accountType !== 'business') {
@@ -933,6 +935,7 @@ profileForm.addEventListener('submit', async (e) => {
   }
   if (data.code === 'plan_used_up' && data.thread) {
     upsertThread(data.thread);
+    void refreshSubscription();
     overageThreadId = data.thread.id;
     $<HTMLDialogElement>('plan-used-up-modal').showModal();
     return;
@@ -947,6 +950,7 @@ profileForm.addEventListener('submit', async (e) => {
     sessionStorage.removeItem(PENDING_Q);
     profileForm.reset();
     me!.freeAvailable = me!.freeAvailable && !data.thread.isFree;
+    void refreshSubscription();
     void fetch('/api/me').then((r) => (r.ok ? r.json() : null)).then((m: Me | null) => { if (m) { me!.chatCredits = m.chatCredits; me!.walletCents = m.walletCents; renderBiz(); } });
     upsertThread(data.thread);
     openThread(data.thread);
