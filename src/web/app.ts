@@ -342,6 +342,7 @@ async function renderPrices(): Promise<void> {
   const p = data;
   showDeal(p);
   const isBusiness = me?.user.accountType === 'business';
+  document.querySelectorAll<HTMLElement>('.personal-offer').forEach((n) => { n.hidden = isBusiness; });
   $('pricing-subtitle').textContent = isBusiness
     ? 'Pay for consultations from your Business wallet.'
     : 'Choose a monthly plan or pay for a consultation only.';
@@ -1426,7 +1427,7 @@ function renderState(): void {
   askForm.hidden = !isLive || (t.questionsLeft < 1 && !t.quickLeft && !autoReload());
   askSubmit.disabled = sending;
   askInput.placeholder = pending > 0 ? 'Kaal is answering… you can type your next question.' : 'Ask a follow-up about career, marriage, health, money…';
-  const left = t.questionsLeft < 1 ? `${RELOAD} more questions are added automatically when you ask (${autoPrice()})` : `${plural(t.questionsLeft, 'question')} left`;
+  const left = t.questionsLeft < 1 ? `Next ${RELOAD} questions added when you ask (${autoPrice()})` : `${plural(t.questionsLeft, 'question')} left`;
   const quickNote = t.quickLeft ? '1 quick answer already paid' : `Quick: up to ${p.quickWords ?? 60} words, half price (1 question = 2 quick answers)`;
   $('composer-hint').textContent = quickMode ? `${quickNote} · ${left}` : `${left} · ${t.language}`;
   const inline = $<HTMLButtonElement>('add-inline');
