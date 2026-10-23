@@ -14,6 +14,7 @@ import { chatPrices } from './festivals.js';
 import { apiBalance, grantApiCredits } from './api.js';
 import { applyPayment, type Thread } from './chat.js';
 import { sendReceiptEmail } from './email.js';
+import { lockCurrency, type Currency } from './currency.js';
 
 export const CHAT_AUTO_DAILY_MAX = 10;
 /** Questions added per extension, both on the first paid extension and on each automatic reload. */
@@ -53,11 +54,11 @@ export async function saveCardFromCheckout(db: D1Database, s: Stripe.Checkout.Se
     .bind(pm.id, pm.card?.last4 ?? null, cust, userId).run();
 }
 
-async function chargeSaved(b: Billing, cents: number, description: string, metadata: Record<string, string>, idempotencyKey: string): Promise<Stripe.PaymentIntent | null> {
+async function chargeSaved(b: Billing, cents: number, currency: Currency, description: string, metadata: Record<string, string>, idempotencyKey: string): Promise<Stripe.PaymentIntent | null> {
   if (!b.stripe_customer_id || !b.stripe_pm_id) return null;
   try {
     const pi = await stripe().paymentIntents.create({
-      amount: cents, currency: env.stripe.currency, customer: b.stripe_customer_id, payment_method: b.stripe_pm_id,
+      amount: cents, currency, customer: b.stripe_customer_id, payment_method: b.stripe_pm_id,
       off_session: true, confirm: true, description, metadata,
     }, { idempotencyKey });
     return pi.status === 'succeeded' ? pi : null;
@@ -78,15 +79,19 @@ export async function autoChargeQuestion(db: D1Database, t: Thread, used: number
   if (!b || !b.chat_autocharge || !b.stripe_pm_id) return false;
   const day = new Date(Date.now() - 86_400_000).toISOString();
   if ((await autoSpendSince(db, t.user_id, "'topup'", day)).n * CHAT_RELOAD_QUESTIONS >= CHAT_AUTO_DAILY_MAX) return false;
-  const p = await chatPrices(db, t.user_id);
+  const account = await db.prepare('SELECT account_type, currency FROM users WHERE id = ?').bind(t.user_id)
+    .first<{ account_type: string; currency: Currency | null }>();
+  const currency = account?.account_type === 'business'
+    ? 'usd' : await lockCurrency(db, t.user_id, account?.currency ?? 'usd');
+  const p = await chatPrices(db, t.user_id, currency);
   const base = p.extraQuestionCents * CHAT_RELOAD_QUESTIONS;
   const cents = base + taxesAndFees(base, p.taxFeePercent);
-  const pi = await chargeSaved(b, cents, `Kaalera — ${CHAT_RELOAD_QUESTIONS} extra questions (auto-reload)`, { kind: 'topup', userId: t.user_id, threadId: t.id, auto: '1' },
+  const pi = await chargeSaved(b, cents, currency, `Kaalera — ${CHAT_RELOAD_QUESTIONS} extra questions (auto-reload)`, { kind: 'topup', userId: t.user_id, threadId: t.id, auto: '1' },
     `auto-q:${t.id}:${used}`);
   if (!pi) return false;
   await applyPayment(db, { stripeSessionId: pi.id, userId: t.user_id, threadId: t.id, kind: 'topup', credits: CHAT_RELOAD_QUESTIONS, amountCents: pi.amount, currency: pi.currency });
   await db.prepare('UPDATE payments SET auto = 1 WHERE stripe_session_id = ?').bind(pi.id).run();
-  await sendReceipt(db, t.user_id, { item: RECEIPT_ITEM.topup, totalCents: pi.amount, baseCents: base, auto: true, ref: pi.id });
+  await sendReceipt(db, t.user_id, { item: RECEIPT_ITEM.topup, totalCents: pi.amount, baseCents: base, currency: pi.currency as Currency, auto: true, ref: pi.id });
   await trackPayment(db, t.user_id);
   return true;
 }
@@ -103,7 +108,7 @@ export async function autoRechargeApi(db: D1Database, userId: string, need = API
   month.setUTCDate(1);
   month.setUTCHours(0, 0, 0, 0);
   if ((await autoSpendSince(db, userId, "'api_credits'", month.toISOString())).cents + cents > b.api_autorecharge_cap_cents) return false;
-  const pi = await chargeSaved(b, cents, `Kaalera API wallet — $${(base / 100).toFixed(2)} (auto-recharge)`, { kind: 'api_credits', userId, credits: String(base), auto: '1' },
+  const pi = await chargeSaved(b, cents, 'usd', `Kaalera API wallet — $${(base / 100).toFixed(2)} (auto-recharge)`, { kind: 'api_credits', userId, credits: String(base), auto: '1' },
     `auto-api:${userId}:${Math.floor(Date.now() / 60_000)}`);
   if (!pi) return false;
   await grantApiCredits(db, userId, base, `stripe:${pi.id}`);
@@ -111,7 +116,7 @@ export async function autoRechargeApi(db: D1Database, userId: string, need = API
     `INSERT INTO payments (stripe_session_id, user_id, thread_id, kind, amount_cents, currency, created_at, auto)
      VALUES (?, ?, NULL, 'api_credits', ?, ?, ?, 1) ON CONFLICT(stripe_session_id) DO NOTHING`,
   ).bind(pi.id, userId, pi.amount, pi.currency, nowIso()).run();
-  await sendReceipt(db, userId, { item: `API wallet top-up $${(base / 100).toFixed(2)} (auto-recharge)`, totalCents: pi.amount, baseCents: base, auto: true, ref: pi.id, api: true });
+  await sendReceipt(db, userId, { item: `API wallet top-up $${(base / 100).toFixed(2)} (auto-recharge)`, totalCents: pi.amount, baseCents: base, currency: pi.currency as Currency, auto: true, ref: pi.id, api: true });
   return true;
 }
 
@@ -126,7 +131,7 @@ export const publicBilling = (b: Billing | null) => ({
 export const RECEIPT_ITEM = { consultation: 'Kaal consultation (opening question)', topup: `${CHAT_RELOAD_QUESTIONS} extra questions` } as const;
 
 /** Email a receipt. Never throws: a mail failure must not affect the payment. */
-export async function sendReceipt(db: D1Database, userId: string, o: { item: string; totalCents: number; baseCents?: number; auto: boolean; ref: string; api?: boolean }): Promise<void> {
+export async function sendReceipt(db: D1Database, userId: string, o: { item: string; totalCents: number; baseCents?: number; currency: Currency; auto: boolean; ref: string; api?: boolean }): Promise<void> {
   try {
     const u = await db.prepare('SELECT email, card_last4, business_name, tax_id FROM users WHERE id = ?').bind(userId)
       .first<{ email: string; card_last4: string | null; business_name: string | null; tax_id: string | null }>();
@@ -135,6 +140,7 @@ export async function sendReceipt(db: D1Database, userId: string, o: { item: str
     const base = o.baseCents ?? Math.round((o.totalCents * 100) / (100 + tax));
     await sendReceiptEmail({
       to: u.email, item: o.item, baseCents: base, feeCents: Math.max(0, o.totalCents - base), feePercent: tax, totalCents: o.totalCents,
+      currency: o.currency,
       billedTo: u.business_name ? [u.business_name, u.tax_id && `Tax no. ${u.tax_id}`].filter(Boolean).join(' · ') : null,
       last4: u.card_last4, auto: o.auto, ref: o.ref, manageUrl: `${env.siteUrl}${o.api ? '/developers#billing' : '/account'}`,
     });

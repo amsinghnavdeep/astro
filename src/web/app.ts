@@ -3,6 +3,7 @@ import { authorizedMonthlyPrice, authorizedPrice, taxFeeNote } from '../disclaim
 import { renderMarkdown } from '../markdown.js';
 import { isPdfRequest, markDates, openReport, parseAnswer } from './extras.js';
 import { saveBilling, type BillingInfo } from './billing.js';
+import type { Currency } from '../currency.js';
 
 type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
 type Thread = {
@@ -22,9 +23,9 @@ type SubscriptionState = {
 type SubscriptionData = {
   enabled: boolean; phoneEnabled: boolean; phoneVerified: boolean; phone: string | null;
   phoneSaved: boolean;
-  trialEligible: boolean; trialDays: number; trialConsults: number; taxFeePercent: number; plans: Plan[]; subscription: SubscriptionState | null;
+  trialEligible: boolean; trialDays: number; trialConsults: number; taxFeePercent: number; currency: Currency; plans: Plan[]; subscription: SubscriptionState | null;
 };
-type Pricing = { quickWords?: number; freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number; plans?: Plan[] };
+type Pricing = { quickWords?: number; freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: Currency; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number; plans?: Plan[] };
 type Me = { walletCents?: number | null; user: { name: string; email: string; accountType?: string; businessName?: string | null }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
@@ -91,7 +92,7 @@ async function api<T>(url: string, init?: RequestInit) {
 }
 
 const money = (cents: number, currency = 'usd') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
+  new Intl.NumberFormat(currency === 'inr' ? 'en-IN' : 'en-US', { style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const pauseScheduleText = (startsAt: string | null, returnsAt: string | null) => {
   if (!startsAt || !returnsAt) return '';
@@ -151,7 +152,7 @@ const walletCovers = (cents: number): boolean => me?.user.accountType === 'busin
 const credTotal = (): number => (me?.chatCredits ?? []).reduce((n, l) => n + l.credits, 0);
 
 async function goToCheckout(threadId: string, btn?: HTMLButtonElement, cents = me!.pricing.packCents): Promise<void> {
-  if (!walletCovers(cents) && !(await confirmPurchase('chat', authorizedPrice(cents, me!.pricing.taxFeePercent), chatPrices()))) return;
+  if (!walletCovers(cents) && !(await confirmPurchase('chat', authorizedPrice(cents, me!.pricing.taxFeePercent, me!.pricing.currency), chatPrices()))) return;
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
@@ -363,8 +364,8 @@ function updatePlanChoice(): void {
   $('subscription-submit').textContent = subscriptionInfo.trialEligible
     ? `Start ${subscriptionInfo.trialDays}-day free trial` : 'Subscribe';
   $('subscription-consent-copy').textContent = subscriptionInfo.trialEligible
-    ? `I agree to the Terms and authorize ${authorizedMonthlyPrice(plan.cents, subscriptionInfo.taxFeePercent)} after my ${subscriptionInfo.trialDays}-day free trial. Cancel anytime from my account.`
-    : `I agree to the Terms and authorize ${authorizedMonthlyPrice(plan.cents, subscriptionInfo.taxFeePercent)} starting today. Cancel anytime from my account.`;
+    ? `I agree to the Terms and authorize ${authorizedMonthlyPrice(plan.cents, subscriptionInfo.taxFeePercent, subscriptionInfo.currency)} after my ${subscriptionInfo.trialDays}-day free trial. Cancel anytime from my account.`
+    : `I agree to the Terms and authorize ${authorizedMonthlyPrice(plan.cents, subscriptionInfo.taxFeePercent, subscriptionInfo.currency)} starting today. Cancel anytime from my account.`;
 }
 
 async function openSubscriptionPlans(threadId: string | null = null): Promise<void> {
@@ -398,7 +399,7 @@ async function openSubscriptionPlans(threadId: string | null = null): Promise<vo
     card.setAttribute('aria-pressed', String(plan.id === selectedPlanId));
     card.append(
       el('strong', '', plan.name),
-      el('span', 'plan-card-price', `${money(plan.cents)}/month`),
+      el('span', 'plan-card-price', `${money(plan.cents, data.currency)}/month`),
       el('span', 'plan-card-consults', `${plan.consultations} consultations`),
       ...(data.taxFeePercent > 0 ? [el('span', 'plan-card-fee', '+ taxes & fees')] : []),
     );
@@ -421,7 +422,7 @@ async function openSubscriptionManage(): Promise<void> {
   $('subscription-manage').hidden = false;
   $('subscription-manage-error').textContent = '';
   $('subscription-manage-summary').textContent =
-    `You have ${sub.consultsLeft} consultations left this month. Your ${sub.planName} plan is ${money(sub.priceCents)}/month${taxFeeNote(data.taxFeePercent)}.`;
+    `You have ${sub.consultsLeft} consultations left this month. Your ${sub.planName} plan is ${money(sub.priceCents, data.currency)}/month${taxFeeNote(data.taxFeePercent)}.`;
   const pauseSchedule = pauseScheduleText(sub.pauseStartsAt, sub.pausedUntil);
   $('subscription-manage-date').textContent = pauseSchedule
     ? pauseSchedule
@@ -908,7 +909,7 @@ profileForm.addEventListener('submit', async (e) => {
   const fromWallet = !personal && !me!.freeAvailable && credTotal() < 1 && walletCovers(me!.pricing.packCents);
   if (fromWallet) (body as Record<string, unknown>).agreed = true;
   else if (!personal && !me!.freeAvailable && credTotal() < 1) {
-    if (!(await confirmPurchase('chat', authorizedPrice(me!.pricing.packCents, me!.pricing.taxFeePercent), chatPrices()))) return;
+    if (!(await confirmPurchase('chat', authorizedPrice(me!.pricing.packCents, me!.pricing.taxFeePercent, me!.pricing.currency), chatPrices()))) return;
     (body as Record<string, unknown>).agreed = true;
   }
   const label = submit.textContent;
@@ -1550,7 +1551,7 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   renderBiz();
 }
 
-const chatPrices = () => ({ extraQuestionCents: me!.pricing.extraQuestionCents, taxFeePercent: me!.pricing.taxFeePercent, apiCreditCents: 0 });
+const chatPrices = () => ({ extraQuestionCents: me!.pricing.extraQuestionCents, taxFeePercent: me!.pricing.taxFeePercent, apiCreditCents: 0, currency: me!.pricing.currency as 'usd' | 'inr' });
 
 const autoPrice = (): string => {
   const p = me!.pricing;

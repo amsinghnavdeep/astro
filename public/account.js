@@ -11,11 +11,15 @@ var taxFeeNote = (percent) => percent > 0 ? " + taxes & fees" : "";
 // src/web/account.ts
 var RELOAD = 2;
 var $ = (id) => document.getElementById(id);
-var usd = (cents) => `$${(cents / 100).toFixed(2)}`;
+var money = (cents, currency) => new Intl.NumberFormat(currency === "inr" ? "en-IN" : "en-US", {
+  style: "currency",
+  currency: currency.toUpperCase(),
+  minimumFractionDigits: cents % 100 ? 2 : 0
+}).format(cents / 100);
 var me;
 var reloadPrice = () => {
   const base = me.pricing.extraQuestionCents * RELOAD;
-  return `${usd(base)}${taxFeeNote(me.pricing.taxFeePercent)}`;
+  return `${money(base, me.pricing.currency)}${taxFeeNote(me.pricing.taxFeePercent)}`;
 };
 function render() {
   const b = me.billing;

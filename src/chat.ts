@@ -240,7 +240,8 @@ export async function applyPayment(db: D1Database, p: PaymentInfo): Promise<Thre
   await grantCredits(db, 'chat', p.userId, p.credits, `stripe:${p.stripeSessionId}`);
   const deal = (await chatPrices(db, p.userId)).deal;
   if (deal?.id.startsWith('coupon:')) await useCoupon(db, p.userId, deal.id.slice(7));
-  const earned = await onChatPayment(db, p, (await getPrices(db)).taxFeePercent)
+  const prices = await getPrices(db);
+  const earned = await onChatPayment(db, p, prices.taxFeePercent, prices.inrPerUsd)
     .catch((err) => { console.error('Partner attribution failed:', err); return null; });
   if (earned) await notifyEarned(db, earned.code, earned.feeCents).catch((err) => console.error('Earned email failed:', err));
   if (p.kind === 'consultation' && t.questions_allowed < 1

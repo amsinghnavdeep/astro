@@ -1,11 +1,12 @@
 /** Hindu festival deals: a % off chat prices during each festival's window (dates from Drik Panchang, New Delhi). */
 import type { D1Database } from '@cloudflare/workers-types';
 import { activeCoupon } from './coupons.js';
+import type { Currency } from './currency.js';
 import { API_DISCOUNT_PERCENT, getPrices, type Prices } from './settings.js';
 
 export interface Deal { id: string; name: string; percent: number; endsOn: string }
 export interface Festival { id: string; name: string; festival_date: string; starts_on: string; ends_on: string; percent: number; enabled: number }
-export type ChatPrices = Prices & { deal: Deal | null; business: boolean; fullPackCents: number; fullExtraQuestionCents: number };
+export type ChatPrices = Prices & { deal: Deal | null; business: boolean; currency: Currency; fullPackCents: number; fullExtraQuestionCents: number };
 
 const DAY = 86_400_000;
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -19,17 +20,20 @@ export async function activeDeal(db: D1Database, day = today()): Promise<Deal | 
 }
 
 /** Website chat prices: Business accounts pay 10% less all year; everyone else gets any running festival discount. API prices never get offers. */
-export async function chatPrices(db: D1Database, userId?: string): Promise<ChatPrices> {
+export async function chatPrices(db: D1Database, userId?: string, currency: Currency = 'usd'): Promise<ChatPrices> {
   const [p, live, acct] = await Promise.all([getPrices(db), activeDeal(db),
     userId ? db.prepare('SELECT account_type FROM users WHERE id = ?').bind(userId).first<{ account_type: string }>() : null]);
   const business = acct?.account_type === 'business';
+  const resolvedCurrency = business ? 'usd' : currency;
   let deal = business ? null : live;
   const cp = !business && userId ? await activeCoupon(db, userId) : null;
   if (cp && cp.percent > (deal?.percent ?? 0)) deal = { id: `coupon:${cp.code}`, name: `Code ${cp.code}`, percent: cp.percent, endsOn: cp.expiresOn ?? '' };
   const pct = business ? API_DISCOUNT_PERCENT : deal?.percent ?? 0;
+  const pack = resolvedCurrency === 'inr' ? p.chatPackInrPaise : p.chatPackCents;
+  const extra = resolvedCurrency === 'inr' ? p.extraQuestionInrPaise : p.extraQuestionCents;
   return {
-    ...p, deal, business, fullPackCents: p.chatPackCents, fullExtraQuestionCents: p.extraQuestionCents,
-    chatPackCents: off(p.chatPackCents, pct), extraQuestionCents: off(p.extraQuestionCents, pct),
+    ...p, deal, business, currency: resolvedCurrency, fullPackCents: pack, fullExtraQuestionCents: extra,
+    chatPackCents: off(pack, pct), extraQuestionCents: off(extra, pct),
   };
 }
 

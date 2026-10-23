@@ -10,6 +10,7 @@ const vars = Object.fromEntries(readFileSync(new URL('../.dev.vars', import.meta
   }));
 const webhookSecret = vars.STRIPE_WEBHOOK_SECRET;
 if (!webhookSecret) throw new Error('STRIPE_WEBHOOK_SECRET is missing from .dev.vars');
+const baseUrl = process.env.SUBSCRIPTION_TEST_BASE_URL ?? 'http://127.0.0.1:8788';
 
 const stripe = new Stripe('sk_test_local_webhook_fixture');
 const now = Math.floor(Date.now() / 1000);
@@ -66,7 +67,7 @@ for (const [label, type, object] of cases) {
   };
   const payload = JSON.stringify(event);
   const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: webhookSecret });
-  const response = await fetch('http://127.0.0.1:8788/api/stripe/webhook', {
+  const response = await fetch(`${baseUrl}/api/stripe/webhook`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'stripe-signature': signature },
     body: payload,

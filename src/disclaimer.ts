@@ -1,3 +1,5 @@
+import type { Currency } from './currency.js';
+
 const BASE = "Kaal's readings are astrological guidance for personal reflection only. They are not medical, legal, financial or other professional advice, and predictions are not guaranteed. All sales are final — no refunds.";
 
 /** Flat lump sum added to every purchase, worldwide. The owner can change it in /admin. */
@@ -6,26 +8,29 @@ export const taxFeeNote = (percent: number): string => (percent > 0 ? ' + taxes 
 export const allIn = (cents: number, percent: number): number => cents + Math.round((cents * percent) / 100);
 
 /** Auto-charge is on by default; shown in the consent box, on Stripe Checkout and again after the first payment. */
-export interface AutoPrices { extraQuestionCents: number; apiCreditCents: number; taxFeePercent: number }
-const usd = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
-export const authorizedPrice = (cents: number, percent: number): string =>
-  percent > 0 ? `${usd(cents)} + ${percent}% taxes & fees (${usd(allIn(cents, percent))} total)` : `${usd(cents)} total`;
-export const authorizedMonthlyPrice = (cents: number, percent: number): string =>
-  percent > 0 ? `${usd(cents)}/month + ${percent}% taxes & fees (${usd(allIn(cents, percent))} total)` : `${usd(cents)}/month`;
+export interface AutoPrices { extraQuestionCents: number; apiCreditCents: number; taxFeePercent: number; currency: Currency }
+const money = (cents: number, currency: Currency) =>
+  new Intl.NumberFormat(currency === 'inr' ? 'en-IN' : 'en-US', {
+    style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0,
+  }).format(cents / 100);
+export const authorizedPrice = (cents: number, percent: number, currency: Currency): string =>
+  percent > 0 ? `${money(cents, currency)} + ${percent}% taxes & fees (${money(allIn(cents, percent), currency)} total)` : `${money(cents, currency)} total`;
+export const authorizedMonthlyPrice = (cents: number, percent: number, currency: Currency): string =>
+  percent > 0 ? `${money(cents, currency)}/month + ${percent}% taxes & fees (${money(allIn(cents, percent), currency)} total)` : `${money(cents, currency)}/month`;
 export const API_AUTO_DEFAULT = { lowCents: 1000, cents: 10_000, capCents: 50_000 };
 export const autoNote = (area: 'chat' | 'api', p: AutoPrices): string => {
   if (area === 'chat') {
-    return `Auto-reload is on: your card is saved and when your questions run out, 2 more are added automatically for ${authorizedPrice(p.extraQuestionCents * 2, p.taxFeePercent)}, up to 10 questions a day. You can turn it off any time on your Account page.`;
+    return `Auto-reload is on: your card is saved and when your questions run out, 2 more are added automatically for ${authorizedPrice(p.extraQuestionCents * 2, p.taxFeePercent, p.currency)}, up to 10 questions a day. You can turn it off any time on your Account page.`;
   }
   const pack = API_AUTO_DEFAULT.cents;
-  return `Auto-recharge is on: your card is saved and when your wallet drops below ${usd(API_AUTO_DEFAULT.lowCents)} we add ${usd(pack)} to your wallet for ${authorizedPrice(pack, p.taxFeePercent)}, up to ${usd(API_AUTO_DEFAULT.capCents)} a month. Change or turn it off on the Developers page.`;
+  return `Auto-recharge is on: your card is saved and when your wallet drops below ${money(API_AUTO_DEFAULT.lowCents, 'usd')} we add ${money(pack, 'usd')} to your wallet for ${authorizedPrice(pack, p.taxFeePercent, 'usd')}, up to ${money(API_AUTO_DEFAULT.capCents, 'usd')} a month. Change or turn it off on the Developers page.`;
 };
 
 export const disclaimer = (area: 'chat' | 'api', p: AutoPrices): string =>
   `${BASE} ${area === 'chat' ? 'Chat questions expire 3 months after purchase.' : 'API wallet balance expires 6 months after purchase.'} ${autoNote(area, p)}`;
 
-export const subscriptionDisclaimer = (o: { trial: boolean; trialEnd: string; monthlyCents: number; taxFeePercent: number }): string => {
-  const monthly = authorizedMonthlyPrice(o.monthlyCents, o.taxFeePercent);
+export const subscriptionDisclaimer = (o: { trial: boolean; trialEnd: string; monthlyCents: number; taxFeePercent: number; currency: Currency }): string => {
+  const monthly = authorizedMonthlyPrice(o.monthlyCents, o.taxFeePercent, o.currency);
   const trial = o.trial ? ` Your 7-day free trial ends on ${o.trialEnd}; your card will be charged ${monthly} after the trial.` : ` You will be charged ${monthly} starting today.`;
   return `${BASE} ${trial} Your consultation allowance resets each paid billing cycle. You can cancel anytime from your account.`;
 };

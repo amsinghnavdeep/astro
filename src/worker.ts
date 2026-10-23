@@ -45,6 +45,7 @@ import { blogIndexPage, blogPostPage, blogVersion, deletePost, getPost, getPubli
 import { layout } from './seo/layout.js';
 import { TOPICS, topicPage } from './seo/topics.js';
 import { creditBalance, creditLots, grantCredits, spendCredit } from './credits.js';
+import { currencyFor, lockCurrency, type Currency } from './currency.js';
 import { checkPhoneVerification, startPhoneVerification, validPhone } from './phone.js';
 import {
   createSubscriptionCheckout, ensurePlanProduct, markTrialIdentity, planFor, plansForPrices, spendSubscriptionConsultation,
@@ -63,11 +64,11 @@ const app = new Hono<AppEnv>();
 const COOKIE = 'kaalera_session';
 const MAX_THREADS = 20;
 
-const pricing = async (db: D1Database, userId?: string) => {
-  const p = await chatPrices(db, userId);
+const pricing = async (db: D1Database, userId?: string, currency: Currency = 'usd') => {
+  const p = await chatPrices(db, userId, currency);
   return {
     freeQuestions: p.freeQuestions, packQuestions: p.chatPackQuestions, packCents: p.chatPackCents, extraQuestionCents: p.extraQuestionCents, quickWords: p.quickWords,
-    consultationDays: env.chat.consultationDays, currency: env.stripe.currency, taxFeePercent: p.taxFeePercent,
+    consultationDays: env.chat.consultationDays, currency: p.currency, taxFeePercent: p.taxFeePercent,
     deal: p.deal, business: p.business, fullPackCents: p.fullPackCents, fullExtraQuestionCents: p.fullExtraQuestionCents,
   };
 };
@@ -143,7 +144,11 @@ const agreedIn = (body: unknown): boolean => !!body && typeof body === 'object' 
 async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadId?: string; credits: number; cents: number; name: string; returnPath: string }): Promise<string> {
   const area = o.kind === 'api_credits' ? 'api' : 'chat';
   const consentId = crypto.randomUUID();
-  const prices = await chatPrices(c.env.DB, user.id);
+  const currency = area === 'api' || user.account_type === 'business'
+    ? 'usd' : await lockCurrency(c.env.DB, user.id, currencyFor(c, user));
+  const prices = await chatPrices(c.env.DB, user.id, currency);
+  const cents = area === 'api' ? o.cents
+    : o.kind === 'topup' ? prices.extraQuestionCents * CHAT_RELOAD_QUESTIONS : prices.chatPackCents;
   const tax = prices.taxFeePercent;
   const name = area !== 'chat' ? o.name : prices.business ? `${o.name} (Business price)` : prices.deal ? `${o.name} (${prices.deal.name} ${prices.deal.percent}% off)` : o.name;
   await c.env.DB.prepare(
@@ -156,13 +161,13 @@ async function createCheckout(c: C, user: User, o: { kind: CheckoutKind; threadI
     customer: await ensureCustomer(c.env.DB, user),
     payment_intent_data: { setup_future_usage: 'off_session' },
     line_items: [
-      { quantity: 1, price_data: { currency: env.stripe.currency, unit_amount: o.cents, product_data: { name } } },
+      { quantity: 1, price_data: { currency, unit_amount: cents, product_data: { name } } },
       ...(tax > 0 ? [{
         quantity: 1,
-        price_data: { currency: env.stripe.currency, unit_amount: taxesAndFees(o.cents, tax), product_data: { name: `Taxes & fees (${tax}%)` } },
+        price_data: { currency, unit_amount: taxesAndFees(cents, tax), product_data: { name: `Taxes & fees (${tax}%)` } },
       }] : []),
     ],
-    metadata: { kind: o.kind, userId: user.id, threadId: o.threadId ?? '', credits: String(o.credits), consentId, baseCents: String(o.cents) },
+    metadata: { kind: o.kind, userId: user.id, threadId: o.threadId ?? '', credits: String(o.credits), consentId, baseCents: String(cents) },
     success_url: `${env.siteUrl}${o.returnPath}${o.returnPath.includes('?') ? '&' : '?'}checkout={CHECKOUT_SESSION_ID}`,
     cancel_url: `${env.siteUrl}${o.returnPath}`,
   });
@@ -188,7 +193,7 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
        VALUES (?, ?, NULL, 'api_credits', ?, ?, ?) ON CONFLICT(stripe_session_id) DO NOTHING`,
     ).bind(s.id, m.userId, s.amount_total ?? 0, s.currency ?? env.stripe.currency, new Date().toISOString()).run();
     if (ins.meta?.changes) {
-      await sendReceipt(db, m.userId, { ...receipt, item: `API wallet top-up ${usdCents(Number(m.credits))}`, api: true });
+      await sendReceipt(db, m.userId, { ...receipt, item: `API wallet top-up ${usdCents(Number(m.credits))}`, currency: (s.currency ?? 'usd') as Currency, api: true });
       await trackPayment(db, m.userId);
     }
     return { kind, threadId: null };
@@ -198,7 +203,7 @@ async function fulfill(db: D1Database, s: Stripe.Checkout.Session): Promise<{ ki
     amountCents: s.amount_total ?? 0, currency: s.currency ?? env.stripe.currency,
   });
   if (t) {
-    await sendReceipt(db, m.userId, { ...receipt, item: RECEIPT_ITEM[kind] });
+    await sendReceipt(db, m.userId, { ...receipt, item: RECEIPT_ITEM[kind], currency: (s.currency ?? 'usd') as Currency });
     await trackPayment(db, m.userId);
   }
   const current = t ?? (await getThreadById(db, m.threadId));
@@ -406,7 +411,7 @@ const adminFilters = (c: C): Filters => Object.fromEntries(FILTER_KEYS.map((k) =
 const loadPeople = async (db: D1Database) => (await db.prepare(`SELECT u.name, u.email, u.account_type, u.business_name, u.created_at, u.last_seen_at,
     (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'web') AS web,
     (SELECT COUNT(*) FROM threads t WHERE t.user_id = u.id AND t.source = 'api') AS api,
-    (SELECT COALESCE(SUM(amount_cents), 0) FROM payments p WHERE p.user_id = u.id) AS cents,
+    (SELECT COALESCE(SUM(CASE WHEN p.currency = 'inr' THEN p.amount_cents / COALESCE((SELECT CAST(value AS REAL) FROM settings WHERE key = 'inr_per_usd'), 85) ELSE p.amount_cents END), 0) FROM payments p WHERE p.user_id = u.id) AS cents,
     (SELECT COALESCE(SUM(delta), 0) FROM chat_credit_ledger l WHERE l.user_id = u.id) AS chats_left,
     (SELECT substr(group_concat(m.body, ' '), 1, 6000) FROM messages m JOIN threads t ON t.id = m.thread_id WHERE t.user_id = u.id AND m.role = 'user') AS asked
   FROM users u ORDER BY COALESCE(u.last_seen_at, u.created_at) DESC LIMIT 5000`).all<Person>()).results;
@@ -438,9 +443,9 @@ app.get('/admin', async (c) => {
   const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
   const [f, revenue, all, people] = await Promise.all([
     funnel(db, days),
-    db.prepare('SELECT substr(created_at, 1, 10) AS day, SUM(amount_cents) AS cents, COUNT(*) AS n FROM payments WHERE created_at >= ? GROUP BY day')
+    db.prepare("SELECT substr(created_at, 1, 10) AS day, SUM(CASE WHEN currency = 'inr' THEN amount_cents / COALESCE((SELECT CAST(value AS REAL) FROM settings WHERE key = 'inr_per_usd'), 85) ELSE amount_cents END) AS cents, COUNT(*) AS n FROM payments WHERE created_at >= ? GROUP BY day")
       .bind(since).all<{ day: string; cents: number; n: number }>(),
-    db.prepare('SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM payments) AS payments, (SELECT COALESCE(SUM(amount_cents), 0) FROM payments) AS cents')
+    db.prepare("SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM payments) AS payments, (SELECT COALESCE(SUM(CASE WHEN currency = 'inr' THEN amount_cents / COALESCE((SELECT CAST(value AS REAL) FROM settings WHERE key = 'inr_per_usd'), 85) ELSE amount_cents END), 0) FROM payments) AS cents")
       .first<{ users: number; payments: number; cents: number }>(),
     loadPeople(db),
   ]);
@@ -730,30 +735,37 @@ app.post('/api/logout', async (c) => {
   return c.json({ ok: true });
 });
 
-const subscriptionPlans = async (db: D1Database) => {
+const subscriptionPlans = async (db: D1Database, currency: Currency) => {
   const prices = await getPrices(db);
   return {
     taxFeePercent: prices.taxFeePercent,
-    plans: plansForPrices(prices),
+    currency,
+    plans: plansForPrices(prices, currency),
   };
 };
 
-app.get('/api/plans', async (c) => c.json({ ...(await pricing(c.env.DB)), ...(await subscriptionPlans(c.env.DB)), languages: LANGUAGES }));
+app.get('/api/plans', async (c) => {
+  const user = c.get('user') ?? null;
+  const currency = currencyFor(c, user);
+  return c.json({ ...(await pricing(c.env.DB, user?.id, currency)), ...(await subscriptionPlans(c.env.DB, currency)), languages: LANGUAGES });
+});
 
 app.get('/api/subscription', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
   const personal = user.account_type !== 'business';
-  const [state, phone, catalog] = await Promise.all([
+  const [state, phone] = await Promise.all([
     subscriptionForUser(c.env.DB, user.id),
     c.env.DB.prepare('SELECT phone_e164, phone_verified_at FROM users WHERE id = ?').bind(user.id)
       .first<{ phone_e164: string | null; phone_verified_at: string | null }>(),
-    personal ? subscriptionPlans(c.env.DB) : Promise.resolve({ taxFeePercent: 0, plans: [] }),
   ]);
-  const plan = state ? planFor(await getPrices(c.env.DB), state.plan) : null;
+  const currency = personal ? state?.currency ?? currencyFor(c, user) : 'usd';
+  const catalog = personal ? await subscriptionPlans(c.env.DB, currency) : { taxFeePercent: 0, currency, plans: [] };
+  const plan = state ? planFor(await getPrices(c.env.DB), state.plan, state.currency) : null;
   return c.json({
     enabled: personal, phoneEnabled: env.phone.enabled, phoneVerified: !!phone?.phone_verified_at,
     phone: phone?.phone_e164 ?? null, phoneSaved: !!phone?.phone_e164,
+    currency,
     trialDays: personal ? (await getPrices(c.env.DB)).trialDays : 0,
     trialConsults: personal ? (await getPrices(c.env.DB)).trialConsults : 0,
     taxFeePercent: catalog.taxFeePercent,
@@ -842,8 +854,9 @@ app.post('/api/subscribe', async (c) => {
   const phone = await c.env.DB.prepare('SELECT phone_e164, phone_verified_at FROM users WHERE id = ?')
     .bind(user.id).first<{ phone_e164: string | null; phone_verified_at: string | null }>();
   if (env.phone.enabled && !phone?.phone_verified_at) return c.json({ error: 'Verify your phone number before subscribing.' }, 400);
+  const currency = await lockCurrency(c.env.DB, user.id, existing?.currency ?? currencyFor(c, user));
   const prices = await getPrices(c.env.DB);
-  const plan = planFor(prices, parsed.data.plan);
+  const plan = planFor(prices, parsed.data.plan, currency);
   if (!plan) return c.json({ error: 'That plan is unavailable.' }, 400);
   if (!env.phone.enabled && !phone?.phone_e164) {
     const normalized = parsed.data.phone?.replace(/[ \-().]/g, '') ?? '';
@@ -865,7 +878,7 @@ app.post('/api/subscribe', async (c) => {
   const trialEnd = new Date(Date.now() + prices.trialDays * 86_400_000).toISOString();
   const url = await createSubscriptionCheckout(c.env.DB, user, {
     plan, eligible, threadId: parsed.data.threadId, taxFeePercent: prices.taxFeePercent,
-    trialDays: prices.trialDays, trialEnd, trialKeys: keys,
+    trialDays: prices.trialDays, trialEnd, trialKeys: keys, currency,
   }, { ip: c.req.header('cf-connecting-ip') ?? null, userAgent: (c.req.header('user-agent') ?? '').slice(0, 300) || null });
   return c.json({ checkoutUrl: url });
 });
@@ -914,8 +927,8 @@ app.post('/api/subscription/manage', async (c) => {
   if (parsed.data.action === 'basic') {
     if (state.plan === 'basic') return c.json({ error: 'You are already on Basic.' }, 409);
     const prices = await getPrices(c.env.DB);
-    const plan = planFor(prices, 'basic')!;
-    const oldProduct = await ensurePlanProduct(c.env.DB, planFor(prices, state.plan)!);
+    const plan = planFor(prices, 'basic', state.currency)!;
+    const oldProduct = await ensurePlanProduct(c.env.DB, planFor(prices, state.plan, state.currency)!);
     const basicProduct = await ensurePlanProduct(c.env.DB, plan);
     const subscription = await stripe().subscriptions.retrieve(state.stripe_subscription_id);
     const items = subscription.items.data;
@@ -926,8 +939,8 @@ app.post('/api/subscription/manage', async (c) => {
     if (!taxProduct) return c.json({ error: 'Could not update this subscription. Contact support.' }, 502);
     const updated = await stripe().subscriptions.update(state.stripe_subscription_id, {
       items: [
-        { id: planItem.id, price_data: { currency: env.stripe.currency, unit_amount: plan.cents, recurring: { interval: 'month' }, product: basicProduct } },
-        { id: taxItem.id, price_data: { currency: env.stripe.currency, unit_amount: taxesAndFees(plan.cents, prices.taxFeePercent), recurring: { interval: 'month' }, product: taxProduct } },
+        { id: planItem.id, price_data: { currency: state.currency, unit_amount: plan.cents, recurring: { interval: 'month' }, product: basicProduct } },
+        { id: taxItem.id, price_data: { currency: state.currency, unit_amount: taxesAndFees(plan.cents, prices.taxFeePercent), recurring: { interval: 'month' }, product: taxProduct } },
       ],
       proration_behavior: 'none',
     });
@@ -990,7 +1003,7 @@ app.get('/api/me', async (c) => {
     user: { name: user.name, email: user.email, accountType: user.account_type ?? 'personal', businessName: user.business_name ?? null }, freeAvailable: !user.free_used && user.account_type !== 'business',
     chatCredits: await creditLots(c.env.DB, 'chat', user.id),
     walletCents: user.account_type === 'business' ? await apiBalance(c.env.DB, user.id) : null,
-    pricing: await pricing(c.env.DB, user.id), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
+    pricing: await pricing(c.env.DB, user.id, currencyFor(c, user)), languages: LANGUAGES, maxChars: env.chat.maxMessageChars,
     billing: publicBilling(await getBilling(c.env.DB, user.id)),
   });
 });
@@ -1054,7 +1067,7 @@ app.post('/api/threads', async (c) => {
     .safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: 'Choose or add a Kundli and write your question.' }, 400);
   const db = c.env.DB;
-  const pr = await chatPrices(db, user.id);
+  const pr = await chatPrices(db, user.id, currencyFor(c, user));
   const k = await getKundli(db, user.id, body.data.kundliId);
   if (!k) return c.json({ error: 'Choose or add a Kundli first.' }, 400);
   const p = { data: { ...kundliInput(k), language: body.data.language, question: body.data.question } };
@@ -1090,10 +1103,11 @@ app.post('/api/threads', async (c) => {
       } else if (!body.data.overage) {
         const keys = await freeKeys(c);
         const prices = await getPrices(db);
-        const catalog = await subscriptionPlans(db);
+        const currency = currencyFor(c, user);
+        const catalog = await subscriptionPlans(db, currency);
         const eligible = await trialEligible(db, user.id, keys);
         return c.json({
-          thread: await pubT(c, t), plansRequired: true, plans: catalog.plans,
+          thread: await pubT(c, t), plansRequired: true, plans: catalog.plans, currency: catalog.currency,
           trialEligible: eligible, trialDays: prices.trialDays, trialConsults: prices.trialConsults,
         });
       }
@@ -1155,7 +1169,7 @@ app.post('/api/threads/:id/checkout', async (c) => {
     if (kind === 'consultation' && !fresh.devin_session_id) await startThreadSession(c.env.DB, fresh).catch((err) => console.error('Session start failed:', err));
     return c.json({ paid: true, thread: await pubT(c, (await getThreadById(c.env.DB, t.id))!) });
   }
-  const pr = await chatPrices(c.env.DB, user.id);
+  const pr = await chatPrices(c.env.DB, user.id, currencyFor(c, user));
   const url = await createCheckout(c, user, {
     kind, threadId: t.id,
     credits: kind === 'topup' ? CHAT_RELOAD_QUESTIONS : pr.chatPackQuestions,
@@ -1376,7 +1390,7 @@ async function applySubscriptionInvoice(db: D1Database, invoice: Stripe.Invoice)
   const prices = await getPrices(db);
   const appliesPendingPlan = invoice.amount_paid > 0 && invoice.billing_reason === 'subscription_cycle' && !!current.pending_plan;
   const planId = appliesPendingPlan ? current.pending_plan! : current.plan;
-  const plan = planFor(prices, planId);
+  const plan = planFor(prices, planId, current.currency);
   if (!plan) return;
   let allowance: number | null = null;
   if (invoice.amount_paid === 0 && invoice.billing_reason === 'subscription_create') allowance = prices.trialConsults;
@@ -1398,7 +1412,7 @@ async function applySubscriptionInvoice(db: D1Database, invoice: Stripe.Invoice)
     ).bind(invoice.id, userId, invoice.amount_paid, invoice.currency, new Date().toISOString()).run();
     await sendReceipt(db, userId, {
       item: `Kaalera ${plan.name} monthly subscription`, totalCents: invoice.amount_paid,
-      baseCents: plan.cents, auto: false, ref: invoice.id,
+      baseCents: plan.cents, currency: (invoice.currency ?? current.currency) as Currency, auto: false, ref: invoice.id,
     });
     await trackPayment(db, userId);
   }
@@ -1457,11 +1471,11 @@ app.post('/api/stripe/webhook', async (c) => {
       if (userId && !emailSent) {
         const state = await subscriptionForUser(c.env.DB, userId);
         const prices = await getPrices(c.env.DB);
-        const plan = state ? planFor(prices, state.plan) : null;
+        const plan = state ? planFor(prices, state.plan, state.currency) : null;
         const account = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string }>();
         if (plan && account) {
           await sendSubscriptionTrialEndingEmail({
-            to: account.email, plan: plan.name, monthlyCents: plan.cents, taxFeePercent: prices.taxFeePercent,
+            to: account.email, plan: plan.name, monthlyCents: plan.cents, taxFeePercent: prices.taxFeePercent, currency: state?.currency ?? 'usd',
             trialEnd: state?.trial_end ?? new Date((subscription.trial_end ?? 0) * 1000).toISOString(),
             manageUrl: `${env.siteUrl}/?app=1&account=1`,
           });

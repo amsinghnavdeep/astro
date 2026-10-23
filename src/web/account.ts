@@ -9,12 +9,15 @@ type Me = {
 
 const RELOAD = 2;
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
-const usd = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
+const money = (cents: number, currency: string): string =>
+  new Intl.NumberFormat(currency === 'inr' ? 'en-IN' : 'en-US', {
+    style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0,
+  }).format(cents / 100);
 let me: Me;
 
 const reloadPrice = (): string => {
   const base = me.pricing.extraQuestionCents * RELOAD;
-  return `${usd(base)}${taxFeeNote(me.pricing.taxFeePercent)}`;
+  return `${money(base, me.pricing.currency)}${taxFeeNote(me.pricing.taxFeePercent)}`;
 };
 
 function render(): void {

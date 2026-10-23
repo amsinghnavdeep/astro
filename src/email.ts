@@ -1,4 +1,5 @@
 import { env } from './env.js';
+import type { Currency } from './currency.js';
 
 export const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -32,28 +33,32 @@ export async function sendSupportEmail(o: { to: string; subject: string; title: 
 }
 
 const usd = (cents: number): string => `$${(cents / 100).toFixed(2)}`;
+const money = (cents: number, currency: Currency): string =>
+  new Intl.NumberFormat(currency === 'inr' ? 'en-IN' : 'en-US', {
+    style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: 2,
+  }).format(cents / 100);
 
 export async function sendReceiptEmail(o: {
-  to: string; item: string; baseCents: number; feeCents: number; feePercent: number; totalCents: number;
+  to: string; item: string; baseCents: number; feeCents: number; feePercent: number; totalCents: number; currency: Currency;
   last4: string | null; auto: boolean; ref: string; manageUrl: string; billedTo?: string | null;
 }): Promise<void> {
   const row = (k: string, v: string, b = false) =>
     `<tr><td style="padding:4px 0;color:#555">${escapeHtml(k)}</td><td style="padding:4px 0;text-align:right${b ? ';font-weight:600' : ''}">${escapeHtml(v)}</td></tr>`;
-  await sendEmail(o.to, `Kaalera receipt — ${usd(o.totalCents)}`, layout('Payment received',
+  await sendEmail(o.to, `Kaalera receipt — ${money(o.totalCents, o.currency)}`, layout('Payment received',
     `<p>Thank you. ${o.auto ? 'This was charged automatically to your saved card.' : 'Your payment went through.'}</p>
-    <table style="width:100%;border-collapse:collapse">${row(o.item, usd(o.baseCents))}${o.feeCents ? row(`Taxes & fees (${o.feePercent}%)`, usd(o.feeCents)) : ''}
-    ${row('Total (USD)', usd(o.totalCents), true)}${o.last4 ? row('Card', `•••• ${o.last4}`) : ''}${row('Date', new Date().toUTCString().slice(5, 16))}${row('Reference', o.ref)}${o.billedTo ? row('Billed to', o.billedTo) : ''}</table>
+    <table style="width:100%;border-collapse:collapse">${row(o.item, money(o.baseCents, o.currency))}${o.feeCents ? row(`Taxes & fees (${o.feePercent}%)`, money(o.feeCents, o.currency)) : ''}
+    ${row(`Total (${o.currency.toUpperCase()})`, money(o.totalCents, o.currency), true)}${o.last4 ? row('Card', `•••• ${o.last4}`) : ''}${row('Date', new Date().toUTCString().slice(5, 16))}${row('Reference', o.ref)}${o.billedTo ? row('Billed to', o.billedTo) : ''}</table>
     <p style="color:#666;font-size:13px">All sales are final — no refunds. Automatic billing is ${o.auto ? 'on' : 'on by default'}; you can change it on your Account page.</p>`
     + button(o.manageUrl, 'Manage billing')));
 }
 
 export async function sendSubscriptionTrialEndingEmail(o: {
-  to: string; plan: string; monthlyCents: number; taxFeePercent: number; trialEnd: string; manageUrl: string;
+  to: string; plan: string; monthlyCents: number; taxFeePercent: number; currency: Currency; trialEnd: string; manageUrl: string;
 }): Promise<void> {
   const chargeDate = new Date(o.trialEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
   const monthly = o.taxFeePercent > 0
-    ? `${usd(o.monthlyCents)}/month + ${o.taxFeePercent}% taxes &amp; fees (${usd(o.monthlyCents + Math.round((o.monthlyCents * o.taxFeePercent) / 100))} total)`
-    : `${usd(o.monthlyCents)}/month`;
+    ? `${money(o.monthlyCents, o.currency)}/month + ${o.taxFeePercent}% taxes &amp; fees (${money(o.monthlyCents + Math.round((o.monthlyCents * o.taxFeePercent) / 100), o.currency)} total)`
+    : `${money(o.monthlyCents, o.currency)}/month`;
   await sendEmail(o.to, 'Your Kaalera trial ends soon', layout('Your trial ends soon',
     `<p>Your ${escapeHtml(o.plan)} plan trial ends on <b>${escapeHtml(chargeDate)}</b>. Your card will then be charged <b>${monthly}</b>.</p>
     <p>Cancel anytime from your account.</p>` + button(o.manageUrl, 'Manage subscription')));

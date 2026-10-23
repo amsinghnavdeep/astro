@@ -7,24 +7,26 @@ import { ensureCustomer } from './autocharge.js';
 import { stripe } from './stripe.js';
 import { getPrices, taxesAndFees, type Prices } from './settings.js';
 import { subscriptionDisclaimer } from './disclaimer.js';
+import type { Currency } from './currency.js';
 
 export type PlanId = 'basic' | 'plus' | 'pro';
 export type Plan = { id: PlanId; name: string; cents: number; consultations: number };
 export type SubscriptionState = {
   user_id: string; stripe_subscription_id: string; plan: PlanId; status: string;
+  currency: Currency;
   pending_plan: PlanId | null;
   trial_end: string | null; current_period_end: string | null; cancel_at_period_end: number;
   paused_until: string | null; pause_starts_at: string | null; consults_left: number; last_invoice_id: string | null; had_trial: number;
 };
 export type SubscriptionUser = { id: string; email: string; name: string };
 
-export const plansForPrices = (prices: Prices): Plan[] => [
-  { id: 'basic', name: 'Basic', cents: prices.planBasicCents, consultations: prices.planBasicConsults },
-  { id: 'plus', name: 'Plus', cents: prices.planPlusCents, consultations: prices.planPlusConsults },
-  { id: 'pro', name: 'Pro', cents: prices.planProCents, consultations: prices.planProConsults },
+export const plansForPrices = (prices: Prices, currency: Currency = 'usd'): Plan[] => [
+  { id: 'basic', name: 'Basic', cents: currency === 'inr' ? prices.planBasicInrPaise : prices.planBasicCents, consultations: prices.planBasicConsults },
+  { id: 'plus', name: 'Plus', cents: currency === 'inr' ? prices.planPlusInrPaise : prices.planPlusCents, consultations: prices.planPlusConsults },
+  { id: 'pro', name: 'Pro', cents: currency === 'inr' ? prices.planProInrPaise : prices.planProCents, consultations: prices.planProConsults },
 ];
 
-export const planFor = (prices: Prices, id: string): Plan | null => plansForPrices(prices).find((p) => p.id === id) ?? null;
+export const planFor = (prices: Prices, id: string, currency: Currency = 'usd'): Plan | null => plansForPrices(prices, currency).find((p) => p.id === id) ?? null;
 
 export async function subscriptionForUser(db: D1Database, userId: string): Promise<SubscriptionState | null> {
   return db.prepare('SELECT * FROM subscriptions WHERE user_id = ?').bind(userId).first<SubscriptionState>();
@@ -63,12 +65,12 @@ export async function ensurePlanProduct(db: D1Database, plan: Plan): Promise<str
 export async function createSubscriptionCheckout(
   db: D1Database,
   user: SubscriptionUser,
-  o: { plan: Plan; eligible: boolean; threadId?: string; taxFeePercent: number; trialDays: number; trialEnd: string; trialKeys: FreeKeys },
+  o: { plan: Plan; eligible: boolean; threadId?: string; taxFeePercent: number; trialDays: number; trialEnd: string; trialKeys: FreeKeys; currency: Currency },
   request: { ip: string | null; userAgent: string | null },
 ): Promise<string> {
   const consentId = crypto.randomUUID();
   const consent = subscriptionDisclaimer({
-    trial: o.eligible, trialEnd: o.trialEnd, monthlyCents: o.plan.cents, taxFeePercent: o.taxFeePercent,
+    trial: o.eligible, trialEnd: o.trialEnd, monthlyCents: o.plan.cents, taxFeePercent: o.taxFeePercent, currency: o.currency,
   });
   const now = new Date().toISOString();
   await db.prepare(
@@ -96,14 +98,14 @@ export async function createSubscriptionCheckout(
       {
         quantity: 1,
         price_data: {
-          currency: env.stripe.currency, unit_amount: o.plan.cents,
+          currency: o.currency, unit_amount: o.plan.cents,
           recurring: { interval: 'month' }, product,
         },
       },
       ...(tax > 0 ? [{
         quantity: 1,
         price_data: {
-          currency: env.stripe.currency, unit_amount: taxesAndFees(o.plan.cents, tax),
+          currency: o.currency, unit_amount: taxesAndFees(o.plan.cents, tax),
           recurring: { interval: 'month' as const }, product_data: { name: `Taxes & fees (${tax}%)` },
         },
       }] : []),
@@ -123,7 +125,8 @@ export async function syncSubscription(db: D1Database, subscription: Stripe.Subs
   const plan = (meta.plan || 'basic') as PlanId;
   if (!userId) return null;
   const prices = await getPrices(db);
-  const planInfo = planFor(prices, plan);
+  const currency = subscription.currency === 'inr' ? 'inr' : 'usd';
+  const planInfo = planFor(prices, plan, currency);
   if (!planInfo) return null;
   const now = new Date().toISOString();
   const trialEnd = subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null;
@@ -134,16 +137,17 @@ export async function syncSubscription(db: D1Database, subscription: Stripe.Subs
   const trialing = subscription.status === 'trialing';
   await db.prepare(
     `INSERT INTO subscriptions
-      (user_id, stripe_subscription_id, plan, status, trial_end, current_period_end, cancel_at_period_end, paused_until, pause_starts_at, consults_left, last_invoice_id, had_trial, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+      (user_id, stripe_subscription_id, plan, status, trial_end, current_period_end, cancel_at_period_end, currency, paused_until, pause_starts_at, consults_left, last_invoice_id, had_trial, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET stripe_subscription_id = excluded.stripe_subscription_id,
        plan = excluded.plan, status = excluded.status, trial_end = excluded.trial_end,
        current_period_end = excluded.current_period_end, cancel_at_period_end = excluded.cancel_at_period_end,
+       currency = excluded.currency,
        paused_until = excluded.paused_until,
        pause_starts_at = CASE WHEN excluded.paused_until IS NULL THEN NULL ELSE COALESCE(subscriptions.pause_starts_at, excluded.pause_starts_at) END,
        had_trial = MAX(subscriptions.had_trial, excluded.had_trial), updated_at = excluded.updated_at`,
   ).bind(userId, subscription.id, plan, subscription.status, trialEnd, currentPeriodEnd,
-    subscription.cancel_at_period_end ? 1 : 0, pausedUntil, pauseStartsAt,
+    subscription.cancel_at_period_end ? 1 : 0, currency, pausedUntil, pauseStartsAt,
     trialing ? prices.trialConsults : 0, trialing ? 1 : 0, now, now).run();
   return userId;
 }

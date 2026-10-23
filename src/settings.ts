@@ -14,6 +14,12 @@ export interface Prices {
   planPlusConsults: number;
   planProCents: number;
   planProConsults: number;
+  chatPackInrPaise: number;
+  extraQuestionInrPaise: number;
+  planBasicInrPaise: number;
+  planPlusInrPaise: number;
+  planProInrPaise: number;
+  inrPerUsd: number;
   trialDays: number;
   trialConsults: number;
   apiCreditCents: number;
@@ -34,6 +40,12 @@ export const PRICE_LIMITS: Record<PriceKey, [number, number]> = {
   planPlusConsults: [1, 100],
   planProCents: [500, 100_000],
   planProConsults: [1, 100],
+  chatPackInrPaise: [10_000, 10_000_000],
+  extraQuestionInrPaise: [10_000, 10_000_000],
+  planBasicInrPaise: [10_000, 10_000_000],
+  planPlusInrPaise: [10_000, 10_000_000],
+  planProInrPaise: [10_000, 10_000_000],
+  inrPerUsd: [50, 150],
   trialDays: [1, 30],
   trialConsults: [1, 10],
   apiCreditCents: [100, 100_000],
@@ -52,6 +64,12 @@ const DB_KEY: Record<PriceKey, string> = {
   planPlusConsults: 'plan_plus_consults',
   planProCents: 'plan_pro_cents',
   planProConsults: 'plan_pro_consults',
+  chatPackInrPaise: 'chat_pack_inr_paise',
+  extraQuestionInrPaise: 'extra_question_inr_paise',
+  planBasicInrPaise: 'plan_basic_inr_paise',
+  planPlusInrPaise: 'plan_plus_inr_paise',
+  planProInrPaise: 'plan_pro_inr_paise',
+  inrPerUsd: 'inr_per_usd',
   trialDays: 'trial_days',
   trialConsults: 'trial_consults',
   apiCreditCents: 'api_credit_cents',
@@ -82,6 +100,12 @@ const defaults = (): Prices => ({
   planPlusConsults: 10,
   planProCents: 8900,
   planProConsults: 25,
+  chatPackInrPaise: 84900,
+  extraQuestionInrPaise: 59900,
+  planBasicInrPaise: 249900,
+  planPlusInrPaise: 419900,
+  planProInrPaise: 749900,
+  inrPerUsd: 85,
   trialDays: 7,
   trialConsults: 2,
   apiCreditCents: 500,

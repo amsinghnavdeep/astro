@@ -234,7 +234,7 @@ export function blogTab(posts: PostRow[], edit: PostRow | null | 'new', notice =
 <div class="tw"><table><tr><th>Title</th><th>Status</th><th>Date</th><th></th></tr>${list || '<tr><td colspan="4" class="dim">No posts yet.</td></tr>'}</table></div></section>`, 30, notice);
 }
 
-export const PRICE_FIELDS: { key: string; label: string; money: boolean; help: string }[] = [
+export const PRICE_FIELDS: { key: string; label: string; money: boolean; help: string; currency?: string; group?: string }[] = [
   { key: 'chatPackCents', label: 'Consultation start price', money: true, help: 'Before taxes & fees. Business pays 10% less.' },
   { key: 'extraQuestionCents', label: 'Extra question price', money: true, help: 'Before taxes & fees. Auto-reload adds 2 at this price.' },
   { key: 'chatPackQuestions', label: 'Questions in a consultation', money: false, help: 'How many questions the start price includes.' },
@@ -250,12 +250,21 @@ export const PRICE_FIELDS: { key: string; label: string; money: boolean; help: s
   { key: 'quickWords', label: 'Quick answer word limit', money: false, help: 'Quick answers cost half an extra question (2 quick answers per question).' },
   { key: 'taxFeePercent', label: 'Taxes & fees %', money: false, help: 'Added on top at checkout.' },
   { key: 'apiMinRechargeCents', label: 'Business activation minimum', money: true, help: 'First wallet payment needed to use the API.' },
+  { key: 'planBasicInrPaise', label: 'Basic monthly price', money: true, currency: 'INR', group: 'india', help: 'Before taxes & fees.' },
+  { key: 'planPlusInrPaise', label: 'Plus monthly price', money: true, currency: 'INR', group: 'india', help: 'Before taxes & fees.' },
+  { key: 'planProInrPaise', label: 'Pro monthly price', money: true, currency: 'INR', group: 'india', help: 'Before taxes & fees.' },
+  { key: 'chatPackInrPaise', label: 'Consultation start price', money: true, currency: 'INR', group: 'india', help: 'Before taxes & fees.' },
+  { key: 'extraQuestionInrPaise', label: 'Extra question price', money: true, currency: 'INR', group: 'india', help: 'Before taxes & fees. Auto-reload adds 2 at this price.' },
+  { key: 'inrPerUsd', label: 'INR per USD reporting rate', money: false, group: 'india', help: 'Used for USD admin reporting and commissions.' },
 ];
 export function pricesTab(prices: Record<string, number>, history: { key: string; old_value: string | null; new_value: string; changed_by: string; changed_at: string }[], notice = ''): string {
-  const fields = PRICE_FIELDS.map((x) => `<label>${h(x.label)}${x.money ? ' (USD)' : ''}<input name="${x.key}" type="number" min="0" step="${x.money ? '0.01' : '1'}" value="${x.money ? (prices[x.key] / 100).toFixed(2) : prices[x.key]}">${x.help ? `<small class="dim">${h(x.help)}</small>` : ''}</label>`).join('');
+  const renderFields = (list: typeof PRICE_FIELDS) => list.map((x) => `<label>${h(x.label)}${x.money ? ` (${x.currency ?? 'USD'})` : ''}<input name="${x.key}" type="number" min="0" step="${x.money ? '0.01' : '1'}" value="${x.money ? (prices[x.key] / 100).toFixed(2) : prices[x.key]}">${x.help ? `<small class="dim">${h(x.help)}</small>` : ''}</label>`).join('');
+  const usdFields = PRICE_FIELDS.filter((x) => x.group !== 'india');
+  const indiaFields = PRICE_FIELDS.filter((x) => x.group === 'india');
   const label = (k: string) => PRICE_FIELDS.find((x) => x.key === k || x.key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`) === k)?.label ?? k;
   const hist = history.map((r) => `<tr><td>${h(r.changed_at.slice(0, 16).replace('T', ' '))}</td><td>${h(label(r.key))}</td><td>${h(r.old_value ?? '–')} → <b>${h(r.new_value)}</b></td></tr>`).join('');
-  return shell('prices', `<section class="card"><h2>PRICES</h2><form method="post" action="/admin/prices" class="form"><div class="two">${fields}</div>
+  return shell('prices', `<section class="card"><h2>PRICES</h2><form method="post" action="/admin/prices" class="form"><h3>USD</h3><div class="two">${renderFields(usdFields)}</div>
+<h3>India (INR)</h3><div class="two">${renderFields(indiaFields)}</div>
 <div class="bar-row"><button class="btn">Save prices</button><span class="dim">Changes apply to new checkouts right away.</span></div></form></section>
 <section class="card" style="margin-top:14px"><h2>CHANGE LOG</h2><div class="tw"><table><tr><th>When (UTC)</th><th>What</th><th>Change</th></tr>${hist || '<tr><td colspan="3" class="dim">No changes yet.</td></tr>'}</table></div></section>`, 30, notice);
 }

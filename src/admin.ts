@@ -31,6 +31,9 @@ export const pricesSchema = z.object({
   chatPackCents: int('chatPackCents'), extraQuestionCents: int('extraQuestionCents'), chatPackQuestions: int('chatPackQuestions'), freeQuestions: int('freeQuestions'),
   planBasicCents: int('planBasicCents'), planBasicConsults: int('planBasicConsults'), planPlusCents: int('planPlusCents'),
   planPlusConsults: int('planPlusConsults'), planProCents: int('planProCents'), planProConsults: int('planProConsults'),
+  chatPackInrPaise: int('chatPackInrPaise'), extraQuestionInrPaise: int('extraQuestionInrPaise'),
+  planBasicInrPaise: int('planBasicInrPaise'), planPlusInrPaise: int('planPlusInrPaise'),
+  planProInrPaise: int('planProInrPaise'), inrPerUsd: int('inrPerUsd'),
   trialDays: int('trialDays'), trialConsults: int('trialConsults'),
   apiCreditCents: int('apiCreditCents'), apiMinRechargeCents: int('apiMinRechargeCents'), taxFeePercent: int('taxFeePercent'), quickWords: int('quickWords'),
 }).partial().strict();

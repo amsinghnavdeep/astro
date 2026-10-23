@@ -276,7 +276,7 @@ $('packs').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pack]');
   if (!btn) return;
   if (!biz().businessName) return openBiz(btn.dataset.pack);
-  if (!(await confirmPurchase('api', authorizedPrice((state?.packs ?? []).find((p) => p.id === btn.dataset.pack)?.cents ?? 0, state?.taxFeePercent ?? 0), { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0 }))) return;
+  if (!(await confirmPurchase('api', authorizedPrice((state?.packs ?? []).find((p) => p.id === btn.dataset.pack)?.cents ?? 0, state?.taxFeePercent ?? 0, 'usd'), { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0, currency: 'usd' }))) return;
   $('buy-error').textContent = '';
   btn.disabled = true;
   btn.textContent = 'Opening secure checkout…';

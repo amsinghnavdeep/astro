@@ -71,7 +71,7 @@ export async function grantFriendBonus(db: D1Database, user: Partnered): Promise
 
 /** Called once per newly recorded website payment (applyPayment is idempotent per payment). */
 export async function onChatPayment(
-  db: D1Database, p: { userId: string; threadId: string; kind: 'consultation' | 'topup'; amountCents: number }, taxFeePercent: number,
+  db: D1Database, p: { userId: string; threadId: string; kind: 'consultation' | 'topup'; amountCents: number; currency: string }, taxFeePercent: number, inrPerUsd: number,
 ): Promise<{ code: string; feeCents: number } | null> {
   const u = await db.prepare('SELECT referred_by, referred_code FROM users WHERE id = ?').bind(p.userId)
     .first<{ referred_by: string | null; referred_code: string | null }>();
@@ -91,7 +91,8 @@ export async function onChatPayment(
   if (u.referred_code) {
     const inf = await db.prepare('SELECT percent FROM influencers WHERE code = ?').bind(u.referred_code).first<{ percent: number }>();
     if (!inf) return null;
-    const base = Math.round((p.amountCents * 100) / (100 + taxFeePercent));
+    const localBase = Math.round((p.amountCents * 100) / (100 + taxFeePercent));
+    const base = p.currency === 'inr' ? Math.round(localBase / inrPerUsd) : localBase;
     const fee = Math.round((base * inf.percent) / 100);
     if (p.kind === 'consultation') {
       const now = Date.now();

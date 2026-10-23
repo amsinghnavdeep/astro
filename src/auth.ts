@@ -1,6 +1,6 @@
 import type { D1Database } from '@cloudflare/workers-types';
 
-export interface User { id: string; email: string; name: string; free_used: number; created_at: string; account_type?: string; business_name?: string | null; tax_id?: string | null }
+export interface User { id: string; email: string; name: string; free_used: number; created_at: string; account_type?: string; currency?: 'usd' | 'inr' | null; business_name?: string | null; tax_id?: string | null }
 
 const LOGIN_TTL_MS = 15 * 60_000;
 const SESSION_TTL_MS = 30 * 86_400_000;
