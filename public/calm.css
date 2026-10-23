@@ -136,3 +136,10 @@ button.side-link {
 button.side-link:hover { background: var(--hover); border-color: var(--saf); }
 button.side-link:focus-visible { outline: 2px solid var(--saf); outline-offset: 2px; }
 #me-avatar { background: var(--chip-bg); color: var(--chip-fg); }
+@media (max-width: 640px) {
+  .plan-cards { grid-template-columns: 1fr; }
+  .plan-card { display: grid; grid-template-columns: 1fr auto; align-items: center; }
+  .plan-card-price { grid-column: 2; grid-row: 1; }
+  .plan-card-consults { grid-column: 1; }
+  .plan-card-fee { grid-column: 2; grid-row: 2; text-align: right; }
+}
