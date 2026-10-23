@@ -10,7 +10,7 @@ import { deleteKundli, getKundli, kundliInput, listKundlis, MAX_KUNDLIS, publicK
 import { LANGUAGES } from './languages.js';
 import { computeChart, computeSky, chartToChatContext } from './kundli/chart.js';
 import { createLoginToken, destroySession, redeemLoginToken, userForSession, type User } from './auth.js';
-import { escapeHtml, sendContactEmails, sendLoginEmail, sendPayoutRequestEmail, sendPayoutSentEmail } from './email.js';
+import { escapeHtml, sendContactEmails, sendLoginEmail, sendPayoutRequestEmail, sendPayoutSentEmail, sendSubscriptionTrialEndingEmail } from './email.js';
 import { cryptoProvider, stripe } from './stripe.js';
 import {
   apiBalance, authenticateApiKey, createApiKey, grantApiCredits, listApiKeys, listApiLedger,
@@ -45,6 +45,11 @@ import { blogIndexPage, blogPostPage, blogVersion, deletePost, getPost, getPubli
 import { layout } from './seo/layout.js';
 import { TOPICS, topicPage } from './seo/topics.js';
 import { creditBalance, creditLots, grantCredits, spendCredit } from './credits.js';
+import { checkPhoneVerification, startPhoneVerification, validPhone } from './phone.js';
+import {
+  createSubscriptionCheckout, ensurePlanProduct, markTrialIdentity, planFor, plansForPrices, spendSubscriptionConsultation,
+  stripeId, subscriptionForUser, subscriptionIdFromInvoice, syncSubscription, trialEligible, type PlanId,
+} from './subscriptions.js';
 import type { AppEnv } from './types.js';
 
 type C = Context<AppEnv>;
@@ -725,7 +730,229 @@ app.post('/api/logout', async (c) => {
   return c.json({ ok: true });
 });
 
-app.get('/api/plans', async (c) => c.json({ ...(await pricing(c.env.DB)), languages: LANGUAGES }));
+const subscriptionPlans = async (db: D1Database) => {
+  const prices = await getPrices(db);
+  return {
+    taxFeePercent: prices.taxFeePercent,
+    plans: plansForPrices(prices).map((plan) => ({
+      ...plan, allInCents: plan.cents + taxesAndFees(plan.cents, prices.taxFeePercent),
+    })),
+  };
+};
+
+app.get('/api/plans', async (c) => c.json({ ...(await pricing(c.env.DB)), ...(await subscriptionPlans(c.env.DB)), languages: LANGUAGES }));
+
+app.get('/api/subscription', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  const personal = user.account_type !== 'business';
+  const [state, phone, catalog] = await Promise.all([
+    subscriptionForUser(c.env.DB, user.id),
+    c.env.DB.prepare('SELECT phone_e164, phone_verified_at FROM users WHERE id = ?').bind(user.id)
+      .first<{ phone_e164: string | null; phone_verified_at: string | null }>(),
+    personal ? subscriptionPlans(c.env.DB) : Promise.resolve({ taxFeePercent: 0, plans: [] }),
+  ]);
+  const plan = state ? planFor(await getPrices(c.env.DB), state.plan) : null;
+  return c.json({
+    enabled: personal, phoneEnabled: env.phone.enabled, phoneVerified: !!phone?.phone_verified_at,
+    phone: phone?.phone_verified_at ? phone.phone_e164 : null,
+    trialDays: personal ? (await getPrices(c.env.DB)).trialDays : 0,
+    trialConsults: personal ? (await getPrices(c.env.DB)).trialConsults : 0,
+    trialEligible: personal ? await trialEligible(c.env.DB, user.id, await freeKeys(c)) : false,
+    plans: catalog.plans,
+    subscription: state ? {
+      plan: state.plan, planName: plan?.name ?? state.plan, status:
+        state.paused_until && Date.parse(state.paused_until) > Date.now() ? 'paused' : state.status,
+      priceCents: plan?.cents ?? 0,
+      allInCents: plan ? plan.cents + taxesAndFees(plan.cents, catalog.taxFeePercent) : 0,
+      consultations: plan?.consultations ?? 0, consultsLeft: state.consults_left,
+      trialEnd: state.trial_end, renewsAt: state.current_period_end,
+      pausedUntil: state.paused_until, cancelAtPeriodEnd: !!state.cancel_at_period_end,
+      pendingPlan: state.pending_plan,
+    } : null,
+  });
+});
+
+app.post('/api/phone/start', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  if (user.account_type === 'business') return c.json({ error: 'Subscriptions are not available for Business accounts.' }, 403);
+  if (!env.phone.enabled) return c.json({ enabled: false });
+  if (await limited(c, 'RL_AUTH', `phone:${user.id}`)) return tooMany(c);
+  const parsed = z.object({ phone: z.string().trim().max(16) }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success || !validPhone(parsed.data.phone)) return c.json({ error: 'Enter a valid phone number in international format.' }, 400);
+  const since = new Date(Date.now() - 60 * 60_000).toISOString();
+  const sends = await c.env.DB.prepare('SELECT COUNT(*) AS n FROM phone_otp_sends WHERE user_id = ? AND created_at > ?')
+    .bind(user.id, since).first<{ n: number }>();
+  if ((sends?.n ?? 0) >= 5) return c.json({ error: 'You have reached the verification limit. Try again later.' }, 429);
+  try {
+    await startPhoneVerification(parsed.data.phone);
+  } catch (err) {
+    console.error('Phone verification start failed:', err);
+    return c.json({ error: 'Could not send a verification code. Try again later.' }, 503);
+  }
+  await c.env.DB.prepare('INSERT INTO phone_otp_sends (id, user_id, created_at) VALUES (?, ?, ?)')
+    .bind(crypto.randomUUID(), user.id, new Date().toISOString()).run();
+  return c.json({ sent: true });
+});
+
+app.post('/api/phone/check', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  if (user.account_type === 'business') return c.json({ error: 'Subscriptions are not available for Business accounts.' }, 403);
+  if (!env.phone.enabled) return c.json({ enabled: false });
+  const parsed = z.object({ phone: z.string().trim().max(16), code: z.string().trim().min(4).max(10) }).strict()
+    .safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success || !validPhone(parsed.data.phone)) return c.json({ error: 'Enter the phone number and verification code.' }, 400);
+  let verified: { status?: string };
+  try {
+    verified = await checkPhoneVerification(parsed.data.phone, parsed.data.code);
+  } catch (err) {
+    console.error('Phone verification check failed:', err);
+    return c.json({ error: 'Could not verify the code. Try again.' }, 503);
+  }
+  if (verified.status !== 'approved') return c.json({ error: 'That verification code is not valid.' }, 400);
+  const owner = await c.env.DB.prepare('SELECT id FROM users WHERE phone_e164 = ? AND id != ?')
+    .bind(parsed.data.phone, user.id).first();
+  if (owner) return c.json({ error: 'That phone number is already linked to another account.' }, 409);
+  try {
+    await c.env.DB.prepare('UPDATE users SET phone_e164 = ?, phone_verified_at = ? WHERE id = ?')
+      .bind(parsed.data.phone, new Date().toISOString(), user.id).run();
+  } catch {
+    return c.json({ error: 'That phone number is already linked to another account.' }, 409);
+  }
+  return c.json({ verified: true });
+});
+
+app.post('/api/subscribe', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  if (user.account_type === 'business') return c.json({ error: 'Subscriptions are not available for Business accounts.' }, 403);
+  const parsed = z.object({ plan: z.enum(['basic', 'plus', 'pro']), threadId: z.string().min(1).optional(), agreed: z.literal(true) })
+    .strict().safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: 'Choose a plan and accept the subscription terms.' }, 400);
+  const existing = await subscriptionForUser(c.env.DB, user.id);
+  if (existing && ['active', 'trialing'].includes(existing.status)) return c.json({ error: 'You already have an active subscription.' }, 409);
+  const phone = env.phone.enabled
+    ? await c.env.DB.prepare('SELECT phone_verified_at FROM users WHERE id = ?').bind(user.id).first<{ phone_verified_at: string | null }>()
+    : null;
+  if (env.phone.enabled && !phone?.phone_verified_at) return c.json({ error: 'Verify your phone number before subscribing.' }, 400);
+  const prices = await getPrices(c.env.DB);
+  const plan = planFor(prices, parsed.data.plan);
+  if (!plan) return c.json({ error: 'That plan is unavailable.' }, 400);
+  const keys = await freeKeys(c);
+  const eligible = await trialEligible(c.env.DB, user.id, keys);
+  const trialEnd = new Date(Date.now() + prices.trialDays * 86_400_000).toISOString();
+  const url = await createSubscriptionCheckout(c.env.DB, user, {
+    plan, eligible, threadId: parsed.data.threadId, taxFeePercent: prices.taxFeePercent,
+    trialDays: prices.trialDays, trialEnd, trialKeys: keys,
+  }, { ip: c.req.header('cf-connecting-ip') ?? null, userAgent: (c.req.header('user-agent') ?? '').slice(0, 300) || null });
+  return c.json({ checkoutUrl: url });
+});
+
+const subscriptionOffer = async (db: D1Database, userId: string, offer: 'pause' | 'basic' | 'cancel', reason?: string, note?: string) =>
+  db.prepare('INSERT INTO subscription_cancellations (id, user_id, reason, note, offer_taken, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(crypto.randomUUID(), userId, reason ?? null, note ?? null, offer, new Date().toISOString()).run();
+
+app.post('/api/subscription/manage', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  if (user.account_type === 'business') return c.json({ error: 'Subscriptions are not available for Business accounts.' }, 403);
+  const parsed = z.object({
+    action: z.enum(['pause', 'basic', 'cancel']), reason: z.enum(['expensive', 'not_using', 'not_helpful', 'other']).optional(),
+    note: z.string().trim().max(500).optional(),
+  }).strict().safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: 'Choose an account action.' }, 400);
+  const state = await subscriptionForUser(c.env.DB, user.id);
+  if (!state || !['active', 'trialing', 'past_due'].includes(state.status)) return c.json({ error: 'No active subscription was found.' }, 409);
+  if (state.cancel_at_period_end) return c.json({ error: 'Your subscription is already set to end.' }, 409);
+  if (parsed.data.action !== 'cancel' && !['active', 'trialing'].includes(state.status)) {
+    return c.json({ error: 'This plan action is not available while payment is past due.' }, 409);
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (parsed.data.action === 'pause') {
+    const periodEnd = state.current_period_end ? Math.floor(Date.parse(state.current_period_end) / 1000) : now;
+    const resumeDate = new Date(Math.max(periodEnd, now) * 1000);
+    const day = resumeDate.getUTCDate();
+    resumeDate.setUTCDate(1);
+    resumeDate.setUTCMonth(resumeDate.getUTCMonth() + 1);
+    resumeDate.setUTCDate(Math.min(day, new Date(Date.UTC(resumeDate.getUTCFullYear(), resumeDate.getUTCMonth() + 1, 0)).getUTCDate()));
+    const updated = await stripe().subscriptions.update(state.stripe_subscription_id, {
+      pause_collection: { behavior: 'void', resumes_at: Math.floor(resumeDate.getTime() / 1000) },
+    });
+    await syncSubscription(c.env.DB, updated, user.id);
+    await subscriptionOffer(c.env.DB, user.id, 'pause', parsed.data.reason, parsed.data.note);
+    return c.json({ pausedUntil: resumeDate.toISOString() });
+  }
+  if (parsed.data.action === 'basic') {
+    if (state.plan === 'basic') return c.json({ error: 'You are already on Basic.' }, 409);
+    const prices = await getPrices(c.env.DB);
+    const plan = planFor(prices, 'basic')!;
+    const oldProduct = await ensurePlanProduct(c.env.DB, planFor(prices, state.plan)!);
+    const basicProduct = await ensurePlanProduct(c.env.DB, plan);
+    const subscription = await stripe().subscriptions.retrieve(state.stripe_subscription_id);
+    const items = subscription.items.data;
+    const planItem = items.find((item) => stripeId(item.price.product) === oldProduct);
+    const taxItem = items.find((item) => item.id !== planItem?.id);
+    if (!planItem || !taxItem) return c.json({ error: 'Could not update this subscription. Contact support.' }, 502);
+    const taxProduct = stripeId(taxItem.price.product);
+    if (!taxProduct) return c.json({ error: 'Could not update this subscription. Contact support.' }, 502);
+    const updated = await stripe().subscriptions.update(state.stripe_subscription_id, {
+      items: [
+        { id: planItem.id, price_data: { currency: env.stripe.currency, unit_amount: plan.cents, recurring: { interval: 'month' }, product: basicProduct } },
+        { id: taxItem.id, price_data: { currency: env.stripe.currency, unit_amount: taxesAndFees(plan.cents, prices.taxFeePercent), recurring: { interval: 'month' }, product: taxProduct } },
+      ],
+      proration_behavior: 'none',
+    });
+    await syncSubscription(c.env.DB, updated, user.id);
+    await c.env.DB.prepare('UPDATE subscriptions SET pending_plan = ? WHERE user_id = ?')
+      .bind('basic', user.id).run();
+    await subscriptionOffer(c.env.DB, user.id, 'basic', parsed.data.reason, parsed.data.note);
+    return c.json({ switchedTo: 'basic', renewsAt: state.current_period_end });
+  }
+  const updated = await stripe().subscriptions.update(state.stripe_subscription_id, { cancel_at_period_end: true });
+  await syncSubscription(c.env.DB, updated, user.id);
+  await subscriptionOffer(c.env.DB, user.id, 'cancel', parsed.data.reason, parsed.data.note);
+  return c.json({ canceledAt: state.current_period_end });
+});
+
+app.post('/api/subscription/resume', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  if (user.account_type === 'business') return c.json({ error: 'Subscriptions are not available for Business accounts.' }, 403);
+  const state = await subscriptionForUser(c.env.DB, user.id);
+  if (!state) return c.json({ error: 'No subscription was found.' }, 404);
+  const update: Stripe.SubscriptionUpdateParams = {};
+  if (state.cancel_at_period_end) update.cancel_at_period_end = false;
+  if (state.paused_until && Date.parse(state.paused_until) > Date.now()) update.pause_collection = null;
+  const updated = await stripe().subscriptions.update(state.stripe_subscription_id, update);
+  await syncSubscription(c.env.DB, updated, user.id);
+  return c.json({ ok: true });
+});
+
+app.post('/api/subscription/cancel', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
+  if (user.account_type === 'business') return c.json({ error: 'Subscriptions are not available for Business accounts.' }, 403);
+  const parsed = z.object({
+    reason: z.enum(['expensive', 'not_using', 'not_helpful', 'other']).optional(),
+    note: z.string().trim().max(500).optional(),
+  }).strict().safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: 'Invalid cancellation details.' }, 400);
+  const state = await subscriptionForUser(c.env.DB, user.id);
+  if (!state || !['active', 'trialing', 'past_due'].includes(state.status)) return c.json({ error: 'No active subscription was found.' }, 409);
+  if (state.cancel_at_period_end) return c.json({ error: 'Your subscription is already set to end.' }, 409);
+  const updated = await stripe().subscriptions.update(state.stripe_subscription_id, { cancel_at_period_end: true });
+  await syncSubscription(c.env.DB, updated, user.id);
+  await subscriptionOffer(c.env.DB, user.id, 'cancel', parsed.data.reason, parsed.data.note);
+  return c.json({ canceledAt: state.current_period_end });
+});
 
 app.get('/api/sky', async (c) => {
   const now = Date.now();
@@ -798,13 +1025,11 @@ app.delete('/api/kundlis/:id', async (c) => {
 app.post('/api/threads', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
-  const body = z.object({ kundliId: z.string().min(1), question: questionText(), language, agreed: z.boolean().optional() })
+  const body = z.object({
+    kundliId: z.string().min(1), question: questionText(), language, agreed: z.boolean().optional(), overage: z.boolean().optional(),
+  })
     .safeParse(await c.req.json().catch(() => null));
   if (!body.success) return c.json({ error: 'Choose or add a Kundli and write your question.' }, 400);
-  const keys = await freeKeys(c);
-  const blocked = !user.free_used && (await freeBlocked(c.env.DB, keys));
-  if ((user.free_used || blocked) && !body.data.agreed && (await chatCredits(c)) < 1)
-    return c.json(blocked ? FREE_BLOCKED : CONSENT_REQUIRED, 400);
   const db = c.env.DB;
   const pr = await chatPrices(db, user.id);
   const k = await getKundli(db, user.id, body.data.kundliId);
@@ -814,25 +1039,54 @@ app.post('/api/threads', async (c) => {
   const chart = await chartText(p.data);
   if (!chart) return c.json({ error: 'Could not calculate this Kundli. Check the date, time and birthplace.' }, 400);
 
-  const free = !blocked && user.account_type !== 'business' && (await claimFreeConsultation(db, user.id));
-  if (free) background(c, trackSafe(db, 'free_question'));
-  if (free) {
-    await recordFreeClaims(db, user.id, keys);
-    await grantFriendBonus(db, user);
-  }
-  const t = newThread(user.id, p.data, chart, p.data.question, free ? { is_free: 1, questions_allowed: pr.freeQuestions } : {});
+  const t = newThread(user.id, p.data, chart, p.data.question, {});
   await createThreadWithQuestion(db, t, p.data.question);
   t.kundli_id = k.id;
   await db.prepare('UPDATE threads SET kundli_id = ? WHERE id = ?').bind(k.id, t.id).run();
-  if (!free && (await spendCredit(db, 'chat', user.id, `first:${t.id}`, { threadId: t.id }))) {
+  let covered = false;
+  if (user.account_type !== 'business') {
+    if (await spendCredit(db, 'chat', user.id, `first:${t.id}`, { threadId: t.id })) {
+      t.questions_allowed = 1;
+      covered = true;
+    } else {
+      const sub = await subscriptionForUser(db, user.id);
+      if (sub && ['trialing', 'active'].includes(sub.status)) {
+        if (await spendSubscriptionConsultation(db, user.id, t.id)) {
+          t.questions_allowed = pr.chatPackQuestions;
+          covered = true;
+        } else if (!body.data.overage) {
+          const fresh = (await getThreadById(db, t.id))!;
+          const paused = sub.paused_until && Date.parse(sub.paused_until) > Date.now();
+          return c.json({
+            thread: await pubT(c, fresh), code: paused ? 'plan_paused' : 'plan_used_up',
+            ...(paused ? { pausedUntil: sub.paused_until } : {}),
+          });
+        }
+      } else if (!body.data.overage) {
+        const keys = await freeKeys(c);
+        const prices = await getPrices(db);
+        const catalog = await subscriptionPlans(db);
+        const eligible = await trialEligible(db, user.id, keys);
+        return c.json({
+          thread: await pubT(c, t), plansRequired: true, plans: catalog.plans,
+          trialEligible: eligible, trialDays: prices.trialDays, trialConsults: prices.trialConsults,
+        });
+      }
+    }
+  } else if (await spendCredit(db, 'chat', user.id, `first:${t.id}`, { threadId: t.id })) {
     await db.prepare('UPDATE threads SET questions_allowed = 1 WHERE id = ?').bind(t.id).run();
     t.questions_allowed = 1;
-  } else if (!free && !(await walletPay(db, user, t, 'consultation'))) {
+    covered = true;
+  }
+  if (!covered && !(await walletPay(db, user, t, 'consultation'))) {
     const url = await createCheckout(c, user, {
       kind: 'consultation', threadId: t.id, credits: pr.chatPackQuestions, cents: pr.chatPackCents,
       name: `Kaalera consultation for ${t.full_name}`, returnPath: `/?t=${t.id}`,
     });
     return c.json({ thread: await pubT(c, t), checkoutUrl: url });
+  }
+  if (t.questions_allowed > 0) {
+    await db.prepare('UPDATE threads SET questions_allowed = ? WHERE id = ?').bind(t.questions_allowed, t.id).run();
   }
   try {
     return c.json({ thread: await pubT(c, await startThreadSession(db, t)) });
@@ -998,6 +1252,134 @@ app.post('/api/threads/:id/messages', async (c) => {
   return c.json({ message: publicMessage(r.message!), autoCharged, thread: await pubT(c, (await getThreadById(c.env.DB, t.id))!) });
 });
 
+async function subscriptionPaymentMethod(db: D1Database, userId: string, subscription: Stripe.Subscription): Promise<string | null> {
+  const method = subscription.default_payment_method;
+  const pm = method && typeof method === 'object'
+    ? method : method ? await stripe().paymentMethods.retrieve(method) : null;
+  if (!pm) return null;
+  const customerId = stripeId(subscription.customer);
+  await db.prepare(
+    'UPDATE users SET stripe_pm_id = ?, card_last4 = ?, stripe_customer_id = COALESCE(stripe_customer_id, ?) WHERE id = ?',
+  ).bind(pm.id, pm.card?.last4 ?? null, customerId, userId).run();
+  return pm.card?.fingerprint ?? null;
+}
+
+async function claimTrialForSubscription(
+  db: D1Database, subscription: Stripe.Subscription, fingerprint: string | null,
+): Promise<Stripe.Subscription> {
+  if (subscription.status !== 'trialing') return subscription;
+  const userId = subscription.metadata?.userId;
+  if (!userId) return subscription;
+  const reservation = await db.prepare(
+    'INSERT INTO subscription_trial_claims (stripe_subscription_id, user_id, created_at) VALUES (?, ?, ?) ON CONFLICT(stripe_subscription_id) DO NOTHING',
+  ).bind(subscription.id, userId, new Date().toISOString()).run();
+  if (!(reservation.meta?.changes ?? 0)) return subscription;
+  const metadata = subscription.metadata ?? {};
+  const keys = {
+    devices: (metadata.trialDeviceKeys ?? '').split(',').filter(Boolean),
+    ip: metadata.trialIpKey || null,
+  };
+  const phone = await db.prepare('SELECT phone_e164 FROM users WHERE id = ? AND phone_verified_at IS NOT NULL')
+    .bind(userId).first<{ phone_e164: string | null }>();
+  const priorPhone = phone?.phone_e164
+    ? await db.prepare("SELECT user_id FROM trial_marks WHERE kind = 'phone' AND value = ?").bind(phone.phone_e164).first<{ user_id: string }>()
+    : null;
+  const priorCard = fingerprint
+    ? await db.prepare("SELECT user_id FROM trial_marks WHERE kind = 'card' AND value = ?").bind(fingerprint).first<{ user_id: string }>()
+    : null;
+  let repeated = await freeBlocked(db, keys) || !!(priorPhone && priorPhone.user_id !== userId)
+    || !!(priorCard && priorCard.user_id !== userId);
+  if (!repeated && fingerprint && !(await markTrialIdentity(db, 'card', fingerprint, userId))) repeated = true;
+  if (!repeated && phone?.phone_e164 && !(await markTrialIdentity(db, 'phone', phone.phone_e164, userId))) repeated = true;
+  if (repeated) {
+    try {
+      const ended = await stripe().subscriptions.update(subscription.id, { trial_end: 'now' });
+      await syncSubscription(db, ended, userId);
+      await db.prepare('UPDATE subscriptions SET consults_left = 0 WHERE stripe_subscription_id = ?').bind(subscription.id).run();
+      return ended;
+    } catch (err) {
+      await db.prepare('DELETE FROM subscription_trial_claims WHERE stripe_subscription_id = ?').bind(subscription.id).run();
+      throw err;
+    }
+  }
+  await recordFreeClaims(db, userId, keys);
+  return subscription;
+}
+
+async function startSubscriptionThread(db: D1Database, userId: string, threadId: string | null): Promise<void> {
+  if (!threadId) return;
+  const consumed = await spendSubscriptionConsultation(db, userId, threadId);
+  const prior = consumed || await db.prepare('SELECT 1 FROM subscription_usages WHERE thread_id = ? AND user_id = ?')
+    .bind(threadId, userId).first();
+  if (!prior) return;
+  const t = await getThreadById(db, threadId);
+  if (!t || t.user_id !== userId || t.status !== 'awaiting_payment') return;
+  const p = await chatPrices(db, userId);
+  await db.prepare('UPDATE threads SET questions_allowed = ? WHERE id = ? AND status = ?')
+    .bind(p.chatPackQuestions, threadId, 'awaiting_payment').run();
+  await startThreadSession(db, (await getThreadById(db, threadId))!);
+}
+
+async function completeSubscriptionCheckout(db: D1Database, session: Stripe.Checkout.Session): Promise<{ kind: string; threadId: string | null } | null> {
+  if (session.mode !== 'subscription' || session.metadata?.kind !== 'subscription' || !session.metadata.userId) return null;
+  const id = stripeId(session.subscription);
+  if (!id) return null;
+  const subscription = await stripe().subscriptions.retrieve(id, { expand: ['default_payment_method', 'latest_invoice'] });
+  const userId = await syncSubscription(db, subscription, session.metadata.userId);
+  if (!userId) return null;
+  const fingerprint = await subscriptionPaymentMethod(db, userId, subscription);
+  const current = await claimTrialForSubscription(db, subscription, fingerprint);
+  const latestInvoice = current.latest_invoice;
+  if (latestInvoice && typeof latestInvoice === 'object' && latestInvoice.status === 'paid')
+    await applySubscriptionInvoice(db, latestInvoice);
+  await startSubscriptionThread(db, userId, session.metadata.threadId || null);
+  return { kind: 'subscription', threadId: session.metadata.threadId || null };
+}
+
+async function applySubscriptionInvoice(db: D1Database, invoice: Stripe.Invoice): Promise<void> {
+  const id = subscriptionIdFromInvoice(invoice);
+  if (!id) return;
+  const subscription = await stripe().subscriptions.retrieve(id);
+  const userId = await syncSubscription(db, subscription);
+  if (!userId) return;
+  const current = await subscriptionForUser(db, userId);
+  if (!current || current.stripe_subscription_id !== id) return;
+  const marker = await db.prepare(
+    'INSERT INTO subscription_invoices (stripe_invoice_id, user_id, created_at) VALUES (?, ?, ?) ON CONFLICT(stripe_invoice_id) DO NOTHING',
+  ).bind(invoice.id, userId, new Date().toISOString()).run();
+  if (!(marker.meta?.changes ?? 0)) return;
+  const prices = await getPrices(db);
+  const appliesPendingPlan = invoice.amount_paid > 0 && invoice.billing_reason === 'subscription_cycle' && !!current.pending_plan;
+  const planId = appliesPendingPlan ? current.pending_plan! : current.plan;
+  const plan = planFor(prices, planId);
+  if (!plan) return;
+  let allowance: number | null = null;
+  if (invoice.amount_paid === 0 && invoice.billing_reason === 'subscription_create') allowance = prices.trialConsults;
+  else if (invoice.amount_paid > 0) allowance = plan.consultations;
+  await db.prepare(
+    `UPDATE subscriptions SET plan = CASE WHEN ? THEN ? ELSE plan END,
+      pending_plan = CASE WHEN ? THEN NULL ELSE pending_plan END,
+      consults_left = COALESCE(?, consults_left), last_invoice_id = ?, updated_at = ?
+     WHERE stripe_subscription_id = ?`,
+  ).bind(appliesPendingPlan ? 1 : 0, planId, appliesPendingPlan ? 1 : 0, allowance,
+    invoice.id, new Date().toISOString(), id).run();
+  if (appliesPendingPlan) {
+    await stripe().subscriptions.update(id, { metadata: { plan: planId, pendingPlan: '' } });
+  }
+  if (invoice.amount_paid > 0) {
+    await db.prepare(
+      `INSERT INTO payments (stripe_session_id, user_id, thread_id, kind, amount_cents, currency, created_at, auto)
+       VALUES (?, ?, NULL, 'subscription', ?, ?, ?, 0) ON CONFLICT(stripe_session_id) DO NOTHING`,
+    ).bind(invoice.id, userId, invoice.amount_paid, invoice.currency, new Date().toISOString()).run();
+    await sendReceipt(db, userId, {
+      item: `Kaalera ${plan.name} monthly subscription`, totalCents: invoice.amount_paid,
+      baseCents: plan.cents, auto: false, ref: invoice.id,
+    });
+    await trackPayment(db, userId);
+  }
+  await startSubscriptionThread(db, userId, subscription.metadata?.threadId || null);
+}
+
 app.get('/api/checkout/confirm', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
@@ -1005,7 +1387,9 @@ app.get('/api/checkout/confirm', async (c) => {
   if (!id.startsWith('cs_')) return c.json({ error: 'Bad session' }, 400);
   const s = await stripe().checkout.sessions.retrieve(id);
   if (s.metadata?.userId !== user.id) return c.json({ error: 'Not found' }, 404);
-  const r = await fulfill(c.env.DB, s);
+  const sub = await completeSubscriptionCheckout(c.env.DB, s);
+  const r = sub ?? await fulfill(c.env.DB, s);
+  if (sub) return c.json({ paid: true, kind: sub.kind, threadId: sub.threadId });
   return c.json({ paid: s.payment_status === 'paid', kind: r?.kind ?? s.metadata?.kind, threadId: r?.threadId ?? null });
 });
 
@@ -1018,8 +1402,52 @@ app.post('/api/stripe/webhook', async (c) => {
   } catch {
     return c.text('Invalid signature', 400);
   }
-  if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
-    await fulfill(c.env.DB, event.data.object as Stripe.Checkout.Session);
+  try {
+    if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.mode === 'subscription') await completeSubscriptionCheckout(c.env.DB, session);
+      else await fulfill(c.env.DB, session);
+    } else if (event.type === 'invoice.paid') {
+      await applySubscriptionInvoice(c.env.DB, event.data.object as Stripe.Invoice);
+    } else if (event.type === 'invoice.payment_failed') {
+      const invoice = event.data.object as Stripe.Invoice;
+      const id = subscriptionIdFromInvoice(invoice);
+      if (id) {
+        const subscription = await stripe().subscriptions.retrieve(id);
+        const userId = await syncSubscription(c.env.DB, subscription);
+        if (userId) await c.env.DB.prepare("UPDATE subscriptions SET status = 'past_due', consults_left = 0, updated_at = ? WHERE stripe_subscription_id = ?")
+          .bind(new Date().toISOString(), id).run();
+      }
+    } else if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+      const subscription = event.data.object as Stripe.Subscription;
+      const userId = await syncSubscription(c.env.DB, subscription);
+      if (userId && event.type === 'customer.subscription.deleted')
+        await c.env.DB.prepare("UPDATE subscriptions SET status = 'canceled', consults_left = 0, updated_at = ? WHERE stripe_subscription_id = ?")
+          .bind(new Date().toISOString(), subscription.id).run();
+    } else if (event.type === 'customer.subscription.trial_will_end') {
+      const subscription = event.data.object as Stripe.Subscription;
+      const userId = await syncSubscription(c.env.DB, subscription);
+      const emailSent = await c.env.DB.prepare('SELECT 1 FROM subscription_trial_emails WHERE stripe_subscription_id = ?')
+        .bind(subscription.id).first();
+      if (userId && !emailSent) {
+        const state = await subscriptionForUser(c.env.DB, userId);
+        const prices = await getPrices(c.env.DB);
+        const plan = state ? planFor(prices, state.plan) : null;
+        const account = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string }>();
+        if (plan && account) {
+          await sendSubscriptionTrialEndingEmail({
+            to: account.email, plan: plan.name, monthlyCents: plan.cents + taxesAndFees(plan.cents, prices.taxFeePercent),
+            trialEnd: state?.trial_end ?? new Date((subscription.trial_end ?? 0) * 1000).toISOString(),
+            manageUrl: `${env.siteUrl}/?app=1&account=1`,
+          });
+          await c.env.DB.prepare('INSERT INTO subscription_trial_emails (stripe_subscription_id, user_id, created_at) VALUES (?, ?, ?)')
+            .bind(subscription.id, userId, new Date().toISOString()).run();
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Stripe subscription webhook failed:', event.type, err);
+    return c.text('Webhook processing failed', 500);
   }
   return c.json({ received: true });
 });

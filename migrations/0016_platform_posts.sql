@@ -20,7 +20,7 @@ Before the first answer, Kaal shows your **exact Kundli card**: ascendant with d
 Kaal answers in English by default, and in the language you choose.
 
 ## Price
-Your first question is free. After that, a consultation is **$11.50** and each extra question **$8.05**, taxes & fees included. No subscription.
+Personal plans include 7 days free and 2 consultations. Extra consultations are available at pay-per-use prices.
 
 [Ask Kaal now](/)', 'published', '2026-10-13T12:00:00.000Z', '2026-10-13T12:00:00.000Z', '2026-10-13T12:00:00.000Z') ON CONFLICT(slug) DO NOTHING;
 INSERT INTO blog_posts (id, slug, title, summary, cover_url, body, status, created_at, updated_at, published_at) VALUES ('8d05eda0-c2ab-54af-ae93-eaf0256b4253', 'how-kaal-reads-your-kundli', 'How Kaal reads your Kundli, step by step', 'From your birth details to dated predictions: the exact Kundli, the dasha periods, the transits ahead and the past events Kaal checks first.', NULL, 'Here is what happens between your question and Kaal''s answer.
@@ -43,7 +43,7 @@ You get **dated predictions**, the main **issue**, and one or two **remedies**, 
 ## What Kaal will not do
 Kaal does not predict death or guarantee events. For health, legal or money decisions, astrology complements professional advice; it does not replace it.
 
-[Get your free first answer](/)', 'published', '2026-10-13T12:01:00.000Z', '2026-10-13T12:01:00.000Z', '2026-10-13T12:01:00.000Z') ON CONFLICT(slug) DO NOTHING;
+[See Personal plans](/)', 'published', '2026-10-13T12:01:00.000Z', '2026-10-13T12:01:00.000Z', '2026-10-13T12:01:00.000Z') ON CONFLICT(slug) DO NOTHING;
 INSERT INTO blog_posts (id, slug, title, summary, cover_url, body, status, created_at, updated_at, published_at) VALUES ('1c0c36d4-f9b8-5489-8a3a-016a9838c069', 'kaalera-api-pricing', 'Kaalera API: what you get and what it costs', 'Add Kaal''s AI Vedic astrology to your app. What the API returns, Business & API pricing 10% below the website, and how the prepaid USD wallet works.', NULL, 'The **Kaalera API** lets businesses and developers add Kaal, our AI Vedic astrologer, to their own app, website or chatbot.
 
 ## What you get

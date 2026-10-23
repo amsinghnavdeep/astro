@@ -22,6 +22,12 @@ export const autoNote = (area: 'chat' | 'api', p: AutoPrices): string => {
 export const disclaimer = (area: 'chat' | 'api', p: AutoPrices): string =>
   `${BASE} ${area === 'chat' ? 'Chat questions expire 3 months after purchase.' : 'API wallet balance expires 6 months after purchase.'} ${autoNote(area, p)}`;
 
+export const subscriptionDisclaimer = (o: { trial: boolean; trialEnd: string; monthlyCents: number; taxFeePercent: number }): string => {
+  const monthly = usd(withFee(o.monthlyCents, o.taxFeePercent));
+  const trial = o.trial ? ` Your 7-day free trial ends on ${o.trialEnd}; your card will be charged ${monthly} monthly after the trial.` : ` You will be charged ${monthly} monthly starting today.`;
+  return `${BASE} ${trial} Your consultation allowance resets each paid billing cycle. You can cancel anytime from your account.`;
+};
+
 /** Shown on the card payment page above the Pay button. */
 export const checkoutNote = (area: 'chat' | 'api', p: AutoPrices): string => [
   'Guidance only, not professional advice.',

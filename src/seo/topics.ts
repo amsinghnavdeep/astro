@@ -34,9 +34,9 @@ export const TOPICS: Topic[] = [
 2. Time of birth — as exact as possible (see [why birth time matters](/blog/why-exact-birth-time-matters)).
 3. Place of birth.
 
-Your first question is free.`,
+Personal plans include 7 days free, 2 consultations, and cancellation anytime.`,
     faqs: [
-      ['Is the Kundli really free?', 'Yes. Creating and saving a Kundli is free, and your first question to Kaal is free. More questions are sold in small packs.'],
+      ['Is there a free trial?', 'Personal plans include 7 days free and 2 consultations. A payment card is required to start, and you can cancel anytime.'],
       ['What if I do not know my exact birth time?', 'Give the closest time you know. The Moon sign and most planet signs stay the same, but the ascendant and houses can change, so time-sensitive predictions become less precise.'],
       ['Which system does Kaalera use?', 'Sidereal astrology with Lahiri ayanamsa, whole-sign houses and the Vimshottari dasha system.'],
     ],
@@ -138,7 +138,7 @@ Ask Kaal whether you are Manglik, whether it is cancelled, and one or two remedi
     title: 'AI Astrologer — Ask an Astrologer Online, Astrology Chat | Kaalera',
     h1: 'Ask Kaal, the AI astrologer',
     kicker: 'AI astrology chat',
-    description: 'Chat with Kaal, an AI astrologer, about career, marriage, health or money. Dated, to-the-point predictions with simple remedies. First question free.',
+    description: 'Chat with Kaal, an AI astrologer, about career, marriage, health or money. Dated, to-the-point predictions with simple remedies. Personal plans include 7 days free, 2 consultations, and cancellation anytime.',
     body: `**Kaal** is Kaalera's AI astrologer. You add your birth details once, then chat like you would with an astrologer online — but answers come in minutes, any time of day, in your language.
 
 ## How it works
@@ -150,7 +150,7 @@ Ask Kaal whether you are Manglik, whether it is cancelled, and one or two remedi
 - **Dated answers** instead of vague statements.
 - **Short and clear** — no long lectures.
 - **Private** — your chats are only visible to you.
-- Your **first question is free**, then small packs of questions.
+- Personal plans include **7 days free and 2 consultations**; cancel anytime.
 
 Kaal does not give political or religious debate, and is not a substitute for medical, legal or financial advice.`,
     faqs: [
@@ -254,7 +254,7 @@ export function topicPage(site: string, t: Topic, published: Post[]): string {
     <p class="w-kicker">${esc(t.kicker)}</p>
     <h1>${esc(t.h1)}</h1>
     <p class="w-lead">${esc(t.description)}</p>
-    <a class="w-cta big" href="${esc(t.cta?.[0] ?? '/?ask=1')}">${esc(t.cta?.[1] ?? 'Ask Kaal — first question free')}</a>
+    <a class="w-cta big" href="${esc(t.cta?.[0] ?? '/?ask=1')}">${esc(t.cta?.[1] ?? 'See plans — 7 days free')}</a>
   </div>
   <div class="b-hero-media">${coverArt(t.slug)}</div>
 </section>

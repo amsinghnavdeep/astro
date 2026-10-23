@@ -8,6 +8,14 @@ export interface Prices {
   extraQuestionCents: number;
   chatPackQuestions: number;
   freeQuestions: number;
+  planBasicCents: number;
+  planBasicConsults: number;
+  planPlusCents: number;
+  planPlusConsults: number;
+  planProCents: number;
+  planProConsults: number;
+  trialDays: number;
+  trialConsults: number;
   apiCreditCents: number;
   apiMinRechargeCents: number;
   taxFeePercent: number;
@@ -20,6 +28,14 @@ export const PRICE_LIMITS: Record<PriceKey, [number, number]> = {
   extraQuestionCents: [100, 100_000],
   chatPackQuestions: [1, 20],
   freeQuestions: [0, 5],
+  planBasicCents: [500, 100_000],
+  planBasicConsults: [1, 100],
+  planPlusCents: [500, 100_000],
+  planPlusConsults: [1, 100],
+  planProCents: [500, 100_000],
+  planProConsults: [1, 100],
+  trialDays: [1, 30],
+  trialConsults: [1, 10],
   apiCreditCents: [100, 100_000],
   apiMinRechargeCents: [0, 1_000_000],
   taxFeePercent: [0, 50],
@@ -30,6 +46,14 @@ const DB_KEY: Record<PriceKey, string> = {
   extraQuestionCents: 'extra_question_cents',
   chatPackQuestions: 'chat_pack_questions',
   freeQuestions: 'free_questions',
+  planBasicCents: 'plan_basic_cents',
+  planBasicConsults: 'plan_basic_consults',
+  planPlusCents: 'plan_plus_cents',
+  planPlusConsults: 'plan_plus_consults',
+  planProCents: 'plan_pro_cents',
+  planProConsults: 'plan_pro_consults',
+  trialDays: 'trial_days',
+  trialConsults: 'trial_consults',
   apiCreditCents: 'api_credit_cents',
   apiMinRechargeCents: 'api_min_recharge_cents',
   taxFeePercent: 'tax_fee_percent',
@@ -52,6 +76,14 @@ const defaults = (): Prices => ({
   extraQuestionCents: 700,
   chatPackQuestions: 1,
   freeQuestions: env.chat.freeQuestions,
+  planBasicCents: 2900,
+  planBasicConsults: 5,
+  planPlusCents: 4900,
+  planPlusConsults: 10,
+  planProCents: 8900,
+  planProConsults: 25,
+  trialDays: 7,
+  trialConsults: 2,
   apiCreditCents: 500,
   apiMinRechargeCents: 10000,
   taxFeePercent: TAX_FEE_PERCENT_DEFAULT,

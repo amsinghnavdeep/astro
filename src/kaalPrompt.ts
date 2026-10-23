@@ -5,7 +5,7 @@ import { DEFAULT_KAAL_PROMPTS, type KaalPrompts } from './devin.js';
 export type KaalKey = keyof KaalPrompts;
 export const KAAL_FIELDS: { key: KaalKey; label: string; help: string }[] = [
   { key: 'style', label: 'How Kaal answers', help: 'Every answer: empathy, Answer, Why, Predictions, Issue, Remedy, length, Ask me next.' },
-  { key: 'freeHook', label: 'Free first reading extras', help: 'Added only to the free first answer: From your past, Kaal sees more.' },
+  { key: 'freeHook', label: 'Trial consultation extras', help: 'Added only to a trial consultation: From your past, Kaal sees more.' },
   { key: 'opening', label: 'First message greeting', help: 'How Kaal opens a new consultation.' },
 ];
 export const KAAL_MIN_CHARS = 20;

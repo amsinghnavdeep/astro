@@ -150,7 +150,7 @@ Ready? [Make your free Kundli](/kundli)."""),
 3. Kaal works through your Kundli, dashas and the live sky, then replies.
 
 ## Pricing
-Your first question is free. After that you buy small packs of questions. All prices are in USD.
+Personal plans include 7 days free and 2 consultations. Extra consultations are available at pay-per-use prices.
 
 ## What Kaal will not do
 No political or religious debate, and no medical, legal or financial advice — astrology is guidance, not a guarantee.

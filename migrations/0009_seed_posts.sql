@@ -136,7 +136,7 @@ INSERT INTO blog_posts (id, slug, title, summary, cover_url, body, status, creat
 3. Kaal works through your Kundli, dashas and the live sky, then replies.
 
 ## Pricing
-Your first question is free. After that you buy small packs of questions. All prices are in USD.
+Personal plans include 7 days free and 2 consultations. Extra consultations are available at pay-per-use prices.
 
 ## What Kaal will not do
 No political or religious debate, and no medical, legal or financial advice — astrology is guidance, not a guarantee.
@@ -204,7 +204,7 @@ INSERT INTO blog_posts (id, slug, title, summary, cover_url, body, status, creat
 ## The honest bottom line
 Astrology is guidance, not a guarantee, whoever reads it. Many people use an AI astrologer for quick, specific questions and a human astrologer for big ceremonies.
 
-Try it yourself: [ask Kaal](/ai-astrologer) — your first question is free.', 'published', '2026-10-06T09:00:00.000Z', '2026-10-06T09:00:00.000Z', '2026-10-06T09:00:00.000Z') ON CONFLICT(slug) DO NOTHING;
+Try it yourself: [ask Kaal](/ai-astrologer) — Personal plans include 7 days free and 2 consultations.', 'published', '2026-10-06T09:00:00.000Z', '2026-10-06T09:00:00.000Z', '2026-10-06T09:00:00.000Z') ON CONFLICT(slug) DO NOTHING;
 INSERT INTO blog_posts (id, slug, title, summary, cover_url, body, status, created_at, updated_at, published_at) VALUES ('4693a930-e4d8-5842-8fa1-594adcfa42ba', 'how-accurate-is-ai-astrology', 'How accurate is AI astrology? An honest answer', 'What AI astrology gets right, where its limits are, and how to judge any astrologer’s accuracy for yourself.', NULL, 'People ask us this a lot, so here is a straight answer.
 
 ## What is exact
@@ -248,7 +248,7 @@ INSERT INTO blog_posts (id, slug, title, summary, cover_url, body, status, creat
 - Give a time frame: “in the next 12 months”.
 - Follow up on the window that matters most.
 
-[Ask Kaal your first question free](/ai-astrologer).', 'published', '2026-10-08T09:00:00.000Z', '2026-10-08T09:00:00.000Z', '2026-10-08T09:00:00.000Z') ON CONFLICT(slug) DO NOTHING;
+[See Personal plans](/ai-astrologer).', 'published', '2026-10-08T09:00:00.000Z', '2026-10-08T09:00:00.000Z', '2026-10-08T09:00:00.000Z') ON CONFLICT(slug) DO NOTHING;
 INSERT INTO blog_posts (id, slug, title, summary, cover_url, body, status, created_at, updated_at, published_at) VALUES ('199ff92c-b263-583a-b105-97ddca73bd55', 'add-horoscope-chatbot-to-your-app', 'Add a horoscope chatbot to your website or app', 'How to add a personalised astrology chatbot to your product with the Kaalera API, and why it beats generic daily horoscopes.', NULL, 'Daily sun-sign horoscopes are the same for millions of people. A **personal astrology chatbot** answers each user from their own birth details — that is what keeps them coming back.
 
 ## What you get with Kaalera

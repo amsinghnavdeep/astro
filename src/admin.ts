@@ -29,6 +29,9 @@ admin.get('/funnel', async (c) => {
 const int = (k: keyof Prices) => z.number().int().min(PRICE_LIMITS[k][0]).max(PRICE_LIMITS[k][1]);
 export const pricesSchema = z.object({
   chatPackCents: int('chatPackCents'), extraQuestionCents: int('extraQuestionCents'), chatPackQuestions: int('chatPackQuestions'), freeQuestions: int('freeQuestions'),
+  planBasicCents: int('planBasicCents'), planBasicConsults: int('planBasicConsults'), planPlusCents: int('planPlusCents'),
+  planPlusConsults: int('planPlusConsults'), planProCents: int('planProCents'), planProConsults: int('planProConsults'),
+  trialDays: int('trialDays'), trialConsults: int('trialConsults'),
   apiCreditCents: int('apiCreditCents'), apiMinRechargeCents: int('apiMinRechargeCents'), taxFeePercent: int('taxFeePercent'), quickWords: int('quickWords'),
 }).partial().strict();
 

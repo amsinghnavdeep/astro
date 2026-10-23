@@ -101,6 +101,6 @@ ${main}
 export const ctaBlock = (heading = 'Ask Kaal about your own future') => `
 <aside class="w-ctabox">
   <h2>${esc(heading)}</h2>
-  <p>Enter your birth date, time and place. Kaal reads your Kundli and gives dated predictions with remedies. Your first question is free.</p>
-  <a class="w-cta big" href="/">Ask Kaal free</a>
+  <p>Enter your birth date, time and place. Kaal reads your Kundli and gives dated predictions with remedies. Personal plans include 7 days free, 2 consultations, and cancellation anytime.</p>
+  <a class="w-cta big" href="/">See plans</a>
 </aside>`;

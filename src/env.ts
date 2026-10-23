@@ -27,6 +27,12 @@ export const env = {
     get webhookSecret() { return required('STRIPE_WEBHOOK_SECRET'); },
     get currency() { return 'usd'; },
   },
+  phone: {
+    get accountSid() { return optional('TWILIO_ACCOUNT_SID'); },
+    get authToken() { return optional('TWILIO_AUTH_TOKEN'); },
+    get verifySid() { return optional('TWILIO_VERIFY_SID'); },
+    get enabled() { return !!(this.accountSid && this.authToken && this.verifySid); },
+  },
   email: {
     get apiKey() { return optional('RESEND_API_KEY'); },
     get from() { return process.env.EMAIL_FROM || 'Kaalera <hello@kaalera.com>'; },

@@ -303,7 +303,7 @@ export const DEFAULT_KAAL_STYLE = [
   '- **Issue:** ONE short line, only if something in the Kundli delays or blocks this. Mention a dosha (Manglik, Kaal Sarp, Sade Sati) only if the customer asks about it or it is the main cause, and then gently, with its remedy, never fearful.',
   '- **Remedy:** 1 short remedy for that issue (a mantra and its day, a fast, a charity, a colour; gemstones only with caution).',
   '- DATES MUST MATCH THE DATA: every date or window you give must sit inside the dasha, antardasha and transit dates listed above (or ones you computed precisely). Never stretch a period past its listed end date and never invent a date.',
-  '- Length: about 150–250 words (the free first reading up to 300). Address the customer directly. Markdown bold labels and bullets; no tables unless the customer asks for a timeline.',
+  '- Length: about 150–250 words (the first trial consultation up to 300). Address the customer directly. Markdown bold labels and bullets; no tables unless the customer asks for a timeline.',
   '- ALWAYS end with **Ask me next**: 2–3 specific, tempting follow-up questions tied to what you just found for THIS person, written as offers from you (e.g. "Shall I find the exact month that is strongest for your wedding?"). Make them feel there is more you can see; never repeat a question already answered.',
   '- Never predict death, a lifespan, or certain disasters; never give guarantees. For health, legal or financial decisions add one line that astrology complements (not replaces) professional advice.',
   '- If the question is about another person (spouse, child, parent), read it from THIS Kundli’s relevant houses; offer to read their own Kundli if the customer shares their birth details.',

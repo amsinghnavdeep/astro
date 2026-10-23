@@ -22,7 +22,7 @@ Before the first answer, Kaal shows your **exact Kundli card**: ascendant with d
 Kaal answers in English by default, and in the language you choose.
 
 ## Price
-Your first question is free. After that, a consultation is **$11.50** and each extra question **$8.05**, taxes & fees included. No subscription.
+Personal plans include 7 days free and 2 consultations. Extra consultations are available at pay-per-use prices.
 
 [Ask Kaal now](/)"""),
 ("how-kaal-reads-your-kundli", "How Kaal reads your Kundli, step by step",
@@ -47,7 +47,7 @@ You get **dated predictions**, the main **issue**, and one or two **remedies**, 
 ## What Kaal will not do
 Kaal does not predict death or guarantee events. For health, legal or money decisions, astrology complements professional advice; it does not replace it.
 
-[Get your free first answer](/)"""),
+[See Personal plans](/)"""),
 ("kaalera-api-pricing", "Kaalera API: what you get and what it costs",
  "Add Kaal's AI astrology to your app. What the API returns, Business & API pricing 10% below the website, and how the prepaid USD wallet works.",
 """The **Kaalera API** lets businesses and developers add Kaal, our AI astrologer, to their own app, website or chatbot.

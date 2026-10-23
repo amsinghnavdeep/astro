@@ -41,7 +41,7 @@
         <form id="l-form" class="composer l-composer">
           <textarea id="l-input" rows="3" maxlength="600" placeholder="e.g. When will I get a better job?" required></textarea>
           <div class="composer-bar">
-            <span class="tiny muted">Your first question is free</span>
+            <span class="tiny muted">7 days free · 2 consultations · cancel anytime</span>
             <button class="send" type="submit" title="Ask" aria-label="Ask">
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
@@ -52,7 +52,7 @@
           <button type="button" class="chip l-chip">When will I get married?</button>
           <button type="button" class="chip l-chip">Why was last year so hard?</button>
         </div>
-        <div class="l-trust tiny muted"><span>✓ First question free</span><span>✓ No subscription</span><span>✓ Answers in your language</span></div>
+        <div class="l-trust tiny muted"><span>7 days free · 2 consultations · cancel anytime</span><span>✓ Answers in your language</span></div>
       </div>
       <aside id="agent" class="agent" aria-label="Kaal at work (demo run)">
         <div class="agent-head">
@@ -90,17 +90,18 @@
 
     <section id="pricing" class="l-section">
       <h2>Pricing</h2>
-      <p class="muted">No subscription. Pay only for the questions you ask.</p>
-      <p class="buy-note">Guidance only, not professional advice. All sales are final — no refunds. Chat questions expire 3 months after purchase.</p>
+      <p class="muted" id="pricing-subtitle">Choose a monthly plan or pay for a consultation only.</p>
+      <p class="buy-note">7 days free · 2 consultations · cancel anytime</p>
       <div class="l-grid" id="l-prices"></div>
+      <p class="muted">Extra consultations at pay-per-use prices.</p>
     </section>
 
     <section id="faq" class="l-section">
       <h2>Questions</h2>
       <div class="faq">
         <details><summary>What do I need to start?</summary><p class="muted">Your name, date, time and place of birth. You can save Kundlis for family members too.</p></details>
-        <details><summary>Is the first question really free?</summary><p class="muted">Yes. Every new account gets one free consultation with an opening reading.</p></details>
-        <details><summary>How long do bought questions last?</summary><p class="muted">Chat questions can be used for 3 months after purchase. Each consultation stays open for 7 days.</p></details>
+        <details><summary>Is there a free trial?</summary><p class="muted">Personal plans include a 7-day free trial with 2 consultations. A payment card is required to start, and trial eligibility rules apply.</p></details>
+        <details><summary>How long do consultations last?</summary><p class="muted">Plan consultations reset each monthly billing cycle. Pay-per-use credits expire 3 months after purchase, and each consultation stays open for 7 days.</p></details>
         <details><summary>Can I get a refund?</summary><p class="muted">All sales are final. Readings are astrological guidance, not professional advice.</p></details>
       </div>
     </section>
@@ -169,7 +170,7 @@
       <label>Email<input name="email" type="email" placeholder="you@example.com" required autocomplete="email" /></label>
       <fieldset class="acct-type">
         <legend>Are you a business?</legend>
-        <label class="check"><input name="acct" type="radio" value="personal" checked /> No, personal: first question free</label>
+        <label class="check"><input name="acct" type="radio" value="personal" checked /> No, personal: start with a 7-day free trial</label>
         <label class="check"><input name="acct" type="radio" value="business" /> Yes, business (pandit, astrologer, company)</label>
         <p class="notice" id="acct-biz-note" hidden>Business accounts start with a <strong>$100</strong> payment ($115 with taxes &amp; fees) into your Business wallet. The wallet pays for chat at 10% lower prices and for the API. No free question for Business.</p>
       </fieldset>
@@ -184,6 +185,67 @@
       <p class="muted">We sent a sign-in link to <strong id="sent-email"></strong>. Open it on this device to continue.</p>
       <p class="notice" id="dev-link-box" hidden>Dev mode: <a id="dev-link" href="#">open sign-in link</a></p>
       <button class="btn wide" type="button" id="login-again">Use a different email</button>
+    </div>
+  </dialog>
+
+  <dialog id="subscription-modal" class="modal wide-modal subscription-modal">
+    <div class="modal-body">
+      <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
+      <section id="subscription-choose">
+        <h2>Choose a monthly plan</h2>
+        <p class="muted" id="subscription-trial-badge" hidden></p>
+        <div class="plan-cards" id="subscription-cards"></div>
+        <div id="subscription-phone" class="phone-step" hidden>
+          <h3>Verify your phone</h3>
+          <p class="muted">Phone verification is required to start a plan.</p>
+          <label>Phone number<input id="subscription-phone-input" type="tel" autocomplete="tel" placeholder="+14155550123" /></label>
+          <button class="btn" type="button" id="subscription-phone-send">Send code</button>
+          <div id="subscription-code-row" hidden>
+            <label>Verification code<input id="subscription-phone-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" /></label>
+            <button class="btn" type="button" id="subscription-phone-check">Verify code</button>
+          </div>
+          <p class="error" id="subscription-phone-error"></p>
+        </div>
+        <label class="check subscription-consent"><input id="subscription-agreed" type="checkbox" />
+          <span id="subscription-consent-copy">I agree to the Terms and authorize the monthly plan charge. Cancel anytime from my account.</span>
+        </label>
+        <p class="error" id="subscription-error"></p>
+        <button class="btn primary wide" type="button" id="subscription-submit">Subscribe</button>
+        <button class="text-link" type="button" id="subscription-pay-only" hidden>Pay for this consultation only</button>
+      </section>
+      <section id="subscription-manage" hidden>
+        <h2>Manage your plan</h2>
+        <p id="subscription-manage-summary"></p>
+        <p id="subscription-manage-date" class="muted"></p>
+        <p class="notice">Your Kundlis and past consultations stay in your account.</p>
+        <fieldset class="cancel-reasons">
+          <legend>Optional: tell us why you are changing your plan</legend>
+          <label class="check"><input type="radio" name="cancel-reason" value="expensive" /> Too expensive</label>
+          <label class="check"><input type="radio" name="cancel-reason" value="not_using" /> Not using it</label>
+          <label class="check"><input type="radio" name="cancel-reason" value="not_helpful" /> Answers not helpful</label>
+          <label class="check"><input type="radio" name="cancel-reason" value="other" /> Other</label>
+          <input id="cancel-note" maxlength="500" placeholder="Optional note" hidden />
+        </fieldset>
+        <div class="manage-offers">
+          <button class="btn" type="button" id="subscription-pause">Pause for 1 month</button>
+          <button class="btn" type="button" id="subscription-basic">Switch to Basic</button>
+          <button class="btn" type="button" id="subscription-resume" hidden>Resume now</button>
+        </div>
+        <p class="error" id="subscription-manage-error"></p>
+        <button class="btn ghost wide" type="button" id="subscription-cancel">Cancel subscription</button>
+      </section>
+    </div>
+  </dialog>
+
+  <dialog id="plan-used-up-modal" class="modal">
+    <div class="modal-body">
+      <button class="icon-btn modal-x" type="button" data-close aria-label="Close">✕</button>
+      <h2>Plan consultations used</h2>
+      <p>You've used all consultations in your plan. You may be charged for any further questions.</p>
+      <div class="row-end">
+        <button class="btn ghost" type="button" id="overage-cancel">Cancel</button>
+        <button class="btn primary" type="button" id="overage-continue">Continue</button>
+      </div>
     </div>
   </dialog>
 
@@ -204,6 +266,11 @@
         <a class="side-link" href="/affiliates">Affiliates</a>
         <a class="side-link" href="/influencers">Influencers</a>
         <button id="biz-toggle" class="side-link" type="button">Switch to Business (10% off)</button>
+        <button id="account-plan" class="side-link plan-link" type="button" hidden>
+          <span id="account-plan-label">Plan · Manage</span><span id="account-plan-detail"></span>
+        </button>
+        <button id="account-cancel" class="side-link" type="button" hidden>Cancel subscription</button>
+        <button id="account-resume" class="side-link" type="button" hidden>Resume now</button>
         <div class="me">
           <div class="avatar" id="me-avatar"></div>
           <div class="me-text"><div id="me-name"></div><div class="tiny muted" id="me-email"></div></div>

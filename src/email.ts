@@ -47,6 +47,15 @@ export async function sendReceiptEmail(o: {
     + button(o.manageUrl, 'Manage billing')));
 }
 
+export async function sendSubscriptionTrialEndingEmail(o: {
+  to: string; plan: string; monthlyCents: number; trialEnd: string; manageUrl: string;
+}): Promise<void> {
+  const chargeDate = new Date(o.trialEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  await sendEmail(o.to, 'Your Kaalera trial ends soon', layout('Your trial ends soon',
+    `<p>Your ${escapeHtml(o.plan)} plan trial ends on <b>${escapeHtml(chargeDate)}</b>. Your card will then be charged <b>${usd(o.monthlyCents)}/month, including taxes &amp; fees</b>.</p>
+    <p>Cancel anytime from your account.</p>` + button(o.manageUrl, 'Manage subscription')));
+}
+
 export async function sendContactEmails(o: { owner: string; name: string; email: string; topic: string; message: string }): Promise<void> {
   await sendEmail(o.owner, `[Kaalera contact] ${o.topic} — ${o.name}`, layout(`Contact form: ${o.topic}`,
     `<p><strong>${escapeHtml(o.name)}</strong> &lt;${escapeHtml(o.email)}&gt;</p><p style="white-space:pre-wrap">${escapeHtml(o.message)}</p>`), o.email);

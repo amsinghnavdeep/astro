@@ -62,7 +62,7 @@ Full reference: [API docs](/docs) · [Quickstart](/docs/quickstart)."""),
 ## The honest bottom line
 Astrology is guidance, not a guarantee, whoever reads it. Many people use an AI astrologer for quick, specific questions and a human astrologer for big ceremonies.
 
-Try it yourself: [ask Kaal](/ai-astrologer) — your first question is free."""),
+Try it yourself: [ask Kaal](/ai-astrologer) — Personal plans include 7 days free and 2 consultations."""),
 ("how-accurate-is-ai-astrology", "How accurate is AI astrology? An honest answer",
  "What AI astrology gets right, where its limits are, and how to judge any astrologer’s accuracy for yourself.",
 """People ask us this a lot, so here is a straight answer.
@@ -110,7 +110,7 @@ Kaal's readings are guidance for reflection only, not medical, legal or financia
 - Give a time frame: “in the next 12 months”.
 - Follow up on the window that matters most.
 
-[Ask Kaal your first question free](/ai-astrologer)."""),
+[See Personal plans](/ai-astrologer)."""),
 ("add-horoscope-chatbot-to-your-app", "Add a horoscope chatbot to your website or app",
  "How to add a personalised astrology chatbot to your product with the Kaalera API, and why it beats generic daily horoscopes.",
 """Daily sun-sign horoscopes are the same for millions of people. A **personal astrology chatbot** answers each user from their own birth details — that is what keeps them coming back.

@@ -17,7 +17,7 @@ const POST_IDEAS = [
   'Ask your followers "Want to know your best months for career this year?" and reply with your link.',
   'Pin your link in your bio and in your top comment this week.',
   'Make a short reel: "I asked an AI astrologer when I\'ll get married", show the answer, link in bio.',
-  'Share your link in family WhatsApp groups: the first question is free and your link adds one more.',
+  'Share your link in family WhatsApp groups: Personal plans include 7 days free and 2 consultations.',
   'Post the festival dates coming up and tell people Kaalera gives 10% off during festivals.',
 ];
 

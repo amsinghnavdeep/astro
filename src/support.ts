@@ -98,7 +98,7 @@ async function accountFacts(db: D1Database, t: Ticket): Promise<string> {
   const lots = (l: { credits: number; expiresAt: string }[]) =>
     l.length ? l.map((x) => `${x.credits} (expires ${x.expiresAt.slice(0, 10)})`).join(', ') : 'none';
   return [
-    `Account created: ${user?.created_at.slice(0, 10) ?? 'unknown'}. Free first question used: ${user?.free_used ? 'yes' : 'no'}.`,
+    `Account created: ${user?.created_at.slice(0, 10) ?? 'unknown'}. Legacy free consultation used: ${user?.free_used ? 'yes' : 'no'}.`,
     `Chat questions left in account: ${lots(chat)}. API credits: ${lots(api)}.`,
     'Consultations (newest first):',
     ...(threads.results.length ? threads.results.map((x) => `- ${x.full_name} (${x.source}), started ${x.created_at.slice(0, 10)}, `
@@ -124,7 +124,7 @@ async function supportPrompt(db: D1Database, t: Ticket, firstMessage: string): P
     '- If the issue needs a person (charged but questions or credits missing, a bug or error, sign-in/account access, abuse, legal, data deletion, or anything you cannot resolve from these facts): tell the customer the issue has been passed to our team, who will reply by email after analysis, and end your message with the exact line [FORWARD]',
     '- After replying, wait. If the customer writes again, follow the same rules.',
     '',
-    'Kaalera facts: the first question is free; a consultation costs $11.50 including taxes & fees and extra questions come 2 at a time for $16.10 including taxes & fees; paid questions expire 3 months after purchase; auto-reload of 2 questions is on by default and can be turned off on the Account page (kaalera.com/account); a consultation is open for 7 days and cannot be reopened after that; each question uses 1; switching the person mid-chat uses the next question as normal; the API uses a prepaid USD wallet (10% below website prices, first recharge $100) and the balance expires 6 months after purchase; failed deliveries are not charged; answers are astrological guidance only, not professional advice, and predictions are not guaranteed. Support page: /support. API keys and credits: /developers.',
+    'Kaalera facts: Personal plans include 7 days free, 2 consultations, and cancellation anytime; current plan prices and consultation limits are shown on the Account page. Extra consultations are available at pay-per-use prices. Pay-per-use credits expire 3 months after purchase; a consultation is open for 7 days and cannot be reopened after that; switching the person mid-chat uses the next question as normal; the API uses a prepaid USD wallet (10% below website prices, first recharge $100) and the balance expires 6 months after purchase; failed deliveries are not charged; answers are astrological guidance only, not professional advice, and predictions are not guaranteed. Support page: /support. API keys and credits: /developers.',
     '',
     `Ticket ${ticketNumber(t.id)} — topic: ${TOPIC_LABEL[t.topic as keyof typeof TOPIC_LABEL] ?? t.topic}; subject: ${t.subject}`,
     `Customer: ${t.name ?? 'unknown name'} <${t.email}>`,

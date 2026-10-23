@@ -123,8 +123,8 @@ export const postCard = (p: Post, featured = false): string => `
 export const askKaalCard = (): string => `
 <div class="b-ask">
   <div class="b-ask-head"><img class="b-ask-av" src="/kaal-mark.svg" alt="" width="44" height="44"><div><strong>Kaal</strong><span>AI astrologer</span></div></div>
-  <p>Ask about your career, marriage, money or health. Kaal reads your own Kundli and gives dates and remedies. Your first question is free.</p>
-  <a class="w-cta big" href="/">Ask Kaal free</a>
+  <p>Personal plans include 7 days free, 2 consultations, and cancellation anytime.</p>
+  <a class="w-cta big" href="/">See plans</a>
   <ul><li><a href="/">When will my career grow?</a></li><li><a href="/">When will I get married?</a></li><li><a href="/">Why was last year so hard?</a></li></ul>
 </div>`;
 
@@ -212,10 +212,10 @@ export function robotsTxt(site: string): string {
 export function llmsTxt(site: string, posts: Post[]): string {
   return `# Kaalera
 
-> Kaalera is an AI astrology service. Its AI astrologer, Kaal, reads a person's Kundli from their birth date, time and place and answers questions about marriage, career, money, health and family with dated predictions, one short line on the main planetary issue, and 1-2 remedies. The first question is free; paid packs add more questions. Kaalera also offers a public REST API so developers can add an AI astrology agent to their own apps.
+> Kaalera offers Personal monthly plans with 7 days free, 2 consultations, and cancellation anytime. Pay-per-use consultations are also available. Kaalera also offers a public REST API so developers can add an AI astrology agent to their own apps.
 
 ## For people
-- [Ask Kaal (chat)](${site}/): ask a question about your future; first question free.
+- [Ask Kaal (chat)](${site}/): Personal plans include 7 days free, 2 consultations, and cancellation anytime.
 ${TOPIC_LINKS.map(([h, l]) => `- [${l}](${site}${h})`).join('\n')}
 
 ## For developers (AI astrology agent API)

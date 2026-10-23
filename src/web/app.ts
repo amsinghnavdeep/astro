@@ -12,7 +12,17 @@ type Thread = {
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
 type Deal = { id?: string; name: string; percent: number; endsOn: string };
-type Pricing = { quickWords?: number; freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number };
+type Plan = { id: 'basic' | 'plus' | 'pro'; name: string; cents: number; consultations: number; allInCents: number };
+type SubscriptionState = {
+  plan: Plan['id']; planName: string; status: string; priceCents: number; allInCents: number;
+  consultations: number; consultsLeft: number; trialEnd: string | null; renewsAt: string | null;
+  pausedUntil: string | null; cancelAtPeriodEnd: boolean; pendingPlan: Plan['id'] | null;
+};
+type SubscriptionData = {
+  enabled: boolean; phoneEnabled: boolean; phoneVerified: boolean; phone: string | null;
+  trialEligible: boolean; trialDays: number; trialConsults: number; plans: Plan[]; subscription: SubscriptionState | null;
+};
+type Pricing = { quickWords?: number; freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number; plans?: Plan[] };
 type Me = { walletCents?: number | null; user: { name: string; email: string; accountType?: string; businessName?: string | null }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
@@ -46,6 +56,10 @@ const PENDING_Q = 'kaalera:pendingQuestion';
 const STEPS = ['Casting your Kundli…', 'Reading the planets and houses…', 'Checking your dashas and transits…', "Writing Kaal's answer…"];
 
 let me: Me | null = null;
+let subscriptionInfo: SubscriptionData | null = null;
+let subscriptionThreadId: string | null = null;
+let overageThreadId: string | null = null;
+let selectedPlanId: Plan['id'] = 'basic';
 let threads: Thread[] = [];
 let current: Thread | null = null;
 let kundlis: Kundli[] = [];
@@ -172,6 +186,57 @@ function renderBiz(): void {
   b.disabled = !!name;
 }
 
+function renderSubscriptionMenu(): void {
+  const button = $<HTMLButtonElement>('account-plan');
+  const cancel = $<HTMLButtonElement>('account-cancel');
+  const resume = $<HTMLButtonElement>('account-resume');
+  if (!me || me.user.accountType === 'business' || !subscriptionInfo?.enabled) {
+    button.hidden = true;
+    cancel.hidden = true;
+    resume.hidden = true;
+    return;
+  }
+  button.hidden = false;
+  const sub = subscriptionInfo.subscription;
+  if (!sub) {
+    $('account-plan-label').textContent = 'Plan · Choose a plan';
+    $('account-plan-detail').textContent = '';
+    cancel.hidden = true;
+    resume.hidden = true;
+    return;
+  }
+  $('account-plan-label').textContent = `Plan · ${sub.planName}`;
+  const until = sub.status === 'paused' && sub.pausedUntil
+    ? `Paused until ${new Date(sub.pausedUntil).toLocaleDateString()}`
+    : sub.cancelAtPeriodEnd && sub.renewsAt
+      ? `Ends ${new Date(sub.renewsAt).toLocaleDateString()}`
+    : sub.trialEnd && sub.status === 'trialing'
+      ? `Trial ends ${new Date(sub.trialEnd).toLocaleDateString()}`
+      : sub.renewsAt ? `Renews ${new Date(sub.renewsAt).toLocaleDateString()}` : sub.status;
+  const pending = sub.pendingPlan && sub.renewsAt
+    ? ` · Changes to ${sub.pendingPlan[0].toUpperCase()}${sub.pendingPlan.slice(1)} ${new Date(sub.renewsAt).toLocaleDateString()}`
+    : '';
+  $('account-plan-detail').textContent = `${sub.consultsLeft} of ${sub.consultations} consultations left · ${until}${pending}`;
+  const hasPlan = ['active', 'trialing', 'paused', 'past_due'].includes(sub.status);
+  cancel.hidden = !hasPlan || sub.cancelAtPeriodEnd;
+  resume.hidden = !hasPlan || !(sub.cancelAtPeriodEnd || sub.status === 'paused');
+  resume.textContent = sub.cancelAtPeriodEnd ? 'Resume plan' : 'Resume now';
+}
+
+async function refreshSubscription(): Promise<SubscriptionData | null> {
+  if (!me || me.user.accountType === 'business') {
+    subscriptionInfo = null;
+    renderSubscriptionMenu();
+    return null;
+  }
+  const { ok, data } = await api<SubscriptionData>('/api/subscription');
+  if (ok) {
+    subscriptionInfo = data;
+    renderSubscriptionMenu();
+  }
+  return ok ? data : null;
+}
+
 $('biz-toggle').addEventListener('click', () => {
   $('biz-error').textContent = '';
   closeMenu();
@@ -261,12 +326,220 @@ async function renderPrices(): Promise<void> {
   if (!ok) return;
   const p = data;
   showDeal(p);
+  const isBusiness = me?.user.accountType === 'business';
+  $('pricing-subtitle').textContent = isBusiness
+    ? 'Pay for consultations from your Business wallet.'
+    : 'Choose a monthly plan or pay for a consultation only.';
+  const subscriptionCards = !isBusiness ? (p.plans ?? []).map((plan) =>
+    priceCard(plan.name, `${money(plan.allInCents, p.currency)}/month`, `${plan.consultations} consultations each month, incl. taxes & fees.`),
+  ) : [];
   $('l-prices').replaceChildren(
-    priceCard('Free', money(0, p.currency), `Your first consultation: an opening reading plus ${plural(p.freeQuestions, 'question')} answered.`),
-    priceCard('Consultation', money(allIn(p.packCents, p.taxFeePercent), p.currency), `${p.deal && p.fullPackCents ? `${p.deal.name}: ${p.deal.percent}% off (was ${money(allIn(p.fullPackCents, p.taxFeePercent), p.currency)}). ` : ''}Start a consultation with your first question. Each extra question is ${money(allIn(p.extraQuestionCents, p.taxFeePercent), p.currency)}.${p.taxFeePercent ? ' Taxes & fees included.' : ''}`),
-    priceCard(`${p.consultationDays}-day consultations`, `${p.consultationDays} days`, `Each consultation stays open for ${p.consultationDays} days, then becomes read-only.`),
+    ...(isBusiness ? [priceCard('Pay per consultation', money(allIn(p.packCents, p.taxFeePercent), p.currency),
+      `Start a consultation and pay for additional help only if needed.${p.taxFeePercent ? ' Taxes & fees included.' : ''}`)] : subscriptionCards),
   );
 }
+
+const subscriptionModal = $<HTMLDialogElement>('subscription-modal');
+
+function updatePlanChoice(): void {
+  if (!subscriptionInfo) return;
+  const plan = subscriptionInfo.plans.find((item) => item.id === selectedPlanId) ?? subscriptionInfo.plans[0];
+  if (!plan) return;
+  document.querySelectorAll<HTMLButtonElement>('[data-plan-id]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.planId === plan.id));
+  });
+  $('subscription-submit').textContent = subscriptionInfo.trialEligible
+    ? `Start ${subscriptionInfo.trialDays}-day free trial` : 'Subscribe';
+  $('subscription-consent-copy').textContent = subscriptionInfo.trialEligible
+    ? `I agree to the Terms and authorize ${money(plan.allInCents)}/month after my ${subscriptionInfo.trialDays}-day free trial. Cancel anytime from my account.`
+    : `I agree to the Terms and authorize a monthly charge of ${money(plan.allInCents)} starting today. Cancel anytime from my account.`;
+}
+
+async function openSubscriptionPlans(threadId: string | null = null): Promise<void> {
+  const data = await refreshSubscription();
+  if (!data?.enabled) return;
+  subscriptionThreadId = threadId;
+  $('subscription-choose').hidden = false;
+  $('subscription-manage').hidden = true;
+  $('subscription-error').textContent = '';
+  $<HTMLInputElement>('subscription-agreed').checked = false;
+  $('subscription-pay-only').hidden = !threadId;
+  $('subscription-phone').hidden = !data.phoneEnabled || data.phoneVerified;
+  $('subscription-trial-badge').hidden = !data.trialEligible;
+  $('subscription-trial-badge').textContent = data.trialEligible
+    ? `${data.trialDays} days free · ${data.trialConsults} consultations · cancel anytime` : '';
+  selectedPlanId = data.plans[0]?.id ?? 'basic';
+  $('subscription-cards').replaceChildren(...data.plans.map((plan) => {
+    const card = el('button', 'plan-card');
+    card.type = 'button';
+    card.dataset.planId = plan.id;
+    card.setAttribute('aria-pressed', String(plan.id === selectedPlanId));
+    card.append(
+      el('strong', '', plan.name),
+      el('span', 'plan-card-price', `${money(plan.allInCents)}/month`),
+      el('span', 'plan-card-consults', `${plan.consultations} consultations`),
+      el('span', 'plan-card-fee', 'incl. taxes & fees'),
+    );
+    card.addEventListener('click', () => { selectedPlanId = plan.id; updatePlanChoice(); });
+    return card;
+  }));
+  updatePlanChoice();
+  if (!subscriptionModal.open) subscriptionModal.showModal();
+}
+
+async function openSubscriptionManage(): Promise<void> {
+  const data = await refreshSubscription();
+  const sub = data?.subscription;
+  if (!data?.enabled) return;
+  if (!sub || !['active', 'trialing', 'paused', 'past_due'].includes(sub.status)) {
+    await openSubscriptionPlans();
+    return;
+  }
+  $('subscription-choose').hidden = true;
+  $('subscription-manage').hidden = false;
+  $('subscription-manage-error').textContent = '';
+  $('subscription-manage-summary').textContent =
+    `You have ${sub.consultsLeft} consultations left this month. Your ${sub.planName} plan is ${money(sub.allInCents)}/month incl. taxes & fees.`;
+  $('subscription-manage-date').textContent = sub.status === 'paused' && sub.pausedUntil
+    ? `Paused until ${new Date(sub.pausedUntil).toLocaleDateString()}.`
+    : sub.cancelAtPeriodEnd && sub.renewsAt
+      ? `Your plan stays active until ${new Date(sub.renewsAt).toLocaleDateString()}.`
+      : sub.pendingPlan && sub.renewsAt
+        ? `Your plan will switch to ${sub.pendingPlan[0].toUpperCase()}${sub.pendingPlan.slice(1)} on ${new Date(sub.renewsAt).toLocaleDateString()}.`
+      : sub.renewsAt ? `Renews ${new Date(sub.renewsAt).toLocaleDateString()}.` : '';
+  $('subscription-pause').hidden = !['active', 'trialing'].includes(sub.status) || sub.cancelAtPeriodEnd;
+  $('subscription-basic').hidden = sub.plan === 'basic' || !!sub.pendingPlan || !['active', 'trialing'].includes(sub.status) || sub.cancelAtPeriodEnd;
+  $('subscription-cancel').hidden = sub.cancelAtPeriodEnd;
+  $('subscription-resume').hidden = !(sub.cancelAtPeriodEnd || sub.status === 'paused');
+  $('subscription-resume').textContent = sub.cancelAtPeriodEnd ? 'Resume plan' : 'Resume now';
+  const note = $<HTMLInputElement>('cancel-note');
+  note.value = '';
+  note.hidden = true;
+  document.querySelectorAll<HTMLInputElement>('input[name="cancel-reason"]').forEach((input) => { input.checked = false; });
+  if (!subscriptionModal.open) subscriptionModal.showModal();
+}
+
+const cancellationDetails = () => ({
+  reason: document.querySelector<HTMLInputElement>('input[name="cancel-reason"]:checked')?.value,
+  note: $<HTMLInputElement>('cancel-note').value.trim() || undefined,
+});
+
+async function subscriptionAction(action: 'pause' | 'basic'): Promise<void> {
+  const error = $('subscription-manage-error');
+  error.textContent = '';
+  const { ok, data } = await api<{ pausedUntil?: string; switchedTo?: string; renewsAt?: string; error?: string }>('/api/subscription/manage', {
+    method: 'POST', body: JSON.stringify({ action, ...cancellationDetails() }),
+  });
+  if (!ok) { error.textContent = data.error ?? 'Could not update your plan.'; return; }
+  await refreshSubscription();
+  if (action === 'pause' && data.pausedUntil) $('subscription-manage-date').textContent = `Paused until ${new Date(data.pausedUntil).toLocaleDateString()}.`;
+  if (action === 'basic' && data.renewsAt) $('subscription-manage-date').textContent = `Your plan will switch to Basic on ${new Date(data.renewsAt).toLocaleDateString()}.`;
+  await openSubscriptionManage();
+}
+
+$('account-plan').addEventListener('click', () => {
+  closeMenu();
+  void openSubscriptionManage();
+});
+$('account-cancel').addEventListener('click', () => {
+  closeMenu();
+  void openSubscriptionManage();
+});
+
+async function resumeSubscription(): Promise<void> {
+  const { ok, data } = await api<{ error?: string }>('/api/subscription/resume', { method: 'POST', body: '{}' });
+  if (!ok) { showBanner(data.error ?? 'Could not resume your plan.'); return; }
+  await refreshSubscription();
+  showBanner('Your plan is active again.', 6000);
+  if (subscriptionModal.open) await openSubscriptionManage();
+}
+$('account-resume').addEventListener('click', () => { closeMenu(); void resumeSubscription(); });
+$('subscription-resume').addEventListener('click', () => { void resumeSubscription(); });
+$('subscription-pause').addEventListener('click', () => { void subscriptionAction('pause'); });
+$('subscription-basic').addEventListener('click', () => { void subscriptionAction('basic'); });
+
+$('subscription-cancel').addEventListener('click', async () => {
+  const end = subscriptionInfo?.subscription?.renewsAt;
+  const date = end ? new Date(end).toLocaleDateString() : 'the end of this billing period';
+  if (!window.confirm(`Cancel your subscription? Your plan stays active until ${date}.`)) return;
+  const { ok, data } = await api<{ canceledAt?: string; error?: string }>('/api/subscription/cancel', {
+    method: 'POST', body: JSON.stringify(cancellationDetails()),
+  });
+  if (!ok) { $('subscription-manage-error').textContent = data.error ?? 'Could not cancel your plan.'; return; }
+  await refreshSubscription();
+  $('subscription-manage-date').textContent = `Your plan stays active until ${date}.`;
+  showBanner(`Your plan stays active until ${date}.`, 7000);
+  await openSubscriptionManage();
+});
+
+document.querySelectorAll<HTMLInputElement>('input[name="cancel-reason"]').forEach((input) => {
+  input.addEventListener('change', () => {
+    $<HTMLInputElement>('cancel-note').hidden = document.querySelector<HTMLInputElement>('input[name="cancel-reason"]:checked')?.value !== 'other';
+  });
+});
+
+$('subscription-phone-send').addEventListener('click', async () => {
+  const error = $('subscription-phone-error');
+  error.textContent = '';
+  const phone = $<HTMLInputElement>('subscription-phone-input').value.trim();
+  const { ok, data } = await api<{ sent?: boolean; error?: string }>('/api/phone/start', {
+    method: 'POST', body: JSON.stringify({ phone }),
+  });
+  if (!ok) { error.textContent = data.error ?? 'Could not send a verification code.'; return; }
+  $('subscription-code-row').hidden = false;
+  error.textContent = 'Code sent.';
+});
+$('subscription-phone-check').addEventListener('click', async () => {
+  const error = $('subscription-phone-error');
+  error.textContent = '';
+  const { ok, data } = await api<{ verified?: boolean; error?: string }>('/api/phone/check', {
+    method: 'POST',
+    body: JSON.stringify({
+      phone: $<HTMLInputElement>('subscription-phone-input').value.trim(),
+      code: $<HTMLInputElement>('subscription-phone-code').value.trim(),
+    }),
+  });
+  if (!ok) { error.textContent = data.error ?? 'Could not verify your phone.'; return; }
+  const fresh = await refreshSubscription();
+  $('subscription-phone').hidden = !!fresh?.phoneVerified;
+  error.textContent = fresh?.phoneVerified ? 'Phone verified.' : '';
+});
+
+$('subscription-submit').addEventListener('click', async () => {
+  const error = $('subscription-error');
+  error.textContent = '';
+  if (!$<HTMLInputElement>('subscription-agreed').checked) {
+    error.textContent = 'Please accept the subscription terms to continue.';
+    return;
+  }
+  if (subscriptionInfo?.phoneEnabled && !subscriptionInfo.phoneVerified) {
+    error.textContent = 'Verify your phone number before subscribing.';
+    return;
+  }
+  const button = $<HTMLButtonElement>('subscription-submit');
+  button.disabled = true;
+  const { ok, data } = await api<{ checkoutUrl?: string; error?: string }>('/api/subscribe', {
+    method: 'POST',
+    body: JSON.stringify({ plan: selectedPlanId, threadId: subscriptionThreadId ?? undefined, agreed: true }),
+  });
+  button.disabled = false;
+  if (!ok || !data.checkoutUrl) { error.textContent = data.error ?? 'Could not open checkout.'; return; }
+  location.href = data.checkoutUrl;
+});
+
+$('subscription-pay-only').addEventListener('click', () => {
+  if (!subscriptionThreadId) return;
+  const threadId = subscriptionThreadId;
+  subscriptionModal.close();
+  void goToCheckout(threadId);
+});
+
+$('overage-cancel').addEventListener('click', () => $<HTMLDialogElement>('plan-used-up-modal').close());
+$('overage-continue').addEventListener('click', () => {
+  const id = overageThreadId;
+  $<HTMLDialogElement>('plan-used-up-modal').close();
+  if (id) void goToCheckout(id);
+});
 
 type SkyPlanet = { name: string; nakshatra: string; retrograde: boolean };
 
@@ -483,10 +756,23 @@ function showProfile(question = ''): void {
   const p = me!.pricing;
   const note = $('price-note');
   const submit = $('profile-submit');
-  if (me!.freeAvailable) {
-    note.innerHTML = '<strong>This consultation is free.</strong> ';
-    note.append(`Kaal gives an opening reading and answers ${plural(p.freeQuestions, 'question')}. Open for ${p.consultationDays} days.`);
-    submit.textContent = 'Start free consultation';
+  const sub = subscriptionInfo?.subscription;
+  if (me!.user.accountType !== 'business' && credTotal() > 0) {
+    const next = me!.chatCredits[0];
+    note.innerHTML = '';
+    note.append(el('strong', '', `${plural(credTotal(), 'consultation credit')} available.`),
+      ` Your admin or coupon credit is used before your plan. Next expiry: ${new Date(next.expiresAt).toLocaleDateString()}.`);
+    submit.textContent = 'Start consultation';
+  } else if (me!.user.accountType !== 'business' && sub && ['active', 'trialing', 'paused'].includes(sub.status)) {
+    note.innerHTML = '';
+    note.append(el('strong', '', `${sub.consultsLeft} of ${sub.consultations} consultations left on ${sub.planName}.`),
+      ` Each consultation includes ${p.packQuestions} ${p.packQuestions === 1 ? 'question' : 'questions'} and stays open for ${p.consultationDays} days.`);
+    submit.textContent = 'Start consultation';
+  } else if (me!.user.accountType !== 'business') {
+    note.innerHTML = '';
+    note.append(el('strong', '', 'Choose a monthly plan to start.'),
+      ' Eligible Personal accounts get a 7-day free trial with 2 consultations. Pay per consultation is also available.');
+    submit.textContent = 'Choose a plan';
   } else if (credTotal() > 0) {
     const next = me!.chatCredits[0];
     note.innerHTML = '';
@@ -585,16 +871,20 @@ profileForm.addEventListener('submit', async (e) => {
     err.textContent = 'Choose a Kundli or add a new one first.';
     return;
   }
-  const fromWallet = !me!.freeAvailable && credTotal() < 1 && walletCovers(me!.pricing.packCents);
+  const personal = me!.user.accountType !== 'business';
+  const fromWallet = !personal && !me!.freeAvailable && credTotal() < 1 && walletCovers(me!.pricing.packCents);
   if (fromWallet) (body as Record<string, unknown>).agreed = true;
-  else if (!me!.freeAvailable && credTotal() < 1) {
+  else if (!personal && !me!.freeAvailable && credTotal() < 1) {
     if (!(await confirmPurchase('chat', money(allIn(me!.pricing.packCents, me!.pricing.taxFeePercent), me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
     (body as Record<string, unknown>).agreed = true;
   }
   const label = submit.textContent;
   submit.disabled = true;
-  submit.textContent = me!.freeAvailable || fromWallet || credTotal() > 0 ? 'Casting your Kundli…' : 'Opening checkout…';
-  const { ok, status, data } = await api<{ thread?: Thread; checkoutUrl?: string }>('/api/threads', { method: 'POST', body: JSON.stringify(body) });
+  submit.textContent = personal || fromWallet || credTotal() > 0 ? 'Starting consultation…' : 'Opening checkout…';
+  const { ok, status, data } = await api<{
+    thread?: Thread; checkoutUrl?: string; plansRequired?: boolean; trialEligible?: boolean;
+    code?: string; error?: string;
+  }>('/api/threads', { method: 'POST', body: JSON.stringify(body) });
   if (data.checkoutUrl) {
     sessionStorage.removeItem(PENDING_Q);
     location.href = data.checkoutUrl;
@@ -602,6 +892,23 @@ profileForm.addEventListener('submit', async (e) => {
   }
   submit.disabled = false;
   submit.textContent = label;
+  if (data.plansRequired && data.thread) {
+    upsertThread(data.thread);
+    void openSubscriptionPlans(data.thread.id);
+    return;
+  }
+  if (data.code === 'plan_used_up' && data.thread) {
+    upsertThread(data.thread);
+    overageThreadId = data.thread.id;
+    $<HTMLDialogElement>('plan-used-up-modal').showModal();
+    return;
+  }
+  if (data.code === 'plan_paused' && data.thread) {
+    upsertThread(data.thread);
+    showBanner('Your plan is paused. Resume it to use your remaining consultations.');
+    void openSubscriptionManage();
+    return;
+  }
   if (data.thread) {
     sessionStorage.removeItem(PENDING_Q);
     profileForm.reset();
@@ -1195,14 +1502,16 @@ askInput.addEventListener('keydown', (e) => {
 /* ---------- boot ---------- */
 
 async function confirmCheckout(sessionId: string): Promise<void> {
-  const { ok, data } = await api<{ paid: boolean; kind?: string }>(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`);
+  const { ok, data } = await api<{ paid: boolean; kind?: string; error?: string }>(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`);
   const p = me!.pricing;
   if (!ok || !data.paid) showBanner(data.error ?? "We couldn't confirm the payment yet. If you were charged, it will appear shortly.");
   else if (data.kind === 'topup') showBanner(`Payment received — ${RELOAD} questions added. When they run out, ${RELOAD} more are added automatically.`, 6000);
   else if (data.kind === 'api_credits') showBanner('Payment received — you are now a Business account. Chat is 10% cheaper and paid from your wallet.', 8000);
+  else if (data.kind === 'subscription') showBanner('Your plan is active. Kaal is starting your consultation.', 6000);
   else showBanner('Payment received — Kaal is starting your consultation.', 6000);
   const fresh = await api<Me>('/api/me');
   if (fresh.ok) me = fresh.data;
+  await refreshSubscription();
   if (ok && data.paid) reloadFailed = false;
   renderBiz();
 }
@@ -1274,6 +1583,7 @@ async function boot(): Promise<void> {
   }
   me = res.data;
   showDeal(me.pricing);
+  await refreshSubscription();
   renderBiz();
   if (localStorage.getItem(BIZ_SIGNUP)) {
     localStorage.removeItem(BIZ_SIGNUP);
@@ -1289,7 +1599,13 @@ async function boot(): Promise<void> {
     document.querySelectorAll<HTMLElement>('[data-open-app]').forEach((b) => { b.hidden = false; });
     return;
   }
-  if (params.has('app')) history.replaceState(null, '', location.pathname + location.search.replace(/[?&]app=1/, '').replace(/^&/, '?'));
+  if (params.has('app') || params.has('account')) {
+    const clean = new URLSearchParams(location.search);
+    clean.delete('app');
+    clean.delete('account');
+    const query = clean.toString();
+    history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}`);
+  }
   landingView.hidden = true;
   appView.hidden = false;
   window.setTimeout(() => void maybeShare('influencer'), 15000);
@@ -1316,6 +1632,7 @@ async function boot(): Promise<void> {
   if (wanted) openThread(wanted);
   else if (pendingQ || !threads.length) showProfile(pendingQ ?? '');
   else openThread(threads[0]);
+  if (params.get('account') === '1') void openSubscriptionManage();
   if (keepBanner) showBanner(keepBanner, 6000);
 }
 
