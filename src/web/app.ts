@@ -21,6 +21,7 @@ type SubscriptionState = {
 };
 type SubscriptionData = {
   enabled: boolean; phoneEnabled: boolean; phoneVerified: boolean; phone: string | null;
+  phoneSaved: boolean;
   trialEligible: boolean; trialDays: number; trialConsults: number; plans: Plan[]; subscription: SubscriptionState | null;
 };
 type Pricing = { quickWords?: number; freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number; plans?: Plan[] };
@@ -375,7 +376,17 @@ async function openSubscriptionPlans(threadId: string | null = null): Promise<vo
   $('subscription-error').textContent = '';
   $<HTMLInputElement>('subscription-agreed').checked = false;
   $('subscription-pay-only').hidden = !threadId;
-  $('subscription-phone').hidden = !data.phoneEnabled || data.phoneVerified;
+  const phoneInput = $<HTMLInputElement>('subscription-phone-input');
+  phoneInput.value = data.phone ?? '';
+  phoneInput.placeholder = data.phoneEnabled ? '+14155550123' : '+91 98765 43210';
+  $('subscription-phone').hidden = data.phoneEnabled ? data.phoneVerified : data.phoneSaved;
+  $('subscription-phone-title').textContent = data.phoneEnabled ? 'Verify your phone' : 'Your mobile number';
+  $('subscription-phone-hint').textContent = data.phoneEnabled
+    ? 'Phone verification is required to start a plan.'
+    : 'Include your country code, e.g. +91 98765 43210. One free trial per number.';
+  $('subscription-phone-label').textContent = data.phoneEnabled ? 'Phone number' : 'Mobile number';
+  $('subscription-phone-send').hidden = !data.phoneEnabled;
+  if (!data.phoneEnabled) $('subscription-code-row').hidden = true;
   $('subscription-trial-badge').hidden = !data.trialEligible;
   $('subscription-trial-badge').textContent = data.trialEligible
     ? `${data.trialDays} days free · ${data.trialConsults} consultations · cancel anytime` : '';
@@ -530,11 +541,19 @@ $('subscription-submit').addEventListener('click', async () => {
     error.textContent = 'Verify your phone number before subscribing.';
     return;
   }
+  let phone: string | undefined;
+  if (subscriptionInfo && !subscriptionInfo.phoneEnabled && !subscriptionInfo.phoneSaved) {
+    phone = $<HTMLInputElement>('subscription-phone-input').value.replace(/[ \-().]/g, '');
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+      error.textContent = 'Enter your mobile number with country code.';
+      return;
+    }
+  }
   const button = $<HTMLButtonElement>('subscription-submit');
   button.disabled = true;
   const { ok, data } = await api<{ checkoutUrl?: string; error?: string }>('/api/subscribe', {
     method: 'POST',
-    body: JSON.stringify({ plan: selectedPlanId, threadId: subscriptionThreadId ?? undefined, agreed: true }),
+    body: JSON.stringify({ plan: selectedPlanId, threadId: subscriptionThreadId ?? undefined, agreed: true, phone }),
   });
   button.disabled = false;
   if (!ok || !data.checkoutUrl) { error.textContent = data.error ?? 'Could not open checkout.'; return; }

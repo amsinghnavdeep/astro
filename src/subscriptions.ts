@@ -33,7 +33,7 @@ export async function subscriptionForUser(db: D1Database, userId: string): Promi
 export async function trialEligible(db: D1Database, userId: string, keys: FreeKeys): Promise<boolean> {
   if (await subscriptionForUser(db, userId)) return false;
   if (await freeBlocked(db, keys)) return false;
-  const phone = await db.prepare('SELECT phone_e164 FROM users WHERE id = ? AND phone_verified_at IS NOT NULL')
+  const phone = await db.prepare('SELECT phone_e164 FROM users WHERE id = ?')
     .bind(userId).first<{ phone_e164: string | null }>();
   if (phone?.phone_e164) {
     const used = await db.prepare("SELECT 1 FROM trial_marks WHERE kind = 'phone' AND value = ?").bind(phone.phone_e164).first();

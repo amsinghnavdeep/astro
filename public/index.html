@@ -199,9 +199,9 @@
         <p class="muted" id="subscription-trial-badge" hidden></p>
         <div class="plan-cards" id="subscription-cards"></div>
         <div id="subscription-phone" class="phone-step" hidden>
-          <h3>Verify your phone</h3>
-          <p class="muted">Phone verification is required to start a plan.</p>
-          <label>Phone number<input id="subscription-phone-input" type="tel" autocomplete="tel" placeholder="+14155550123" /></label>
+          <h3 id="subscription-phone-title">Verify your phone</h3>
+          <p class="muted" id="subscription-phone-hint">Phone verification is required to start a plan.</p>
+          <label><span id="subscription-phone-label">Phone number</span><input id="subscription-phone-input" type="tel" autocomplete="tel" placeholder="+14155550123" /></label>
           <button class="btn" type="button" id="subscription-phone-send">Send code</button>
           <div id="subscription-code-row" hidden>
             <label>Verification code<input id="subscription-phone-code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" /></label>

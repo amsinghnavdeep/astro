@@ -755,7 +755,7 @@ app.get('/api/subscription', async (c) => {
   const plan = state ? planFor(await getPrices(c.env.DB), state.plan) : null;
   return c.json({
     enabled: personal, phoneEnabled: env.phone.enabled, phoneVerified: !!phone?.phone_verified_at,
-    phone: phone?.phone_verified_at ? phone.phone_e164 : null,
+    phone: phone?.phone_e164 ?? null, phoneSaved: !!phone?.phone_e164,
     trialDays: personal ? (await getPrices(c.env.DB)).trialDays : 0,
     trialConsults: personal ? (await getPrices(c.env.DB)).trialConsults : 0,
     trialEligible: personal ? await trialEligible(c.env.DB, user.id, await freeKeys(c)) : false,
@@ -833,18 +833,35 @@ app.post('/api/subscribe', async (c) => {
   if (!user) return unauth(c);
   if (!sameSite(c)) return c.json({ error: 'Not allowed' }, 403);
   if (user.account_type === 'business') return c.json({ error: 'Subscriptions are not available for Business accounts.' }, 403);
-  const parsed = z.object({ plan: z.enum(['basic', 'plus', 'pro']), threadId: z.string().min(1).optional(), agreed: z.literal(true) })
+  const parsed = z.object({
+    plan: z.enum(['basic', 'plus', 'pro']), threadId: z.string().min(1).optional(),
+    agreed: z.literal(true), phone: z.string().max(24).optional(),
+  })
     .strict().safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: 'Choose a plan and accept the subscription terms.' }, 400);
   const existing = await subscriptionForUser(c.env.DB, user.id);
   if (existing && ['active', 'trialing'].includes(existing.status)) return c.json({ error: 'You already have an active subscription.' }, 409);
-  const phone = env.phone.enabled
-    ? await c.env.DB.prepare('SELECT phone_verified_at FROM users WHERE id = ?').bind(user.id).first<{ phone_verified_at: string | null }>()
-    : null;
+  const phone = await c.env.DB.prepare('SELECT phone_e164, phone_verified_at FROM users WHERE id = ?')
+    .bind(user.id).first<{ phone_e164: string | null; phone_verified_at: string | null }>();
   if (env.phone.enabled && !phone?.phone_verified_at) return c.json({ error: 'Verify your phone number before subscribing.' }, 400);
   const prices = await getPrices(c.env.DB);
   const plan = planFor(prices, parsed.data.plan);
   if (!plan) return c.json({ error: 'That plan is unavailable.' }, 400);
+  if (!env.phone.enabled && !phone?.phone_e164) {
+    const normalized = parsed.data.phone?.replace(/[ \-().]/g, '') ?? '';
+    if (!validPhone(normalized)) return c.json({ error: 'Enter your mobile number with country code.' }, 400);
+    const owner = await c.env.DB.prepare('SELECT id FROM users WHERE phone_e164 = ? AND id != ?')
+      .bind(normalized, user.id).first();
+    if (owner) return c.json({ error: 'That mobile number is already linked to another account.' }, 409);
+    try {
+      await c.env.DB.prepare('UPDATE users SET phone_e164 = ? WHERE id = ?').bind(normalized, user.id).run();
+    } catch (err) {
+      if (err instanceof Error && /UNIQUE constraint failed: users\.phone_e164/.test(err.message)) {
+        return c.json({ error: 'That mobile number is already linked to another account.' }, 409);
+      }
+      throw err;
+    }
+  }
   const keys = await freeKeys(c);
   const eligible = await trialEligible(c.env.DB, user.id, keys);
   const trialEnd = new Date(Date.now() + prices.trialDays * 86_400_000).toISOString();
@@ -1289,7 +1306,7 @@ async function claimTrialForSubscription(
     devices: (metadata.trialDeviceKeys ?? '').split(',').filter(Boolean),
     ip: metadata.trialIpKey || null,
   };
-  const phone = await db.prepare('SELECT phone_e164 FROM users WHERE id = ? AND phone_verified_at IS NOT NULL')
+  const phone = await db.prepare('SELECT phone_e164 FROM users WHERE id = ?')
     .bind(userId).first<{ phone_e164: string | null }>();
   const priorPhone = phone?.phone_e164
     ? await db.prepare("SELECT user_id FROM trial_marks WHERE kind = 'phone' AND value = ?").bind(phone.phone_e164).first<{ user_id: string }>()
