@@ -734,9 +734,7 @@ const subscriptionPlans = async (db: D1Database) => {
   const prices = await getPrices(db);
   return {
     taxFeePercent: prices.taxFeePercent,
-    plans: plansForPrices(prices).map((plan) => ({
-      ...plan, allInCents: plan.cents + taxesAndFees(plan.cents, prices.taxFeePercent),
-    })),
+    plans: plansForPrices(prices),
   };
 };
 
@@ -758,6 +756,7 @@ app.get('/api/subscription', async (c) => {
     phone: phone?.phone_e164 ?? null, phoneSaved: !!phone?.phone_e164,
     trialDays: personal ? (await getPrices(c.env.DB)).trialDays : 0,
     trialConsults: personal ? (await getPrices(c.env.DB)).trialConsults : 0,
+    taxFeePercent: catalog.taxFeePercent,
     trialEligible: personal ? await trialEligible(c.env.DB, user.id, await freeKeys(c)) : false,
     plans: catalog.plans,
     subscription: state ? {
@@ -766,7 +765,6 @@ app.get('/api/subscription', async (c) => {
           && Date.parse(state.pause_starts_at) <= Date.now() && Date.parse(state.paused_until) > Date.now()
           ? 'paused' : state.status,
       priceCents: plan?.cents ?? 0,
-      allInCents: plan ? plan.cents + taxesAndFees(plan.cents, catalog.taxFeePercent) : 0,
       consultations: plan?.consultations ?? 0, consultsLeft: state.consults_left,
       trialEnd: state.trial_end, renewsAt: state.current_period_end,
       pauseStartsAt: state.pause_starts_at, pausedUntil: state.paused_until, cancelAtPeriodEnd: !!state.cancel_at_period_end,
@@ -1463,7 +1461,7 @@ app.post('/api/stripe/webhook', async (c) => {
         const account = await c.env.DB.prepare('SELECT email FROM users WHERE id = ?').bind(userId).first<{ email: string }>();
         if (plan && account) {
           await sendSubscriptionTrialEndingEmail({
-            to: account.email, plan: plan.name, monthlyCents: plan.cents + taxesAndFees(plan.cents, prices.taxFeePercent),
+            to: account.email, plan: plan.name, monthlyCents: plan.cents, taxFeePercent: prices.taxFeePercent,
             trialEnd: state?.trial_end ?? new Date((subscription.trial_end ?? 0) * 1000).toISOString(),
             manageUrl: `${env.siteUrl}/?app=1&account=1`,
           });

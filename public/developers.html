@@ -8,13 +8,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/developers.css" />
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
+  <script src="/theme.js"></script>
   <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "f7e133eb76b54c81ab5181bb69473560"}'></script>
 </head>
 <body>
   <!-- Signed out -->
   <div id="signin-view" class="d-signin" hidden>
     <form id="signin-form" class="d-card d-signin-card">
-      <a class="d-brand" href="/"><span class="d-logo">ॐ</span> Kaalera <span class="d-tag">Developers</span></a>
+      <div class="d-signin-head"><a class="d-brand" href="/"><span class="d-logo">ॐ</span> Kaalera <span class="d-tag">Developers</span></a><button class="theme-toggle" type="button" aria-label="Switch dark or light mode"></button></div>
       <h1>Sign in to the developer dashboard</h1>
       <p class="d-muted">Create API keys and top up your Kaalera API wallet. We'll email you a sign-in link.</p>
       <label>Email
@@ -38,7 +39,7 @@
   <!-- Signed in -->
   <div id="dash-view" class="d-layout" hidden>
     <aside class="d-side">
-      <a class="d-brand" href="/"><span class="d-logo">ॐ</span> Kaalera</a>
+      <div class="d-side-top"><a class="d-brand" href="/"><span class="d-logo">ॐ</span> Kaalera</a><button class="theme-toggle" type="button" aria-label="Switch dark or light mode"></button></div>
       <a class="d-back" href="/">← Back to app</a>
       <div class="d-side-label">Developers</div>
       <nav class="d-nav">
@@ -100,7 +101,7 @@
         <header class="d-head">
           <div>
             <h1>Credits &amp; billing</h1>
-            <p class="d-muted">Business &amp; API pricing is 10% below standard rates: starting a consultation costs $9 and each follow-up $6.30, paid from a prepaid USD wallet. No free or test API: keys activate after your first recharge of $100 or more.</p>
+            <p class="d-muted">Business &amp; API base prices are 10% below standard rates: starting a consultation costs $9 + taxes &amp; fees and each follow-up $6.30 + taxes &amp; fees, paid from a prepaid USD wallet. No free or test API: keys activate after your first recharge of $100 + taxes &amp; fees or more.</p>
           </div>
         </header>
         <div class="d-card">
@@ -180,7 +181,7 @@
   <dialog id="biz-modal" class="d-modal">
     <form id="biz-form" method="dialog">
       <h2>Switch to a Business account</h2>
-      <p>The API is for Business accounts. Your first API wallet payment of <strong id="biz-amount">$100</strong> switches your account to Business, and the full amount goes into your wallet for API calls. Business accounts also pay 10% less for chat.</p>
+      <p>The API is for Business accounts. Your first API wallet payment of <strong id="biz-amount">$100</strong> + taxes &amp; fees switches your account to Business, and the full base amount goes into your wallet for API calls. Business accounts also pay 10% less for chat.</p>
       <label>Business name
         <input id="biz-name" maxlength="120" required placeholder="e.g. Sharma Jyotish Kendra" />
       </label>

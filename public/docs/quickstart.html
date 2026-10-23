@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Quickstart — Kaalera API</title>
 <meta name="description" content="Create an API key, top up your wallet and get your first answer from Kaal.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/docs/docs.css">
+<script src="/theme.js"></script>
 <script src="/docs/docs.js" defer></script>
   <link rel="icon" type="image/svg+xml" href="/kaal-mark.svg" />
 </head>
@@ -23,7 +26,7 @@
 </li>
 <li>
 <h2>Top up your wallet</h2>
-<p>On the same dashboard, add $100, $250 or $500 to your USD wallet (your first recharge must be at least $100, which activates your keys). Business &amp; API pricing is 10% below standard: starting a consultation costs $9 and each follow-up $6.30. There is no free or test API. Check your balance at any time:</p>
+<p>On the same dashboard, add $100, $250 or $500 + taxes &amp; fees to your USD wallet (your first recharge must be at least $100 + taxes &amp; fees, which activates your keys). Business &amp; API base prices are 10% below standard: starting a consultation costs $9 + taxes &amp; fees and each follow-up $6.30 + taxes &amp; fees. There is no free or test API. Check your balance at any time:</p>
 <div class="code"><pre data-lang="cURL"><code>curl {BASE}/v1/balance \
   -H &quot;Authorization: Bearer $KAALERA_API_KEY&quot;</code></pre><pre data-lang="JavaScript"><code>const res = await fetch(&quot;{BASE}/v1/balance&quot;, {
   headers: { Authorization: `Bearer ${process.env.KAALERA_API_KEY}` },

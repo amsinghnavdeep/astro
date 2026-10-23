@@ -1,5 +1,5 @@
 import { confirmPurchase } from './consent.js';
-import { taxFeeNote } from '../disclaimer.js';
+import { authorizedPrice, taxFeeNote } from '../disclaimer.js';
 import { autoChargeNotice, saveBilling, type BillingInfo } from './billing.js';
 type Key = { id: string; name: string; prefix: string; created_at: string; last_used_at: string | null; revoked_at: string | null };
 type Entry = { id: string; delta: number; reason: string; ref: string; api_key_id: string | null; thread_id: string | null; created_at: string };
@@ -259,15 +259,15 @@ function renderBilling(): void {
   const ap = state.apiPrice ?? { startCents: 900, questionCents: 630 };
   $('balance').textContent = usd2(balance);
   $('side-balance').textContent = usd2(balance);
-  $('balance-sub').textContent = `About ${plural(Math.floor(balance / ap.questionCents), 'follow-up question')} at ${usd2(ap.questionCents)} each`
+  $('balance-sub').textContent = `About ${plural(Math.floor(balance / ap.questionCents), 'follow-up question')} at ${usd2(ap.questionCents)}${taxFeeNote(state.taxFeePercent)} each`
     + (lots.length ? ` · ${usd2(lots[0].credits)} expires on ${new Date(lots[0].expiresAt).toLocaleDateString()}` : '');
-  $('per-credit').textContent = `Start ${usd2(ap.startCents)} · follow-up ${usd2(ap.questionCents)} (${state.apiDiscountPercent ?? 10}% below standard)`;
+  $('per-credit').textContent = `Start ${usd2(ap.startCents)}${taxFeeNote(state.taxFeePercent)} · follow-up ${usd2(ap.questionCents)}${taxFeeNote(state.taxFeePercent)} (${state.apiDiscountPercent ?? 10}% below standard)`;
   $('packs').innerHTML = packs.map((p) => `
     <div class="d-pack">
       <div class="d-pack-credits">${usd(p.cents)}</div>
       <div class="d-muted d-small">about ${plural(Math.floor(p.cents / ap.questionCents), 'question')}</div>
-      <div class="d-pack-price">${usd(withFee(p.cents))}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
-      <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Add ${usd(p.cents)}</button>
+      <div class="d-pack-price">${usd(p.cents)}<span class="d-muted" style="font-size:12px;font-weight:400">${taxFeeNote(state?.taxFeePercent ?? 0)}</span></div>
+      <button class="d-btn primary" type="button" data-pack="${esc(p.id)}">Add ${usd(p.cents)}${taxFeeNote(state?.taxFeePercent ?? 0)}</button>
     </div>`).join('');
   renderAutoRecharge();
 }
@@ -276,7 +276,7 @@ $('packs').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-pack]');
   if (!btn) return;
   if (!biz().businessName) return openBiz(btn.dataset.pack);
-  if (!(await confirmPurchase('api', `${usd(withFee((state?.packs ?? []).find((p) => p.id === btn.dataset.pack)?.cents ?? 0))}${taxFeeNote(state?.taxFeePercent ?? 0)}`, { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0 }))) return;
+  if (!(await confirmPurchase('api', authorizedPrice((state?.packs ?? []).find((p) => p.id === btn.dataset.pack)?.cents ?? 0, state?.taxFeePercent ?? 0), { extraQuestionCents: 0, apiCreditCents: state?.creditCents ?? 0, taxFeePercent: state?.taxFeePercent ?? 0 }))) return;
   $('buy-error').textContent = '';
   btn.disabled = true;
   btn.textContent = 'Opening secure checkout…';
@@ -293,8 +293,6 @@ $('packs').addEventListener('click', async (e) => {
 
 /* ---------- auto-recharge ---------- */
 
-const withFee = (cents: number) => cents + Math.round((cents * (state?.taxFeePercent ?? 0)) / 100);
-
 function renderAutoRecharge(): void {
   const b = state?.billing;
   if (!b || !state) return;
@@ -306,7 +304,7 @@ function renderAutoRecharge(): void {
 }
 
 const arText = (b: BillingInfo): string =>
-  `When your wallet drops below ${usd(b.apiLowCents)}, we add ${usd(b.apiAutoRechargeCents)} to your wallet for ${usd(withFee(b.apiAutoRechargeCents))}${taxFeeNote(state?.taxFeePercent ?? 0)}, up to ${usd(b.apiAutoRechargeCapCents)} a month.`;
+  `When your wallet drops below ${usd(b.apiLowCents)}, we add ${usd(b.apiAutoRechargeCents)} to your wallet for ${usd(b.apiAutoRechargeCents)}${taxFeeNote(state?.taxFeePercent ?? 0)}, up to ${usd(b.apiAutoRechargeCapCents)} a month.`;
 
 $('ar-form').addEventListener('submit', async (e) => {
   e.preventDefault();

@@ -59,16 +59,16 @@ Kaal does not predict death or guarantee events. For health, legal or money deci
 - **One Bearer key** (`kal_live_...`) from your [Developers dashboard](/developers).
 
 ## Pricing
-Business & API pricing is always **10% below our website prices**, in USD, taxes & fees included:
+Business & API base prices are always **10% below our website prices**, in USD; taxes & fees are added at checkout:
 
 | | Website | Business & API |
 |---|---|---|
-| Start a consultation | $11.50 | **$10.35** |
-| Each follow-up question | $8.05 | **$7.25** |
+| Start a consultation | $10 + taxes & fees | **$9 + taxes & fees** |
+| Each follow-up question | $7 + taxes & fees | **$6.30 + taxes & fees** |
 
 ## The prepaid wallet
-- Your first recharge is **$115** (taxes & fees included). It unlocks your API keys.
-- Recharge options are $115, $287.50 and $575.
+- Your first recharge is **$100 + taxes & fees**. It unlocks your API keys.
+- Recharge options are $100, $250 and $500, plus taxes & fees.
 - Every call is paid from the wallet. **There are no free or test API calls.** Once your wallet has money in it, you can try the API straight away.
 - Auto-recharge tops your wallet up when it runs low, so your app never stops.
 

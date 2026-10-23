@@ -42,6 +42,7 @@
       <a href="/docs">API reference</a>
       <a href="/">App</a>
       <a href="/support">Support</a>
+      <button class="theme-toggle" type="button" aria-label="Switch dark or light mode"></button>
       <a class="cta" href="/developers">Dashboard</a>
     </nav>`);
   const side = el('aside', { class: 'd-side' }, NAV.map((g) => `<h5>${g.group}</h5>` + g.items.map(([s, label, m]) =>

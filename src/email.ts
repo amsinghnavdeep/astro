@@ -48,11 +48,14 @@ export async function sendReceiptEmail(o: {
 }
 
 export async function sendSubscriptionTrialEndingEmail(o: {
-  to: string; plan: string; monthlyCents: number; trialEnd: string; manageUrl: string;
+  to: string; plan: string; monthlyCents: number; taxFeePercent: number; trialEnd: string; manageUrl: string;
 }): Promise<void> {
   const chargeDate = new Date(o.trialEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+  const monthly = o.taxFeePercent > 0
+    ? `${usd(o.monthlyCents)}/month + ${o.taxFeePercent}% taxes &amp; fees (${usd(o.monthlyCents + Math.round((o.monthlyCents * o.taxFeePercent) / 100))} total)`
+    : `${usd(o.monthlyCents)}/month`;
   await sendEmail(o.to, 'Your Kaalera trial ends soon', layout('Your trial ends soon',
-    `<p>Your ${escapeHtml(o.plan)} plan trial ends on <b>${escapeHtml(chargeDate)}</b>. Your card will then be charged <b>${usd(o.monthlyCents)}/month, including taxes &amp; fees</b>.</p>
+    `<p>Your ${escapeHtml(o.plan)} plan trial ends on <b>${escapeHtml(chargeDate)}</b>. Your card will then be charged <b>${monthly}</b>.</p>
     <p>Cancel anytime from your account.</p>` + button(o.manageUrl, 'Manage subscription')));
 }
 

@@ -10,7 +10,7 @@ POSTS = [
 Sign in at [kaalera.com/developers](/developers) and create a key. It starts with `kal_live_` and is shown once — keep it on your server.
 
 ## 2. Recharge your wallet
-The API is prepaid from a USD wallet, at Business & API prices 10% below the website: **$10.35** to start a consultation and **$7.25** per follow-up, taxes & fees included. Your first recharge must be at least **$115** (incl. taxes & fees), which activates your keys. There are no free or test API calls.
+The API is prepaid from a USD wallet, at Business & API base prices 10% below the website: **$9 + taxes & fees** to start a consultation and **$6.30 + taxes & fees** per follow-up. Your first recharge must be at least **$100 + taxes & fees**, which activates your keys. There are no free or test API calls.
 
 ## 3. Start a consultation
 ```bash
@@ -119,7 +119,7 @@ Kaal's readings are guidance for reflection only, not medical, legal or financia
 - **Kaal**, an AI astrologer, behind a REST API.
 - Answers with **dated predictions**, a short issue line, remedies and suggested next questions.
 - Many languages, including English, Hindi and Hinglish.
-- Prepaid USD wallet, 10% below website prices: $10.35 to start a consultation, $7.25 per follow-up (taxes & fees included).
+- Prepaid USD wallet, 10% below website base prices: $9 + taxes & fees to start a consultation, $6.30 + taxes & fees per follow-up.
 
 ## Architecture
 1. Your app collects name, date, time and place of birth.
@@ -155,7 +155,7 @@ Start here: [Developers](/developers) · [Quickstart](/docs/quickstart) · [Buil
 
 ## Why Kaalera
 - One REST API: create a consultation, poll, ask follow-ups.
-- Prepaid USD wallet, 10% below website prices: $10.35 to start a consultation, $7.25 per follow-up (taxes & fees included).
+- Prepaid USD wallet, 10% below website base prices: $9 + taxes & fees to start a consultation, $6.30 + taxes & fees per follow-up.
 - No political or religious debate; health, legal and money questions carry disclaimers.
 
 See [Developers](/developers) and the [API docs](/docs)."""),

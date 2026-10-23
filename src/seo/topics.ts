@@ -224,11 +224,11 @@ Kaal does not give political or religious debate, and is not a substitute for me
 - **Simple auth:** one Bearer key (\`kal_live_...\`) from your [Developers dashboard](/developers).
 
 ## Pricing
-Business & API pricing is **10% below our website prices**, in USD, taxes & fees included:
-- **$10.35** to start a consultation (first question included);
-- **$7.25** per follow-up question.
+Business & API base prices are **10% below our website prices**, in USD; taxes & fees are added at checkout:
+- **$9 + taxes & fees** to start a consultation (first question included);
+- **$6.30 + taxes & fees** per follow-up question.
 
-You top up a prepaid USD wallet, with a first recharge of **$115**. Every call is paid from the wallet; there are no free or test API calls. Auto-recharge keeps it topped up.
+You top up a prepaid USD wallet, with a first recharge of **$100 + taxes & fees**. Every call is paid from the wallet; there are no free or test API calls. Auto-recharge keeps it topped up.
 
 ## Get started
 1. Sign in at [Developers](/developers) and recharge your wallet.
@@ -238,7 +238,7 @@ You top up a prepaid USD wallet, with a first recharge of **$115**. Every call i
       ['Is there a free trial or test API?', 'No. Every API call is paid from your prepaid USD wallet. Once your wallet is topped up you can try the API straight away.'],
       ['Can I build a horoscope chatbot with it?', 'Yes. Start a consultation with the user\'s birth details, then send each chat message as a follow-up question. Kaal answers with dated predictions and remedies.'],
       ['Which astrology system does Kaal use?', 'Sidereal astrology with Lahiri ayanamsa, whole-sign houses and the Vimshottari dasha system.'],
-      ['How much does it cost?', 'Business & API pricing is 10% below website prices: $10.35 to start a consultation and $7.25 per follow-up, taxes & fees included, from a prepaid USD wallet with a $115 first recharge.'],
+      ['How much does it cost?', 'Business & API base prices are 10% below website prices: $9 + taxes & fees to start a consultation and $6.30 + taxes & fees per follow-up, from a prepaid USD wallet with a $100 + taxes & fees first recharge.'],
     ],
     posts: ['build-ai-astrology-app-kaalera-api', 'add-horoscope-chatbot-to-your-app', 'astrology-api-use-cases'],
     cta: ['/developers', 'Get your API key'],

@@ -1,4 +1,5 @@
 import { saveBilling, type BillingInfo } from './billing.js';
+import { taxFeeNote } from '../disclaimer.js';
 
 type Me = {
   user: { name: string; email: string; accountType: 'personal' | 'business'; businessName: string | null };
@@ -13,7 +14,7 @@ let me: Me;
 
 const reloadPrice = (): string => {
   const base = me.pricing.extraQuestionCents * RELOAD;
-  return usd(base + Math.round((base * me.pricing.taxFeePercent) / 100));
+  return `${usd(base)}${taxFeeNote(me.pricing.taxFeePercent)}`;
 };
 
 function render(): void {
@@ -38,7 +39,7 @@ function render(): void {
   }
   if (b.chatAutoCharge) {
     text.innerHTML = 'Auto-reload <span class="a-on-badge">On</span>';
-    $('a-reload-note').textContent = `When you run out, ${RELOAD} questions are added for ${reloadPrice()} (taxes & fees included) on card •••• ${b.card.last4}, up to ${b.chatAutoDailyMax} questions a day. A receipt is emailed every time.`;
+    $('a-reload-note').textContent = `When you run out, ${RELOAD} questions are added for ${reloadPrice()} on card •••• ${b.card.last4}, up to ${b.chatAutoDailyMax} questions a day. A receipt is emailed every time.`;
     off.hidden = false;
   } else {
     text.innerHTML = 'Auto-reload is off';

@@ -1,5 +1,5 @@
 import { confirmPurchase } from './consent.js';
-import { allIn, taxFeeNote } from '../disclaimer.js';
+import { authorizedMonthlyPrice, authorizedPrice, taxFeeNote } from '../disclaimer.js';
 import { renderMarkdown } from '../markdown.js';
 import { isPdfRequest, markDates, openReport, parseAnswer } from './extras.js';
 import { saveBilling, type BillingInfo } from './billing.js';
@@ -12,9 +12,9 @@ type Thread = {
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
 type Deal = { id?: string; name: string; percent: number; endsOn: string };
-type Plan = { id: 'basic' | 'plus' | 'pro'; name: string; cents: number; consultations: number; allInCents: number };
+type Plan = { id: 'basic' | 'plus' | 'pro'; name: string; cents: number; consultations: number };
 type SubscriptionState = {
-  plan: Plan['id']; planName: string; status: string; priceCents: number; allInCents: number;
+  plan: Plan['id']; planName: string; status: string; priceCents: number;
   consultations: number; consultsLeft: number; trialEnd: string | null; renewsAt: string | null;
   pauseStartsAt: string | null;
   pausedUntil: string | null; cancelAtPeriodEnd: boolean; pendingPlan: Plan['id'] | null;
@@ -22,7 +22,7 @@ type SubscriptionState = {
 type SubscriptionData = {
   enabled: boolean; phoneEnabled: boolean; phoneVerified: boolean; phone: string | null;
   phoneSaved: boolean;
-  trialEligible: boolean; trialDays: number; trialConsults: number; plans: Plan[]; subscription: SubscriptionState | null;
+  trialEligible: boolean; trialDays: number; trialConsults: number; taxFeePercent: number; plans: Plan[]; subscription: SubscriptionState | null;
 };
 type Pricing = { quickWords?: number; freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number; plans?: Plan[] };
 type Me = { walletCents?: number | null; user: { name: string; email: string; accountType?: string; businessName?: string | null }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
@@ -102,7 +102,7 @@ const pauseScheduleText = (startsAt: string | null, returnsAt: string | null) =>
     : `Pause starts on ${start}; your plan comes back on ${end}.`;
 };
 const RELOAD = 2;
-const packLabel = (p: Pricing) => `Add ${RELOAD} questions — ${money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}`;
+const packLabel = (p: Pricing) => `Add ${RELOAD} questions — ${money(p.extraQuestionCents * RELOAD, p.currency)}${taxFeeNote(p.taxFeePercent)}`;
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -151,7 +151,7 @@ const walletCovers = (cents: number): boolean => me?.user.accountType === 'busin
 const credTotal = (): number => (me?.chatCredits ?? []).reduce((n, l) => n + l.credits, 0);
 
 async function goToCheckout(threadId: string, btn?: HTMLButtonElement, cents = me!.pricing.packCents): Promise<void> {
-  if (!walletCovers(cents) && !(await confirmPurchase('chat', money(allIn(cents, me!.pricing.taxFeePercent), me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
+  if (!walletCovers(cents) && !(await confirmPurchase('chat', authorizedPrice(cents, me!.pricing.taxFeePercent), chatPrices()))) return;
   if (btn) {
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
@@ -343,11 +343,11 @@ async function renderPrices(): Promise<void> {
     ? 'Pay for consultations from your Business wallet.'
     : 'Choose a monthly plan or pay for a consultation only.';
   const subscriptionCards = !isBusiness ? (p.plans ?? []).map((plan) =>
-    priceCard(plan.name, `${money(plan.allInCents, p.currency)}/month`, `${plan.consultations} consultations each month, incl. taxes & fees.`),
+    priceCard(plan.name, `${money(plan.cents, p.currency)}/month${taxFeeNote(p.taxFeePercent)}`, `${plan.consultations} consultations each month.`),
   ) : [];
   $('l-prices').replaceChildren(
-    ...(isBusiness ? [priceCard('Pay per consultation', money(allIn(p.packCents, p.taxFeePercent), p.currency),
-      `Start a consultation and pay for additional help only if needed.${p.taxFeePercent ? ' Taxes & fees included.' : ''}`)] : subscriptionCards),
+    ...(isBusiness ? [priceCard('Pay per consultation', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)}`,
+      'Start a consultation and pay for additional help only if needed.')] : subscriptionCards),
   );
 }
 
@@ -363,8 +363,8 @@ function updatePlanChoice(): void {
   $('subscription-submit').textContent = subscriptionInfo.trialEligible
     ? `Start ${subscriptionInfo.trialDays}-day free trial` : 'Subscribe';
   $('subscription-consent-copy').textContent = subscriptionInfo.trialEligible
-    ? `I agree to the Terms and authorize ${money(plan.allInCents)}/month after my ${subscriptionInfo.trialDays}-day free trial. Cancel anytime from my account.`
-    : `I agree to the Terms and authorize a monthly charge of ${money(plan.allInCents)} starting today. Cancel anytime from my account.`;
+    ? `I agree to the Terms and authorize ${authorizedMonthlyPrice(plan.cents, subscriptionInfo.taxFeePercent)} after my ${subscriptionInfo.trialDays}-day free trial. Cancel anytime from my account.`
+    : `I agree to the Terms and authorize ${authorizedMonthlyPrice(plan.cents, subscriptionInfo.taxFeePercent)} starting today. Cancel anytime from my account.`;
 }
 
 async function openSubscriptionPlans(threadId: string | null = null): Promise<void> {
@@ -398,9 +398,8 @@ async function openSubscriptionPlans(threadId: string | null = null): Promise<vo
     card.setAttribute('aria-pressed', String(plan.id === selectedPlanId));
     card.append(
       el('strong', '', plan.name),
-      el('span', 'plan-card-price', `${money(plan.allInCents)}/month`),
+      el('span', 'plan-card-price', `${money(plan.cents)}/month${taxFeeNote(data.taxFeePercent)}`),
       el('span', 'plan-card-consults', `${plan.consultations} consultations`),
-      el('span', 'plan-card-fee', 'incl. taxes & fees'),
     );
     card.addEventListener('click', () => { selectedPlanId = plan.id; updatePlanChoice(); });
     return card;
@@ -421,7 +420,7 @@ async function openSubscriptionManage(): Promise<void> {
   $('subscription-manage').hidden = false;
   $('subscription-manage-error').textContent = '';
   $('subscription-manage-summary').textContent =
-    `You have ${sub.consultsLeft} consultations left this month. Your ${sub.planName} plan is ${money(sub.allInCents)}/month incl. taxes & fees.`;
+    `You have ${sub.consultsLeft} consultations left this month. Your ${sub.planName} plan is ${money(sub.priceCents)}/month${taxFeeNote(data.taxFeePercent)}.`;
   const pauseSchedule = pauseScheduleText(sub.pauseStartsAt, sub.pausedUntil);
   $('subscription-manage-date').textContent = pauseSchedule
     ? pauseSchedule
@@ -819,9 +818,9 @@ function showProfile(question = ''): void {
     submit.textContent = `Start consultation — ${money(p.packCents, p.currency)} from wallet`;
   } else {
     note.innerHTML = '';
-    note.append(el('strong', '', `${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} to start.`),
-      ` An opening reading and the answer to your question, open for ${p.consultationDays} days. Extra questions come ${RELOAD} at a time for ${money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency)}. You'll pay securely by card.`);
-    submit.textContent = `Continue to payment — ${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}`;
+    note.append(el('strong', '', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)} to start.`),
+      ` An opening reading and the answer to your question, open for ${p.consultationDays} days. Extra questions come ${RELOAD} at a time for ${money(p.extraQuestionCents * RELOAD, p.currency)}${taxFeeNote(p.taxFeePercent)}. You'll pay securely by card.`);
+    submit.textContent = `Continue to payment — ${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)}`;
   }
   history.replaceState(null, '', '/');
 }
@@ -908,7 +907,7 @@ profileForm.addEventListener('submit', async (e) => {
   const fromWallet = !personal && !me!.freeAvailable && credTotal() < 1 && walletCovers(me!.pricing.packCents);
   if (fromWallet) (body as Record<string, unknown>).agreed = true;
   else if (!personal && !me!.freeAvailable && credTotal() < 1) {
-    if (!(await confirmPurchase('chat', money(allIn(me!.pricing.packCents, me!.pricing.taxFeePercent), me!.pricing.currency) + taxFeeNote(me!.pricing.taxFeePercent), chatPrices()))) return;
+    if (!(await confirmPurchase('chat', authorizedPrice(me!.pricing.packCents, me!.pricing.taxFeePercent), chatPrices()))) return;
     (body as Record<string, unknown>).agreed = true;
   }
   const label = submit.textContent;
@@ -1410,13 +1409,13 @@ function renderState(): void {
   if (t.expired) {
     panel(`This consultation closed after ${p.consultationDays} days`, 'You can still read it. Start a new consultation to ask more.', btn('Start a new consultation', () => showProfile()));
   } else if (t.status === 'awaiting_payment') {
-    panel('Complete payment to start', `${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} for an opening reading and the answer to your question.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
+    panel('Complete payment to start', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)} for an opening reading and the answer to your question.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
   } else if (t.status === 'failed') {
     panel("Kaal couldn't start this consultation", 'Your question is saved and you were not charged for a failed start.', btn('Retry', retry));
   } else if (isLive && t.questionsLeft < 1 && !t.quickLeft && pending === 0 && !autoReload()) {
     const b = btn(packLabel(p), () => undefined);
     b.dataset.addq = '';
-    panel("You've used all questions in this consultation", `Add ${RELOAD} more for ${money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}. After that, ${RELOAD} more are added automatically whenever you run out · ${timeLeft(t)} in this consultation.`, b);
+    panel("You've used all questions in this consultation", `Add ${RELOAD} more for ${money(p.extraQuestionCents * RELOAD, p.currency)}${taxFeeNote(p.taxFeePercent)}. After that, ${RELOAD} more are added automatically whenever you run out · ${timeLeft(t)} in this consultation.`, b);
   }
   askForm.hidden = !isLive || (t.questionsLeft < 1 && !t.quickLeft && !autoReload());
   askSubmit.disabled = sending;
@@ -1555,7 +1554,7 @@ const chatPrices = () => ({ extraQuestionCents: me!.pricing.extraQuestionCents, 
 const autoPrice = (): string => {
   const p = me!.pricing;
   if (me!.user.accountType === 'business') return money(p.extraQuestionCents * RELOAD, p.currency);
-  return money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency);
+  return `${money(p.extraQuestionCents * RELOAD, p.currency)}${taxFeeNote(p.taxFeePercent)}`;
 };
 
 let reloadFailed = false;

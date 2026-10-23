@@ -5,6 +5,9 @@ async function saveBilling(patch) {
   return (await res.json()).billing;
 }
 
+// src/disclaimer.ts
+var taxFeeNote = (percent) => percent > 0 ? " + taxes & fees" : "";
+
 // src/web/account.ts
 var RELOAD = 2;
 var $ = (id) => document.getElementById(id);
@@ -12,7 +15,7 @@ var usd = (cents) => `$${(cents / 100).toFixed(2)}`;
 var me;
 var reloadPrice = () => {
   const base = me.pricing.extraQuestionCents * RELOAD;
-  return usd(base + Math.round(base * me.pricing.taxFeePercent / 100));
+  return `${usd(base)}${taxFeeNote(me.pricing.taxFeePercent)}`;
 };
 function render() {
   const b = me.billing;
@@ -36,7 +39,7 @@ function render() {
   }
   if (b.chatAutoCharge) {
     text.innerHTML = 'Auto-reload <span class="a-on-badge">On</span>';
-    $("a-reload-note").textContent = `When you run out, ${RELOAD} questions are added for ${reloadPrice()} (taxes & fees included) on card \u2022\u2022\u2022\u2022 ${b.card.last4}, up to ${b.chatAutoDailyMax} questions a day. A receipt is emailed every time.`;
+    $("a-reload-note").textContent = `When you run out, ${RELOAD} questions are added for ${reloadPrice()} on card \u2022\u2022\u2022\u2022 ${b.card.last4}, up to ${b.chatAutoDailyMax} questions a day. A receipt is emailed every time.`;
     off.hidden = false;
   } else {
     text.innerHTML = "Auto-reload is off";
