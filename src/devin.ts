@@ -329,7 +329,7 @@ const GENERAL_READING = 'Then give a short general reading for the next 12–18 
 export function wrapCustomerMessage(text: string, language = 'English', quickWords = 0): string {
   const safe = text.replaceAll('<', '‹').replaceAll('>', '›');
   const how = quickWords > 0
-    ? `QUICK ANSWER (the customer paid for a short reply): at most ${quickWords} words in total. Only the **Answer:** with the month/year window and confidence, then one line **Why:** naming the period or transit. No greeting, empathy line, Predictions, Issue, Remedy, past events or Ask me next. End with exactly: "Want the full reading? Ask again with Full."`
+    ? `QUICK ANSWER (the customer paid for a short reply): at most ${quickWords} words in total, counting every word including the last line (count before sending; shorter is fine). Only the **Answer:** with the month/year window and confidence, then one line **Why:** naming the period or transit. No greeting, empathy line, Predictions, Issue, Remedy, past events or Ask me next. End with exactly: "Want the full reading? Ask again with Full."`
     : 'following your standing instructions';
   return `<customer_message>\n${safe}\n</customer_message>\n(Reply to the customer in ${language} with exactly one message, ${how}.)`;
 }
