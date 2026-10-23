@@ -16,6 +16,7 @@ type Plan = { id: 'basic' | 'plus' | 'pro'; name: string; cents: number; consult
 type SubscriptionState = {
   plan: Plan['id']; planName: string; status: string; priceCents: number; allInCents: number;
   consultations: number; consultsLeft: number; trialEnd: string | null; renewsAt: string | null;
+  pauseStartsAt: string | null;
   pausedUntil: string | null; cancelAtPeriodEnd: boolean; pendingPlan: Plan['id'] | null;
 };
 type SubscriptionData = {
@@ -91,6 +92,14 @@ async function api<T>(url: string, init?: RequestInit) {
 const money = (cents: number, currency = 'usd') =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const pauseScheduleText = (startsAt: string | null, returnsAt: string | null) => {
+  if (!startsAt || !returnsAt) return '';
+  const start = new Date(startsAt).toLocaleDateString();
+  const end = new Date(returnsAt).toLocaleDateString();
+  return Date.parse(startsAt) <= Date.now()
+    ? `Pause started on ${start}; your plan comes back on ${end}.`
+    : `Pause starts on ${start}; your plan comes back on ${end}.`;
+};
 const RELOAD = 2;
 const packLabel = (p: Pricing) => `Add ${RELOAD} questions — ${money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}`;
 
@@ -206,8 +215,9 @@ function renderSubscriptionMenu(): void {
     return;
   }
   $('account-plan-label').textContent = `Plan · ${sub.planName}`;
-  const until = sub.status === 'paused' && sub.pausedUntil
-    ? `Paused until ${new Date(sub.pausedUntil).toLocaleDateString()}`
+  const pauseSchedule = pauseScheduleText(sub.pauseStartsAt, sub.pausedUntil);
+  const until = pauseSchedule
+    ? pauseSchedule
     : sub.cancelAtPeriodEnd && sub.renewsAt
       ? `Ends ${new Date(sub.renewsAt).toLocaleDateString()}`
     : sub.trialEnd && sub.status === 'trialing'
@@ -218,8 +228,9 @@ function renderSubscriptionMenu(): void {
     : '';
   $('account-plan-detail').textContent = `${sub.consultsLeft} of ${sub.consultations} consultations left · ${until}${pending}`;
   const hasPlan = ['active', 'trialing', 'paused', 'past_due'].includes(sub.status);
+  const pauseScheduled = !!(sub.pauseStartsAt && sub.pausedUntil);
   cancel.hidden = !hasPlan || sub.cancelAtPeriodEnd;
-  resume.hidden = !hasPlan || !(sub.cancelAtPeriodEnd || sub.status === 'paused');
+  resume.hidden = !hasPlan || !(sub.cancelAtPeriodEnd || sub.status === 'paused' || pauseScheduled);
   resume.textContent = sub.cancelAtPeriodEnd ? 'Resume plan' : 'Resume now';
 }
 
@@ -400,17 +411,18 @@ async function openSubscriptionManage(): Promise<void> {
   $('subscription-manage-error').textContent = '';
   $('subscription-manage-summary').textContent =
     `You have ${sub.consultsLeft} consultations left this month. Your ${sub.planName} plan is ${money(sub.allInCents)}/month incl. taxes & fees.`;
-  $('subscription-manage-date').textContent = sub.status === 'paused' && sub.pausedUntil
-    ? `Paused until ${new Date(sub.pausedUntil).toLocaleDateString()}.`
+  const pauseSchedule = pauseScheduleText(sub.pauseStartsAt, sub.pausedUntil);
+  $('subscription-manage-date').textContent = pauseSchedule
+    ? pauseSchedule
     : sub.cancelAtPeriodEnd && sub.renewsAt
       ? `Your plan stays active until ${new Date(sub.renewsAt).toLocaleDateString()}.`
       : sub.pendingPlan && sub.renewsAt
         ? `Your plan will switch to ${sub.pendingPlan[0].toUpperCase()}${sub.pendingPlan.slice(1)} on ${new Date(sub.renewsAt).toLocaleDateString()}.`
       : sub.renewsAt ? `Renews ${new Date(sub.renewsAt).toLocaleDateString()}.` : '';
-  $('subscription-pause').hidden = !['active', 'trialing'].includes(sub.status) || sub.cancelAtPeriodEnd;
+  $('subscription-pause').hidden = sub.status !== 'active' || !!sub.pauseStartsAt || sub.cancelAtPeriodEnd;
   $('subscription-basic').hidden = sub.plan === 'basic' || !!sub.pendingPlan || !['active', 'trialing'].includes(sub.status) || sub.cancelAtPeriodEnd;
   $('subscription-cancel').hidden = sub.cancelAtPeriodEnd;
-  $('subscription-resume').hidden = !(sub.cancelAtPeriodEnd || sub.status === 'paused');
+  $('subscription-resume').hidden = !(sub.cancelAtPeriodEnd || sub.status === 'paused' || !!sub.pauseStartsAt);
   $('subscription-resume').textContent = sub.cancelAtPeriodEnd ? 'Resume plan' : 'Resume now';
   const note = $<HTMLInputElement>('cancel-note');
   note.value = '';
@@ -427,12 +439,14 @@ const cancellationDetails = () => ({
 async function subscriptionAction(action: 'pause' | 'basic'): Promise<void> {
   const error = $('subscription-manage-error');
   error.textContent = '';
-  const { ok, data } = await api<{ pausedUntil?: string; switchedTo?: string; renewsAt?: string; error?: string }>('/api/subscription/manage', {
+  const { ok, data } = await api<{ pauseStartsAt?: string; pausedUntil?: string; switchedTo?: string; renewsAt?: string; error?: string }>('/api/subscription/manage', {
     method: 'POST', body: JSON.stringify({ action, ...cancellationDetails() }),
   });
   if (!ok) { error.textContent = data.error ?? 'Could not update your plan.'; return; }
   await refreshSubscription();
-  if (action === 'pause' && data.pausedUntil) $('subscription-manage-date').textContent = `Paused until ${new Date(data.pausedUntil).toLocaleDateString()}.`;
+  if (action === 'pause' && data.pauseStartsAt && data.pausedUntil) {
+    $('subscription-manage-date').textContent = pauseScheduleText(data.pauseStartsAt, data.pausedUntil);
+  }
   if (action === 'basic' && data.renewsAt) $('subscription-manage-date').textContent = `Your plan will switch to Basic on ${new Date(data.renewsAt).toLocaleDateString()}.`;
   await openSubscriptionManage();
 }

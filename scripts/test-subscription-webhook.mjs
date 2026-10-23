@@ -30,6 +30,8 @@ const fixture = (overrides = {}) => ({ ...baseSubscription, ...overrides });
 const cases = [
   ['trial', 'customer.subscription.updated', fixture()],
   ['pause', 'customer.subscription.updated', fixture({
+    status: 'active',
+    trial_end: null,
     pause_collection: { behavior: 'void', resumes_at: now + 60 * 86400 },
   })],
   ['switch_to_basic', 'customer.subscription.updated', fixture({

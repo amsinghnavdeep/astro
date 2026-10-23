@@ -12,6 +12,7 @@ CREATE TABLE subscriptions (
   current_period_end TEXT,
   cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
   paused_until TEXT,
+  pause_starts_at TEXT,
   consults_left INTEGER NOT NULL DEFAULT 0,
   last_invoice_id TEXT,
   had_trial INTEGER NOT NULL DEFAULT 0,
@@ -30,7 +31,7 @@ CREATE TABLE trial_marks (
 CREATE TABLE subscription_usages (
   thread_id TEXT PRIMARY KEY REFERENCES threads(id),
   user_id TEXT NOT NULL REFERENCES users(id),
-  stripe_subscription_id TEXT NOT NULL REFERENCES subscriptions(stripe_subscription_id),
+  stripe_subscription_id TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
 CREATE INDEX subscription_usages_user_idx ON subscription_usages(user_id, created_at);

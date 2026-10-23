@@ -14,7 +14,7 @@ export type SubscriptionState = {
   user_id: string; stripe_subscription_id: string; plan: PlanId; status: string;
   pending_plan: PlanId | null;
   trial_end: string | null; current_period_end: string | null; cancel_at_period_end: number;
-  paused_until: string | null; consults_left: number; last_invoice_id: string | null; had_trial: number;
+  paused_until: string | null; pause_starts_at: string | null; consults_left: number; last_invoice_id: string | null; had_trial: number;
 };
 export type SubscriptionUser = { id: string; email: string; name: string };
 
@@ -130,17 +130,19 @@ export async function syncSubscription(db: D1Database, subscription: Stripe.Subs
   const currentPeriodEnd = subscription.current_period_end ? new Date(subscription.current_period_end * 1000).toISOString() : null;
   const pausedUntil = subscription.pause_collection?.resumes_at
     ? new Date(subscription.pause_collection.resumes_at * 1000).toISOString() : null;
+  const pauseStartsAt = subscription.pause_collection ? currentPeriodEnd : null;
   const trialing = subscription.status === 'trialing';
   await db.prepare(
     `INSERT INTO subscriptions
-      (user_id, stripe_subscription_id, plan, status, trial_end, current_period_end, cancel_at_period_end, paused_until, consults_left, last_invoice_id, had_trial, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
+      (user_id, stripe_subscription_id, plan, status, trial_end, current_period_end, cancel_at_period_end, paused_until, pause_starts_at, consults_left, last_invoice_id, had_trial, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET stripe_subscription_id = excluded.stripe_subscription_id,
        plan = excluded.plan, status = excluded.status, trial_end = excluded.trial_end,
        current_period_end = excluded.current_period_end, cancel_at_period_end = excluded.cancel_at_period_end,
-       paused_until = excluded.paused_until, had_trial = MAX(subscriptions.had_trial, excluded.had_trial), updated_at = excluded.updated_at`,
+       paused_until = excluded.paused_until, pause_starts_at = excluded.pause_starts_at,
+       had_trial = MAX(subscriptions.had_trial, excluded.had_trial), updated_at = excluded.updated_at`,
   ).bind(userId, subscription.id, plan, subscription.status, trialEnd, currentPeriodEnd,
-    subscription.cancel_at_period_end ? 1 : 0, pausedUntil,
+    subscription.cancel_at_period_end ? 1 : 0, pausedUntil, pauseStartsAt,
     trialing ? prices.trialConsults : 0, trialing ? 1 : 0, now, now).run();
   return userId;
 }
@@ -163,9 +165,9 @@ export async function spendSubscriptionConsultation(
      FROM threads t JOIN subscriptions s ON s.user_id = t.user_id
      WHERE t.id = ? AND t.user_id = ? AND t.status = 'awaiting_payment'
        AND s.consults_left > 0 AND s.status IN ('trialing', 'active')
-       AND (s.paused_until IS NULL OR s.paused_until <= ?)
+       AND (s.paused_until IS NULL OR s.paused_until <= ? OR (s.pause_starts_at IS NOT NULL AND ? < s.pause_starts_at))
      ON CONFLICT(thread_id) DO NOTHING`,
-  ).bind(now, threadId, userId, now).run();
+  ).bind(now, threadId, userId, now, now).run();
   return (result.meta?.changes ?? 0) > 0;
 }
 

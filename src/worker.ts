@@ -762,12 +762,14 @@ app.get('/api/subscription', async (c) => {
     plans: catalog.plans,
     subscription: state ? {
       plan: state.plan, planName: plan?.name ?? state.plan, status:
-        state.paused_until && Date.parse(state.paused_until) > Date.now() ? 'paused' : state.status,
+        state.pause_starts_at && state.paused_until
+          && Date.parse(state.pause_starts_at) <= Date.now() && Date.parse(state.paused_until) > Date.now()
+          ? 'paused' : state.status,
       priceCents: plan?.cents ?? 0,
       allInCents: plan ? plan.cents + taxesAndFees(plan.cents, catalog.taxFeePercent) : 0,
       consultations: plan?.consultations ?? 0, consultsLeft: state.consults_left,
       trialEnd: state.trial_end, renewsAt: state.current_period_end,
-      pausedUntil: state.paused_until, cancelAtPeriodEnd: !!state.cancel_at_period_end,
+      pauseStartsAt: state.pause_starts_at, pausedUntil: state.paused_until, cancelAtPeriodEnd: !!state.cancel_at_period_end,
       pendingPlan: state.pending_plan,
     } : null,
   });
@@ -869,12 +871,16 @@ app.post('/api/subscription/manage', async (c) => {
   if (!parsed.success) return c.json({ error: 'Choose an account action.' }, 400);
   const state = await subscriptionForUser(c.env.DB, user.id);
   if (!state || !['active', 'trialing', 'past_due'].includes(state.status)) return c.json({ error: 'No active subscription was found.' }, 409);
+  if (parsed.data.action === 'pause' && state.status === 'trialing') {
+    return c.json({ error: 'Pause is available after your first monthly payment.' }, 409);
+  }
   if (state.cancel_at_period_end) return c.json({ error: 'Your subscription is already set to end.' }, 409);
   if (parsed.data.action !== 'cancel' && !['active', 'trialing'].includes(state.status)) {
     return c.json({ error: 'This plan action is not available while payment is past due.' }, 409);
   }
   const now = Math.floor(Date.now() / 1000);
   if (parsed.data.action === 'pause') {
+    const pauseStartsAt = state.current_period_end ?? new Date(now * 1000).toISOString();
     const periodEnd = state.current_period_end ? Math.floor(Date.parse(state.current_period_end) / 1000) : now;
     const resumeDate = new Date(Math.max(periodEnd, now) * 1000);
     const day = resumeDate.getUTCDate();
@@ -885,8 +891,10 @@ app.post('/api/subscription/manage', async (c) => {
       pause_collection: { behavior: 'void', resumes_at: Math.floor(resumeDate.getTime() / 1000) },
     });
     await syncSubscription(c.env.DB, updated, user.id);
+    await c.env.DB.prepare('UPDATE subscriptions SET pause_starts_at = ? WHERE user_id = ?')
+      .bind(pauseStartsAt, user.id).run();
     await subscriptionOffer(c.env.DB, user.id, 'pause', parsed.data.reason, parsed.data.note);
-    return c.json({ pausedUntil: resumeDate.toISOString() });
+    return c.json({ pauseStartsAt, pausedUntil: resumeDate.toISOString() });
   }
   if (parsed.data.action === 'basic') {
     if (state.plan === 'basic') return c.json({ error: 'You are already on Basic.' }, 409);
@@ -1056,10 +1064,12 @@ app.post('/api/threads', async (c) => {
           covered = true;
         } else if (!body.data.overage) {
           const fresh = (await getThreadById(db, t.id))!;
-          const paused = sub.paused_until && Date.parse(sub.paused_until) > Date.now();
+          const now = Date.now();
+          const paused = !!(sub.pause_starts_at && sub.paused_until
+            && Date.parse(sub.pause_starts_at) <= now && Date.parse(sub.paused_until) > now);
           return c.json({
             thread: await pubT(c, fresh), code: paused ? 'plan_paused' : 'plan_used_up',
-            ...(paused ? { pausedUntil: sub.paused_until } : {}),
+            ...(paused ? { pauseStartsAt: sub.pause_starts_at, pausedUntil: sub.paused_until } : {}),
           });
         }
       } else if (!body.data.overage) {
