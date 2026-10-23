@@ -13,6 +13,7 @@
 }
 body { background: var(--bg); color: var(--text); font-size: 15px; }
 ::selection { background: color-mix(in srgb, var(--saf) 28%, transparent); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--saf); }
 
 /* Buttons: warm saffron instead of black */
 .btn { background: var(--card); border-color: var(--line-strong); border-radius: 999px; transition: background .2s, border-color .2s, transform .15s, box-shadow .2s; }
@@ -100,6 +101,9 @@ dialog, .modal, .modal-card { background: var(--card); color: var(--text); borde
 .consent-text { background: var(--soft); border-color: var(--line); color: var(--muted); }
 .consent-actions button { background: var(--card); color: var(--text); border-color: var(--line-strong); border-radius: 999px; }
 .consent-actions .consent-pay { background: linear-gradient(135deg, var(--saf2), var(--saf)); border-color: transparent; color: #fff; }
+.modal .modal-x { width: 40px; height: 40px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--card); color: var(--muted); }
+.modal .modal-x:focus { outline: none; box-shadow: none; }
+.modal .modal-x:focus-visible { outline: 2px solid var(--saf); outline-offset: 2px; }
 .t-ic { background: var(--chip-bg); color: var(--chip-fg); }
 .modal { border-color: var(--line); }
 .modal::backdrop, .consent-dialog::backdrop { background: rgba(42,30,20,.32); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
@@ -107,6 +111,13 @@ dialog, .modal, .modal-card { background: var(--card); color: var(--text); borde
 .landing { background-color: var(--bg); }
 .step-n { background: var(--text); }
 .text-link { color: var(--text); }
+.subscription-consent { align-items: flex-start; margin-bottom: 10px; line-height: 1.45; }
+.subscription-consent input { flex: none; margin-top: 3px; }
+#subscription-submit { margin-top: 10px; }
+.manage-offers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.manage-offers .btn { min-height: 44px; height: auto; white-space: normal; }
+#subscription-cancel { margin-top: 8px; }
+@media (max-width: 359px) { .manage-offers { grid-template-columns: 1fr; } }
 input:focus, select:focus, textarea:focus { border-color: color-mix(in srgb, var(--saf) 55%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--saf) 14%, transparent); }
 [data-theme="dark"] .msg.kaal .body h3, [data-theme="dark"] .msg.kaal .body h4 { color: var(--saf2); }
 [data-theme="dark"] .zodiac-wheel { color: #4b5578; }
