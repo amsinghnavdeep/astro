@@ -103,7 +103,7 @@ dialog, .modal, .modal-card { background: var(--card); color: var(--text); borde
 .consent-actions .consent-pay { background: linear-gradient(135deg, var(--saf2), var(--saf)); border-color: transparent; color: #fff; }
 .modal .modal-x { width: 40px; height: 40px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--card); color: var(--muted); }
 .modal .modal-x:focus { outline: none; box-shadow: none; }
-.modal .modal-x:focus-visible { outline: 2px solid var(--saf); outline-offset: 2px; }
+.modal .modal-x:focus-visible { outline: none; border-color: var(--saf); color: var(--text); }
 .t-ic { background: var(--chip-bg); color: var(--chip-fg); }
 .modal { border-color: var(--line); }
 .modal::backdrop, .consent-dialog::backdrop { background: rgba(42,30,20,.32); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }

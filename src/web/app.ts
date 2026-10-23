@@ -398,8 +398,9 @@ async function openSubscriptionPlans(threadId: string | null = null): Promise<vo
     card.setAttribute('aria-pressed', String(plan.id === selectedPlanId));
     card.append(
       el('strong', '', plan.name),
-      el('span', 'plan-card-price', `${money(plan.cents)}/month${taxFeeNote(data.taxFeePercent)}`),
+      el('span', 'plan-card-price', `${money(plan.cents)}/month`),
       el('span', 'plan-card-consults', `${plan.consultations} consultations`),
+      ...(data.taxFeePercent > 0 ? [el('span', 'plan-card-fee', '+ taxes & fees')] : []),
     );
     card.addEventListener('click', () => { selectedPlanId = plan.id; updatePlanChoice(); });
     return card;
