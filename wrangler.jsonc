@@ -33,7 +33,8 @@
     "SITE_URL": "https://kaalera.com",
     "EMAIL_FROM": "Kaalera <hello@kaalera.com>",
     "DEV_LOGIN_LINKS": "false",
-    "SUPPORT_EMAIL": "amsinghnavdeep@gmail.com"
+    "SUPPORT_EMAIL": "amsinghnavdeep@gmail.com",
+    "DEVIN_CHAT_MODE": "ultra"
   },
   "triggers": { "crons": ["0 13 * * *"] }
 }

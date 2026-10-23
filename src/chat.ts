@@ -4,7 +4,7 @@ import { useCoupon } from './coupons.js';
 import type { D1Database } from '@cloudflare/workers-types';
 import { env } from './env.js';
 import {
-  createChatSession, getSession, listSessionMessages, postSessionMessage, wrapCustomerMessage,
+  continuationOpening, createChatSession, getSession, listSessionMessages, postSessionMessage, wrapCustomerMessage,
   type ChatPersona,
 } from './devin.js';
 import { refundApiCredit, spendApiCredit } from './api.js';
@@ -22,7 +22,7 @@ export interface Thread {
   status: 'awaiting_payment' | 'starting' | 'active' | 'failed'; is_free: number;
   questions_allowed: number; questions_used: number; acus_consumed: number;
   last_synced_at: number; created_at: string; expires_at: number | null;
-  kundli_id?: string | null;
+  kundli_id?: string | null; quick_credit?: number; renewed_at?: number;
 }
 export interface Message {
   id: string; thread_id: string; role: 'user' | 'pandit'; body: string;
@@ -31,6 +31,9 @@ export interface Message {
 
 const SYNC_INTERVAL_MS = 3000;
 const MAX_UNANSWERED = 2;
+/** A question unanswered this long while its session is not running means the session stopped (e.g. its ACU cap). */
+const STUCK_MS = 8 * 60_000;
+const ALIVE = new Set(['new', 'claimed', 'running', 'resuming']);
 const DAY_MS = 86_400_000;
 const nowIso = (): string => new Date().toISOString();
 
@@ -114,7 +117,7 @@ export function pendingCount(messages: Message[]): number {
 export type SendError = 'no_questions' | 'expired' | 'too_many_pending' | 'thread_unavailable' | 'delivery_failed';
 
 export async function sendCustomerMessage(
-  db: D1Database, t: Thread, text: string, language?: string, context?: string,
+  db: D1Database, t: Thread, text: string, language?: string, context?: string, quickWords = 0,
 ): Promise<{ message?: Message; error?: SendError }> {
   if (t.status !== 'active' || !t.devin_session_id) return { error: 'thread_unavailable' };
   if (isExpired(t)) return { error: 'expired' };
@@ -122,26 +125,33 @@ export async function sendCustomerMessage(
   const id = crypto.randomUUID();
   const ref = `question:${id}`;
   let fromCredits = false;
-  let spent = t.source === 'api'
-    ? await spendApiCredit(db, t.user_id, ref, t.api_key_id, t.id, apiPrice(await getPrices(db)).questionCents)
+  const quick = quickWords > 0;
+  const fromBank = quick && t.source === 'web' && (t.quick_credit ?? 0) > 0
+    && ((await db.prepare('UPDATE threads SET quick_credit = 0 WHERE id = ? AND quick_credit > 0').bind(t.id).run()).meta?.changes ?? 0) > 0;
+  const price = apiPrice(await getPrices(db));
+  let spent = fromBank || (t.source === 'api'
+    ? await spendApiCredit(db, t.user_id, ref, t.api_key_id, t.id, quick ? price.quickCents : price.questionCents)
     : ((await db.prepare(
         "UPDATE threads SET questions_used = questions_used + 1 WHERE id = ? AND status = 'active' AND questions_used < questions_allowed AND (expires_at IS NULL OR expires_at > ?)",
-      ).bind(t.id, Date.now()).run()).meta?.changes ?? 0) > 0;
+      ).bind(t.id, Date.now()).run()).meta?.changes ?? 0) > 0);
   if (!spent && t.source === 'web' && (await spendCredit(db, 'chat', t.user_id, ref, { threadId: t.id }))) {
     await db.prepare('UPDATE threads SET questions_used = questions_used + 1, questions_allowed = questions_allowed + 1 WHERE id = ?').bind(t.id).run();
     spent = fromCredits = true;
   }
   if (!spent) return { error: 'no_questions' };
+  const banked = quick && t.source === 'web' && !fromBank;
+  if (banked) await db.prepare('UPDATE threads SET quick_credit = 1 WHERE id = ?').bind(t.id).run();
   const lang = language ?? t.language;
   if (lang !== t.language) await db.prepare('UPDATE threads SET language = ? WHERE id = ?').bind(lang, t.id).run();
   const message: Message = { id, thread_id: t.id, role: 'user', body: text, devin_event_id: null, created_at: nowIso() };
   await insertMessage(db, message);
   try {
-    await postSessionMessage(t.devin_session_id, (context ? `${context}\n\n` : '') + wrapCustomerMessage(text, lang), { retryOnInitializing: true });
+    await postSessionMessage(t.devin_session_id, (context ? `${context}\n\n` : '') + wrapCustomerMessage(text, lang, quickWords), { retryOnInitializing: true });
   } catch (err) {
     console.error('Chat delivery failed:', err);
     await db.prepare('DELETE FROM messages WHERE id = ?').bind(id).run();
-    if (t.source === 'api') await refundApiCredit(db, t.user_id, ref);
+    if (fromBank || banked) await db.prepare('UPDATE threads SET quick_credit = ? WHERE id = ?').bind(fromBank ? 1 : 0, t.id).run();
+    if (fromBank) { /* nothing else was spent */ } else if (t.source === 'api') await refundApiCredit(db, t.user_id, ref);
     else if (fromCredits) {
       await refundCredit(db, 'chat', t.user_id, ref);
       await db.prepare('UPDATE threads SET questions_used = questions_used - 1, questions_allowed = questions_allowed - 1 WHERE id = ?').bind(t.id).run();
@@ -180,6 +190,33 @@ export async function syncThread(db: D1Database, t: Thread): Promise<void> {
     } catch { /* best-effort */ }
   }
   await db.prepare('UPDATE threads SET devin_cursor = ?, acus_consumed = ? WHERE id = ?').bind(cursor, acus, t.id).run();
+  if (!gotNew && t.status === 'active') await renewIfStuck(db, t);
+}
+
+/** Moves a consultation to a fresh Kaal session (with the conversation so far) when its session stopped mid-question. */
+async function renewIfStuck(db: D1Database, t: Thread): Promise<void> {
+  const msgs = await listMessages(db, t.id);
+  let i = msgs.length;
+  while (i > 0 && msgs[i - 1].role === 'user') i -= 1;
+  const waiting = msgs.slice(i);
+  const now = Date.now();
+  if (!waiting.length || now - Date.parse(waiting[0].created_at) < STUCK_MS || now - (t.renewed_at ?? 0) < STUCK_MS) return;
+  const s = await getSession(t.devin_session_id!).catch(() => null);
+  if (!s || ALIVE.has(s.status ?? '')) return;
+  const claim = await db.prepare('UPDATE threads SET renewed_at = ? WHERE id = ? AND renewed_at = ?').bind(now, t.id, t.renewed_at ?? 0).run();
+  if ((claim.meta?.changes ?? 0) === 0) return;
+  const transcript = msgs.slice(Math.max(0, i - 8), i)
+    .map((m) => `${m.role === 'user' ? 'Customer' : 'Kaal'}: ${m.body.slice(0, 1500).replaceAll('<', '‹').replaceAll('>', '›')}`).join('\n\n');
+  try {
+    const n = await createChatSession(personaOf(t), {
+      threadId: t.id, userId: t.user_id, prompts: await getKaalPrompts(db),
+      continuation: continuationOpening(transcript || '(no earlier messages)', waiting.map((m) => m.body), t.language),
+    });
+    await db.prepare('UPDATE threads SET devin_session_id = ?, devin_cursor = NULL WHERE id = ?').bind(n.session_id, t.id).run();
+    console.log(`Renewed Kaal session for thread ${t.id} (previous status ${s.status}/${(s as { status_detail?: string }).status_detail ?? ''})`);
+  } catch (err) {
+    console.error('Session renewal failed:', err);
+  }
 }
 
 export interface PaymentInfo {
@@ -218,7 +255,7 @@ export const publicThread = (t: Thread, chatCredits = 0) => ({
   placeOfBirth: t.place_of_birth, language: t.language, status: t.status, isFree: !!t.is_free,
   questionsLeft: questionsLeft(t) + (t.source === 'web' && !isExpired(t) ? chatCredits : 0), questionsAllowed: t.questions_allowed,
   expired: isExpired(t), expiresAt: t.expires_at ? new Date(t.expires_at).toISOString() : null, createdAt: t.created_at,
-  kundliId: t.kundli_id ?? null,
+  kundliId: t.kundli_id ?? null, quickLeft: t.quick_credit ?? 0,
 });
 
 export const publicMessage = (m: Message) => ({ id: m.id, role: m.role, body: m.body, createdAt: m.created_at });

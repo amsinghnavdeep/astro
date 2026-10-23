@@ -268,7 +268,7 @@ function buildChatPrompt(p: ChatPersona, opening: string, style: string): string
     p.chartContext,
     '----- END PRECOMPUTED CHART -----',
     'These figures were computed with the Swiss Ephemeris (sidereal, Lahiri, whole-sign) and are authoritative — never contradict or guess them.',
-    'If a question needs data not listed (exact transit dates, a divisional chart, pratyantar dasha, a partner\'s chart, a muhurta), compute it precisely with `pip install pyswisseph` in Python using the same settings. Never invent positions.',
+    'WRITE ONLY (strict): everything you need is in the data above, already calculated exactly. Never open a browser, search the web, run a terminal or shell, write or run code, install anything, or create or read files. Read the data, write the answer and send it. If a detail is not listed (a pratyantar dasha, a muhurta, an exact day), answer from the closest listed period or transit and say the timing is approximate. Never invent positions.',
     '',
     'HOW TO ANSWER:',
     style,
@@ -326,9 +326,22 @@ export const DEFAULT_KAAL_PROMPTS: KaalPrompts = { style: DEFAULT_KAAL_STYLE, fr
 const GENERAL_READING = 'Then give a short general reading for the next 12–18 months: **Predictions** with 4–5 dated bullets (career, money, relationships/marriage, health, family as relevant), each with a month/year window and High/Medium/Low confidence; one **Issue** line, one **Remedy**, and **Ask me next** with 3 specific offers ("Shall I check…?").';
 
 /** Wrap customer text so the agent treats it as data, not instructions. */
-export function wrapCustomerMessage(text: string, language = 'English'): string {
+export function wrapCustomerMessage(text: string, language = 'English', quickWords = 0): string {
   const safe = text.replaceAll('<', '‹').replaceAll('>', '›');
-  return `<customer_message>\n${safe}\n</customer_message>\n(Reply to the customer in ${language} with exactly one message, following your standing instructions.)`;
+  const how = quickWords > 0
+    ? `QUICK ANSWER (the customer paid for a short reply): at most ${quickWords} words in total. Only the **Answer:** with the month/year window and confidence, then one line **Why:** naming the period or transit. No greeting, empathy line, Predictions, Issue, Remedy, past events or Ask me next. End with exactly: "Want the full reading? Ask again with Full."`
+    : 'following your standing instructions';
+  return `<customer_message>\n${safe}\n</customer_message>\n(Reply to the customer in ${language} with exactly one message, ${how}.)`;
+}
+
+/** Instructions for a fresh session that takes over a consultation (the previous session stopped). */
+export function continuationOpening(transcript: string, pending: string[], language: string): string {
+  return [
+    'THIS CONSULTATION IS ALREADY UNDERWAY. Do not greet again or introduce yourself. The conversation so far (for context only, do not repeat it):',
+    '----- BEGIN CONVERSATION -----', transcript, '----- END CONVERSATION -----',
+    'Now answer the customer\'s latest message below in one message.',
+    ...pending.map((q) => wrapCustomerMessage(q, language)),
+  ].join('\n');
 }
 
 /**
@@ -337,13 +350,13 @@ export function wrapCustomerMessage(text: string, language = 'English'): string 
  */
 export async function createChatSession(
   p: ChatPersona,
-  opts: { threadId: string; userId: string; firstQuestion?: string; isFree?: boolean; prompts?: KaalPrompts },
+  opts: { threadId: string; userId: string; firstQuestion?: string; isFree?: boolean; prompts?: KaalPrompts; continuation?: string },
 ): Promise<DevinSession> {
   const k = opts.prompts ?? DEFAULT_KAAL_PROMPTS;
-  const base = opts.firstQuestion
+  const base = opts.continuation ? opts.continuation : opts.firstQuestion
     ? `${k.opening} Then, in the same message, answer the customer's first question below following HOW TO ANSWER (Answer and Why first, everything else after).\n\n${wrapCustomerMessage(opts.firstQuestion, p.language)}`
     : `${k.opening} ${GENERAL_READING} Write it in ${p.language}.`;
-  const opening = opts.isFree ? `${k.freeHook}\n${base}` : base;
+  const opening = opts.isFree && !opts.continuation ? `${k.freeHook}\n${base}` : base;
   const body: Record<string, unknown> = {
     prompt: buildChatPrompt(p, opening, k.style),
     title: `Kaal — ${p.fullName}`,

@@ -8,11 +8,11 @@ type Status = 'awaiting_payment' | 'starting' | 'active' | 'failed';
 type Thread = {
   id: string; fullName: string; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string;
   language: string; status: Status; isFree: boolean; questionsLeft: number; questionsAllowed: number;
-  expired: boolean; expiresAt: string | null; createdAt: string; kundliId: string | null;
+  expired: boolean; expiresAt: string | null; createdAt: string; kundliId: string | null; quickLeft?: number;
 };
 type Msg = { id: string; role: 'user' | 'pandit'; body: string; createdAt: string };
 type Deal = { id?: string; name: string; percent: number; endsOn: string };
-type Pricing = { freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number };
+type Pricing = { quickWords?: number; freeQuestions: number; packQuestions: number; packCents: number; consultationDays: number; currency: string; taxFeePercent: number; extraQuestionCents: number; deal?: Deal | null; business?: boolean; fullPackCents?: number };
 type Me = { walletCents?: number | null; user: { name: string; email: string; accountType?: string; businessName?: string | null }; freeAvailable: boolean; chatCredits: { credits: number; expiresAt: string }[]; pricing: Pricing; languages: string[]; maxChars: number; billing?: BillingInfo };
 type Kundli = { id: string; fullName: string; newborn: boolean; gender: string; dateOfBirth: string; timeOfBirth: string; placeOfBirth: string; timezone: string; latitude: number | null; longitude: number | null };
 type Place = { label: string; latitude: number; longitude: number; timezone: string | null };
@@ -31,6 +31,13 @@ const working = $('working');
 const askForm = $<HTMLFormElement>('ask-form');
 const askInput = $<HTMLTextAreaElement>('ask-input');
 const askSubmit = $<HTMLButtonElement>('ask-submit');
+let quickMode = false;
+const lenButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-len]'));
+for (const b of lenButtons) b.addEventListener('click', () => {
+  quickMode = b.dataset.len === 'quick';
+  for (const x of lenButtons) x.setAttribute('aria-pressed', String(x === b));
+  renderState();
+});
 const askError = $('ask-error');
 const statePanel = $('state-panel');
 const banner = $('banner');
@@ -1065,15 +1072,17 @@ function renderState(): void {
     panel('Complete payment to start', `${money(allIn(p.packCents, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)} for an opening reading and the answer to your question.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
   } else if (t.status === 'failed') {
     panel("Kaal couldn't start this consultation", 'Your question is saved and you were not charged for a failed start.', btn('Retry', retry));
-  } else if (isLive && t.questionsLeft < 1 && pending === 0 && !autoReload()) {
+  } else if (isLive && t.questionsLeft < 1 && !t.quickLeft && pending === 0 && !autoReload()) {
     const b = btn(packLabel(p), () => undefined);
     b.dataset.addq = '';
     panel("You've used all questions in this consultation", `Add ${RELOAD} more for ${money(allIn(p.extraQuestionCents * RELOAD, p.taxFeePercent), p.currency)}${taxFeeNote(p.taxFeePercent)}. After that, ${RELOAD} more are added automatically whenever you run out · ${timeLeft(t)} in this consultation.`, b);
   }
-  askForm.hidden = !isLive || (t.questionsLeft < 1 && !autoReload());
+  askForm.hidden = !isLive || (t.questionsLeft < 1 && !t.quickLeft && !autoReload());
   askSubmit.disabled = sending;
   askInput.placeholder = pending > 0 ? 'Kaal is answering… you can type your next question.' : 'Ask a follow-up about career, marriage, health, money…';
-  $('composer-hint').textContent = t.questionsLeft < 1 ? `${RELOAD} more questions are added automatically when you ask (${autoPrice()}) · ${t.language}` : `${plural(t.questionsLeft, 'question')} left · ${t.language}`;
+  const left = t.questionsLeft < 1 ? `${RELOAD} more questions are added automatically when you ask (${autoPrice()})` : `${plural(t.questionsLeft, 'question')} left`;
+  const quickNote = t.quickLeft ? '1 quick answer already paid' : `Quick: up to ${p.quickWords ?? 60} words, half price (1 question = 2 quick answers)`;
+  $('composer-hint').textContent = quickMode ? `${quickNote} · ${left}` : `${left} · ${t.language}`;
   const inline = $<HTMLButtonElement>('add-inline');
   inline.hidden = !isLive || t.questionsLeft < 1;
   inline.disabled = false;
@@ -1142,7 +1151,7 @@ async function ask(text: string): Promise<void> {
   renderState();
   const { ok, status, data } = await api<{ message: Msg; thread: Thread }>(`/api/threads/${encodeURIComponent(t.id)}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text, language: langSelect.value || t.language, kundliId: aboutSelect.value || undefined }),
+    body: JSON.stringify({ text, language: langSelect.value || t.language, kundliId: aboutSelect.value || undefined, quick: quickMode || undefined }),
   });
   sending = false;
   renderedKey = '';

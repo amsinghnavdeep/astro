@@ -434,3 +434,7 @@ label.check input { width: auto; margin-top: 2px; flex: none; }
 @keyframes boot-breathe { 50% { transform: scale(1.06); } }
 @keyframes av-glow { 0%, 100% { box-shadow: 0 0 0 1px rgba(245,158,11,.5), 0 0 4px rgba(245,158,11,.25); } 50% { box-shadow: 0 0 0 1px rgba(245,158,11,.9), 0 0 16px rgba(245,158,11,.85); } }
 @media (prefers-reduced-motion: reduce) { .boot-mark, .loader-mark, .agent-av { animation: none; } }
+
+.len-toggle { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 999px; overflow: hidden; flex: none; }
+.len-toggle button { border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; }
+.len-toggle button[aria-pressed="true"] { background: var(--saffron, #e8792b); color: #fff; }

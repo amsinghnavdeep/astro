@@ -11,6 +11,7 @@ export interface Prices {
   apiCreditCents: number;
   apiMinRechargeCents: number;
   taxFeePercent: number;
+  quickWords: number;
 }
 type PriceKey = keyof Prices;
 
@@ -22,6 +23,7 @@ export const PRICE_LIMITS: Record<PriceKey, [number, number]> = {
   apiCreditCents: [100, 100_000],
   apiMinRechargeCents: [0, 1_000_000],
   taxFeePercent: [0, 50],
+  quickWords: [30, 150],
 };
 const DB_KEY: Record<PriceKey, string> = {
   chatPackCents: 'chat_pack_cents',
@@ -31,6 +33,7 @@ const DB_KEY: Record<PriceKey, string> = {
   apiCreditCents: 'api_credit_cents',
   apiMinRechargeCents: 'api_min_recharge_cents',
   taxFeePercent: 'tax_fee_percent',
+  quickWords: 'quick_words',
 };
 const FIELDS = Object.keys(DB_KEY) as PriceKey[];
 /** Business & API pay this much less than website prices; the API wallet is in USD cents. */
@@ -39,6 +42,7 @@ const API_PACK_CENTS = [10_000, 25_000, 50_000];
 export const apiPrice = (p: Prices) => ({
   startCents: Math.round((p.chatPackCents * (100 - API_DISCOUNT_PERCENT)) / 100),
   questionCents: Math.round((p.extraQuestionCents * (100 - API_DISCOUNT_PERCENT)) / 100),
+  quickCents: Math.round((p.extraQuestionCents * (100 - API_DISCOUNT_PERCENT)) / 200),
 });
 /** Starting an API consultation (with its first question) uses this many credits; each follow-up uses 1. */
 const CACHE_MS = 15_000;
@@ -51,6 +55,7 @@ const defaults = (): Prices => ({
   apiCreditCents: 500,
   apiMinRechargeCents: 10000,
   taxFeePercent: TAX_FEE_PERCENT_DEFAULT,
+  quickWords: 60,
 });
 
 let cache: { at: number; prices: Prices } | null = null;

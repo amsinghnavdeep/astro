@@ -52,7 +52,7 @@ export const env = {
     get consultationDays() { return int('CONSULTATION_DAYS', 7); },
     get playbook() { return optional('DEVIN_CHAT_PLAYBOOK'); },
     get devinMode() { return optional('DEVIN_CHAT_MODE'); },
-    get maxAcuPerSession() { return int('CHAT_MAX_ACU_PER_SESSION', 20); },
+    get maxAcuPerSession() { return int('CHAT_MAX_ACU_PER_SESSION', 10); },
     get maxMessageChars() { return int('CHAT_MAX_MESSAGE_CHARS', 600); },
   },
 };

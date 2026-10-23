@@ -61,7 +61,7 @@ const MAX_THREADS = 20;
 const pricing = async (db: D1Database, userId?: string) => {
   const p = await chatPrices(db, userId);
   return {
-    freeQuestions: p.freeQuestions, packQuestions: p.chatPackQuestions, packCents: p.chatPackCents, extraQuestionCents: p.extraQuestionCents,
+    freeQuestions: p.freeQuestions, packQuestions: p.chatPackQuestions, packCents: p.chatPackCents, extraQuestionCents: p.extraQuestionCents, quickWords: p.quickWords,
     consultationDays: env.chat.consultationDays, currency: env.stripe.currency, taxFeePercent: p.taxFeePercent,
     deal: p.deal, business: p.business, fullPackCents: p.fullPackCents, fullExtraQuestionCents: p.fullExtraQuestionCents,
   };
@@ -971,7 +971,7 @@ const SEND_ERRORS: Record<SendError, [402 | 409 | 429 | 503, string]> = {
 app.post('/api/threads/:id/messages', async (c) => {
   const t = await ownThread(c);
   if (!t) return c.json({ error: 'Not found' }, 404);
-  const p = z.object({ text: questionText(), language: z.enum(LANGUAGES).optional(), kundliId: z.string().optional() })
+  const p = z.object({ text: questionText(), language: z.enum(LANGUAGES).optional(), kundliId: z.string().optional(), quick: z.boolean().optional() })
     .safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: `Please write a question (up to ${env.chat.maxMessageChars} characters).` }, 400);
   let context: string | undefined;
@@ -981,13 +981,14 @@ app.post('/api/threads/:id/messages', async (c) => {
     context = (await chartContext(k, t.full_name)) ?? undefined;
     if (!context) return c.json({ error: 'Could not calculate that Kundli. Check its birth details.' }, 400);
   }
-  let r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context);
+  const quickWords = p.data.quick ? (await getPrices(c.env.DB)).quickWords : 0;
+  let r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context, quickWords);
   let autoCharged = false;
   const me = c.get('user');
   if (r.error === 'no_questions' && t.source === 'web'
     && ((me && (await walletPay(c.env.DB, me, t, 'topup'))) || (await autoChargeQuestion(c.env.DB, t, t.questions_used)))) {
     autoCharged = true;
-    r = await sendCustomerMessage(c.env.DB, (await getThreadById(c.env.DB, t.id))!, p.data.text, p.data.language, context);
+    r = await sendCustomerMessage(c.env.DB, (await getThreadById(c.env.DB, t.id))!, p.data.text, p.data.language, context, quickWords);
   }
   if (r.error) {
     const [status, error] = SEND_ERRORS[r.error];
@@ -1177,11 +1178,12 @@ const API_SEND_ERRORS: Record<SendError, [402 | 409 | 429 | 503, string, string]
 app.post('/v1/consultations/:id/questions', async (c) => {
   const t = await ownApiThread(c);
   if (!t) return apiError(c, 404, 'not_found', 'Consultation not found.');
-  const p = z.object({ question: questionText(), language: z.enum(LANGUAGES).optional() }).safeParse(await c.req.json().catch(() => null));
+  const p = z.object({ question: questionText(), language: z.enum(LANGUAGES).optional(), quick: z.boolean().optional() }).safeParse(await c.req.json().catch(() => null));
   if (!p.success) return apiError(c, 400, 'invalid_request', `question is required (2–${env.chat.maxMessageChars} characters).`);
-  const qCents = apiPrice(await getPrices(c.env.DB)).questionCents;
+  const prices = await getPrices(c.env.DB);
+  const qCents = p.data.quick ? apiPrice(prices).quickCents : apiPrice(prices).questionCents;
   if ((await apiBalance(c.env.DB, t.user_id)) < qCents) await autoRechargeApi(c.env.DB, t.user_id, qCents);
-  const r = await sendCustomerMessage(c.env.DB, t, p.data.question, p.data.language);
+  const r = await sendCustomerMessage(c.env.DB, t, p.data.question, p.data.language, undefined, p.data.quick ? prices.quickWords : 0);
   if (!r.error) background(c, autoRechargeApi(c.env.DB, t.user_id));
   if (r.error) {
     const [status, code, message] = API_SEND_ERRORS[r.error];

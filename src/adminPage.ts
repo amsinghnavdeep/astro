@@ -239,6 +239,7 @@ export const PRICE_FIELDS: { key: string; label: string; money: boolean; help: s
   { key: 'extraQuestionCents', label: 'Extra question price', money: true, help: 'Before taxes & fees. Auto-reload adds 2 at this price.' },
   { key: 'chatPackQuestions', label: 'Questions in a consultation', money: false, help: 'How many questions the start price includes.' },
   { key: 'freeQuestions', label: 'Free questions for new Personal accounts', money: false, help: '' },
+  { key: 'quickWords', label: 'Quick answer word limit', money: false, help: 'Quick answers cost half an extra question (2 quick answers per question).' },
   { key: 'taxFeePercent', label: 'Taxes & fees %', money: false, help: 'Added on top at checkout.' },
   { key: 'apiMinRechargeCents', label: 'Business activation minimum', money: true, help: 'First wallet payment needed to use the API.' },
 ];
