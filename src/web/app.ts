@@ -347,11 +347,11 @@ async function renderPrices(): Promise<void> {
     ? 'Pay for consultations from your Business wallet.'
     : 'Choose a monthly plan or pay for a consultation only.';
   const subscriptionCards = !isBusiness ? (p.plans ?? []).map((plan) =>
-    priceCard(plan.name, `${money(plan.cents, p.currency)}/month${taxFeeNote(p.taxFeePercent)}`, `${plan.consultations} consultations each month.`),
+    priceCard(plan.name, `${money(plan.cents, p.currency)}/month`, `${plan.consultations} consultations each month${p.taxFeePercent ? ' + taxes & fees' : ''}.`),
   ) : [];
   $('l-prices').replaceChildren(
-    ...(isBusiness ? [priceCard('Pay per consultation', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)}`,
-      'Start a consultation and pay for additional help only if needed.')] : subscriptionCards),
+    ...(isBusiness ? [priceCard('Pay per consultation', money(p.packCents, p.currency),
+      `Start a consultation and pay for additional help only if needed${p.taxFeePercent ? '. Plus taxes & fees' : ''}.`)] : subscriptionCards),
   );
 }
 
