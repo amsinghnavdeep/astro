@@ -223,6 +223,13 @@ function renderSubscriptionMenu(): void {
     return;
   }
   $('account-plan-label').textContent = `Plan · ${sub.planName}`;
+  if (['canceled', 'incomplete_expired', 'unpaid'].includes(sub.status)) {
+    $('account-plan-label').textContent = 'Plan · Choose a plan';
+    $('account-plan-detail').textContent = `${sub.planName} ended`;
+    cancel.hidden = true;
+    resume.hidden = true;
+    return;
+  }
   const pauseSchedule = pauseScheduleText(sub.pauseStartsAt, sub.pausedUntil);
   const until = pauseSchedule
     ? pauseSchedule
