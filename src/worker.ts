@@ -34,7 +34,7 @@ import { affiliatesPage, influencersPage } from './programs.js';
 import { chatPrices, listFestivals, updateFestival } from './festivals.js';
 import { sendExpiryReminders, sendFestivalEmails, sendInfluencerDigests, unsubscribe, validUnsubToken } from './engagement.js';
 import { festivalSchema, isAdmin, postSchema, pricesSchema } from './admin.js';
-import { CODE_RE, createCoupon, listCoupons, normCode, redeemCoupon, setCouponEnabled } from './coupons.js';
+import { CODE_RE, createCoupon, finalizePlanCoupon, listCoupons, normCode, planCouponMonths, redeemCoupon, reservePlanCoupon, setCouponEnabled } from './coupons.js';
 import { apiTokenInfo, AUDIENCES, broadcastLog, checkApiToken, FROM_IDS, renderEmail, resolveRecipients, rotateApiToken, sendBroadcast, sendTest, type AudienceId, type Draft } from './broadcast.js';
 import { isKaalKey, KAAL_FIELDS, KAAL_MAX_CHARS, KAAL_MIN_CHARS, kaalFields, kaalHistory, kaalVersion, setKaalPrompt } from './kaalPrompt.js';
 import { adminPage, blogTab, festivalsTab, filterRows, FILTER_KEYS, noticeHtml, peopleCsv, couponsTab, emailTab, kaalTab, pricesTab, PRICE_FIELDS, toRows, type Filters, type Person } from './adminPage.js';
@@ -49,7 +49,7 @@ import { currencyFor, lockCurrency, type Currency } from './currency.js';
 import { checkPhoneVerification, startPhoneVerification, validPhone } from './phone.js';
 import {
   createSubscriptionCheckout, ensurePlanProduct, markTrialIdentity, planFor, plansForPrices, spendSubscriptionConsultation,
-  ensureTaxFeeProduct, stripeId, subscriptionForUser, subscriptionIdFromInvoice, syncSubscription, trialEligible, type PlanId,
+  ensureStripePlanCoupon, ensureTaxFeeProduct, stripeId, subscriptionForUser, subscriptionIdFromInvoice, syncSubscription, trialEligible, type PlanId,
 } from './subscriptions.js';
 import type { AppEnv } from './types.js';
 
@@ -545,12 +545,13 @@ app.post('/admin/coupons', async (c) => {
   if (!sameSite(c)) return c.html(ownerHtml('Not allowed', ''), 403);
   const f = await formOf(c);
   const code = normCode(f.code ?? '');
-  const kind = f.kind === 'chats' ? 'chats' : 'percent';
+  const kind = f.kind === 'chats' ? 'chats' : f.kind === 'plan' ? 'plan' : 'percent';
   const value = Number(f.value);
   const maxUses = f.max_uses ? Number(f.max_uses) : null;
   const expiresOn = /^\d{4}-\d{2}-\d{2}$/.test(f.expires_on ?? '') ? f.expires_on : null;
   if (!CODE_RE.test(code)) return back(c, 'coupons', '', 'Code: 3–24 letters, numbers, - or _.');
-  if (!Number.isInteger(value) || value < 1 || value > (kind === 'chats' ? 20 : 90)) return back(c, 'coupons', '', kind === 'chats' ? 'Free chats: 1 to 20.' : '% off: 1 to 90.');
+  const maxValue = kind === 'chats' ? 20 : kind === 'plan' ? 3 : 90;
+  if (!Number.isInteger(value) || value < 1 || value > maxValue) return back(c, 'coupons', '', kind === 'chats' ? 'Free chats: 1 to 20.' : kind === 'plan' ? 'Free plan months: 1 to 3.' : '% off: 1 to 90.');
   if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1)) return back(c, 'coupons', '', 'Max people must be 1 or more.');
   const err = await createCoupon(c.env.DB, { code, kind, value, maxUses, expiresOn, note: (f.note ?? '').trim().slice(0, 200) || null }, user.email);
   return err ? back(c, 'coupons', '', err) : back(c, 'coupons', `Coupon ${code} created.`);
@@ -574,6 +575,8 @@ app.get('/redeem', async (c) => {
   const code = normCode(c.req.query('code') ?? '').slice(0, 24);
   const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
   if (!user) return redeemPage(c, `<p class="w-lead">Sign in first, then open this page again to use ${code ? `code <b>${escapeHtml(code)}</b>` : 'your code'}.</p><p><a class="w-cta big" href="/?app=1">Sign in</a></p>`);
+  const coupon = code ? await c.env.DB.prepare('SELECT kind FROM coupons WHERE code = ?').bind(code).first<{ kind: string }>() : null;
+  if (coupon?.kind === 'plan') return redeemPage(c, `<p class="w-lead">Enter this code in the plan window when you choose a plan.</p><p><a class="w-cta big" href="/?app=1">Choose a plan</a></p>`);
   return redeemPage(c, `<p class="w-lead">Free chats are added right away. A % code applies to your next purchase.</p>${redeemForm(code)}`);
 });
 app.post('/redeem', async (c) => {
@@ -581,6 +584,9 @@ app.post('/redeem', async (c) => {
   const user = await userForSession(c.env.DB, getCookie(c, COOKIE));
   if (!user) return redeemPage(c, '<p class="w-lead">Sign in first.</p><p><a class="w-cta big" href="/?app=1">Sign in</a></p>');
   const code = (await formOf(c)).code ?? '';
+  const normalized = normCode(code);
+  const coupon = CODE_RE.test(normalized) ? await c.env.DB.prepare('SELECT kind FROM coupons WHERE code = ?').bind(normalized).first<{ kind: string }>() : null;
+  if (coupon?.kind === 'plan') return redeemPage(c, `<p class="w-lead">Enter this code in the plan window when you choose a plan.</p><p><a class="w-cta big" href="/?app=1">Choose a plan</a></p>`);
   const r = await redeemCoupon(c.env.DB, user, code);
   return r.ok
     ? redeemPage(c, `<p class="w-lead">${escapeHtml(r.message)}</p><p><a class="w-cta big" href="/?app=1">Ask Kaal now</a></p>`)
@@ -750,6 +756,14 @@ app.get('/api/plans', async (c) => {
   return c.json({ ...(await pricing(c.env.DB, user?.id, currency)), ...(await subscriptionPlans(c.env.DB, currency)), languages: LANGUAGES });
 });
 
+app.get('/api/plan-coupon', async (c) => {
+  const user = c.get('user');
+  if (!user) return unauth(c);
+  if (user.account_type === 'business') return c.json({ error: 'Codes are for personal accounts only.' }, 403);
+  const result = await planCouponMonths(c.env.DB, user, c.req.query('code') ?? '');
+  return typeof result === 'string' ? c.json({ error: result }, 400) : c.json(result);
+});
+
 app.get('/api/subscription', async (c) => {
   const user = c.get('user');
   if (!user) return unauth(c);
@@ -845,7 +859,7 @@ app.post('/api/subscribe', async (c) => {
   if (user.account_type === 'business') return c.json({ error: 'Subscriptions are not available for Business accounts.' }, 403);
   const parsed = z.object({
     plan: z.enum(['basic', 'plus', 'pro']), threadId: z.string().min(1).optional(),
-    agreed: z.literal(true), phone: z.string().max(24).optional(),
+    agreed: z.literal(true), phone: z.string().max(24).optional(), coupon: z.string().trim().max(24).optional(),
   })
     .strict().safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: 'Choose a plan and accept the subscription terms.' }, 400);
@@ -873,12 +887,22 @@ app.post('/api/subscribe', async (c) => {
       throw err;
     }
   }
+  let coupon: { code: string; months: number; stripeCouponId: string } | undefined;
+  const couponCode = parsed.data.coupon ? normCode(parsed.data.coupon) : '';
+  if (couponCode) {
+    const reservation = await reservePlanCoupon(c.env.DB, user, couponCode);
+    if (typeof reservation === 'string') return c.json({ error: reservation }, 400);
+    coupon = {
+      code: couponCode, months: reservation.months,
+      stripeCouponId: await ensureStripePlanCoupon(c.env.DB, couponCode, reservation.months),
+    };
+  }
   const keys = await freeKeys(c);
-  const eligible = await trialEligible(c.env.DB, user.id, keys);
+  const eligible = !coupon && await trialEligible(c.env.DB, user.id, keys);
   const trialEnd = new Date(Date.now() + prices.trialDays * 86_400_000).toISOString();
   const url = await createSubscriptionCheckout(c.env.DB, user, {
     plan, eligible, threadId: parsed.data.threadId, taxFeePercent: prices.taxFeePercent,
-    trialDays: prices.trialDays, trialEnd, trialKeys: keys, currency,
+    trialDays: prices.trialDays, trialEnd, trialKeys: keys, currency, coupon,
   }, { ip: c.req.header('cf-connecting-ip') ?? null, userAgent: (c.req.header('user-agent') ?? '').slice(0, 300) || null });
   return c.json({ checkoutUrl: url });
 });
@@ -1305,7 +1329,7 @@ async function subscriptionPaymentMethod(db: D1Database, userId: string, subscri
 async function claimTrialForSubscription(
   db: D1Database, subscription: Stripe.Subscription, fingerprint: string | null,
 ): Promise<Stripe.Subscription> {
-  if (subscription.status !== 'trialing') return subscription;
+  if (subscription.status !== 'trialing' || subscription.metadata?.couponCode) return subscription;
   const userId = subscription.metadata?.userId;
   if (!userId) return subscription;
   const reservation = await db.prepare(
@@ -1365,8 +1389,12 @@ async function completeSubscriptionCheckout(db: D1Database, session: Stripe.Chec
   const subscription = await stripe().subscriptions.retrieve(id, { expand: ['default_payment_method', 'latest_invoice'] });
   const userId = await syncSubscription(db, subscription, session.metadata.userId);
   if (!userId) return null;
+  const couponCode = session.metadata.couponCode || subscription.metadata?.couponCode;
+  if (couponCode && !(await finalizePlanCoupon(db, userId, couponCode))) {
+    throw new Error(`Could not finalize plan coupon ${couponCode}`);
+  }
   const fingerprint = await subscriptionPaymentMethod(db, userId, subscription);
-  const current = await claimTrialForSubscription(db, subscription, fingerprint);
+  const current = couponCode ? subscription : await claimTrialForSubscription(db, subscription, fingerprint);
   const latestInvoice = current.latest_invoice;
   if (latestInvoice && typeof latestInvoice === 'object' && latestInvoice.status === 'paid')
     await applySubscriptionInvoice(db, latestInvoice);
@@ -1392,7 +1420,9 @@ async function applySubscriptionInvoice(db: D1Database, invoice: Stripe.Invoice)
   const plan = planFor(prices, planId, current.currency);
   if (!plan) return;
   let allowance: number | null = null;
-  if (invoice.amount_paid === 0 && invoice.billing_reason === 'subscription_create') allowance = prices.trialConsults;
+  if (invoice.amount_paid === 0 && subscription.metadata?.couponCode
+    && (invoice.billing_reason === 'subscription_create' || invoice.billing_reason === 'subscription_cycle')) allowance = plan.consultations;
+  else if (invoice.amount_paid === 0 && invoice.billing_reason === 'subscription_create' && subscription.status === 'trialing') allowance = prices.trialConsults;
   else if (invoice.amount_paid > 0) allowance = plan.consultations;
   await db.prepare(
     `UPDATE subscriptions SET plan = CASE WHEN ? THEN ? ELSE plan END,

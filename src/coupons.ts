@@ -1,8 +1,8 @@
-/** Owner coupons: % off the next website chat purchase, or free chats added on redeem. Personal accounts only. */
+/** Owner coupons: purchase discounts, free chats, or free plan months. Personal accounts only. */
 import type { D1Database } from '@cloudflare/workers-types';
 import { grantCredits } from './credits.js';
 
-export type CouponKind = 'percent' | 'chats';
+export type CouponKind = 'percent' | 'chats' | 'plan';
 export interface Coupon {
   code: string; kind: CouponKind; value: number; max_uses: number | null; uses: number; expires_on: string | null;
   enabled: number; note: string | null; created_by: string; created_at: string;
@@ -31,6 +31,7 @@ export async function redeemCoupon(db: D1Database, user: { id: string; account_t
   const c = CODE_RE.test(code) ? await db.prepare('SELECT * FROM coupons WHERE code = ?').bind(code).first<Coupon>() : null;
   if (!c || !c.enabled) return { ok: false, message: 'This code is not valid.' };
   if (c.expires_on && c.expires_on < today()) return { ok: false, message: 'This code has expired.' };
+  if (c.kind === 'plan') return { ok: false, message: 'Enter this code in the plan window when you choose a plan.' };
   if (user.account_type === 'business') return { ok: false, message: 'Codes are for personal accounts only.' };
   if (c.max_uses !== null && c.uses >= c.max_uses) return { ok: false, message: 'This code has been fully used.' };
   const ins = await db.prepare(`INSERT INTO coupon_redemptions (id, code, user_id, kind, value, status, created_at, used_at)
@@ -47,6 +48,71 @@ export async function redeemCoupon(db: D1Database, user: { id: string; account_t
     return { ok: true, message: `Done. ${c.value} free ${c.value === 1 ? 'chat was' : 'chats were'} added to your account.` };
   }
   return { ok: true, message: `Done. ${c.value}% off your next purchase is ready and shows at checkout.` };
+}
+
+type PlanCouponResult = { code: string; coupon: Coupon } | { error: string };
+const pendingExpiry = (): string => new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+
+async function availablePlanCoupon(db: D1Database, user: { id: string; account_type?: string }, raw: string): Promise<PlanCouponResult> {
+  const code = normCode(raw);
+  if (!CODE_RE.test(code)) return { error: 'This code is not valid.' };
+  const coupon = await db.prepare('SELECT * FROM coupons WHERE code = ?').bind(code).first<Coupon>();
+  if (!coupon || !coupon.enabled) return { error: 'This code is not valid.' };
+  if (coupon.expires_on && coupon.expires_on < today()) return { error: 'This code has expired.' };
+  if (coupon.kind !== 'plan') return { error: 'This code is not a free plan code.' };
+  if (coupon.value < 1 || coupon.value > 3) return { error: 'This code is not valid.' };
+  if (user.account_type === 'business') return { error: 'Codes are for personal accounts only.' };
+  await db.prepare("DELETE FROM coupon_redemptions WHERE code = ? AND kind = 'plan' AND status = 'pending' AND created_at < ?")
+    .bind(code, pendingExpiry()).run();
+  const redeemed = await db.prepare('SELECT status FROM coupon_redemptions WHERE code = ? AND user_id = ?')
+    .bind(code, user.id).first<{ status: string }>();
+  if (redeemed) return { error: 'You have already used this code.' };
+  const pending = await db.prepare("SELECT COUNT(*) AS count FROM coupon_redemptions WHERE code = ? AND status = 'pending'")
+    .bind(code).first<{ count: number }>();
+  if (coupon.max_uses !== null && coupon.uses + (pending?.count ?? 0) >= coupon.max_uses) {
+    return { error: 'This code has been fully used.' };
+  }
+  return { code, coupon };
+}
+
+export async function planCouponMonths(db: D1Database, user: { id: string; account_type?: string }, raw: string): Promise<{ months: number } | string> {
+  const result = await availablePlanCoupon(db, user, raw);
+  return 'error' in result ? result.error : { months: result.coupon.value };
+}
+
+export async function reservePlanCoupon(db: D1Database, user: { id: string; account_type?: string }, raw: string): Promise<{ months: number } | string> {
+  const result = await availablePlanCoupon(db, user, raw);
+  if ('error' in result) return result.error;
+  const now = nowIso();
+  const expires = today();
+  const cutoff = pendingExpiry();
+  const inserted = await db.prepare(`INSERT INTO coupon_redemptions (id, code, user_id, kind, value, status, created_at, used_at)
+    SELECT ?, coupons.code, ?, coupons.kind, coupons.value, 'pending', ?, NULL
+    FROM coupons
+    WHERE coupons.code = ? AND coupons.kind = 'plan' AND coupons.enabled = 1
+      AND (coupons.expires_on IS NULL OR coupons.expires_on >= ?)
+      AND (coupons.max_uses IS NULL OR coupons.uses + (
+        SELECT COUNT(*) FROM coupon_redemptions
+        WHERE code = coupons.code AND status = 'pending' AND created_at >= ?
+      ) < coupons.max_uses)
+    ON CONFLICT(code, user_id) DO NOTHING`)
+    .bind(crypto.randomUUID(), user.id, now, result.code, expires, cutoff).run();
+  if (inserted.meta?.changes) return { months: result.coupon.value };
+  const retry = await availablePlanCoupon(db, user, result.code);
+  return 'error' in retry ? retry.error : 'This code has been fully used.';
+}
+
+export async function finalizePlanCoupon(db: D1Database, userId: string, raw: string): Promise<boolean> {
+  const code = normCode(raw);
+  const now = nowIso();
+  const updated = await db.prepare(`UPDATE coupon_redemptions SET status = 'used', used_at = ?
+    WHERE code = ? AND user_id = ? AND kind = 'plan' AND status = 'pending'
+      AND EXISTS (SELECT 1 FROM coupons WHERE code = ? AND kind = 'plan' AND (max_uses IS NULL OR uses < max_uses))`)
+    .bind(now, code, userId, code).run();
+  if (updated.meta?.changes) return true;
+  const existing = await db.prepare("SELECT 1 FROM coupon_redemptions WHERE code = ? AND user_id = ? AND kind = 'plan' AND status = 'used'")
+    .bind(code, userId).first();
+  return !!existing;
 }
 
 /** Best unused % code for this person, if still valid. */

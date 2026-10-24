@@ -78,15 +78,34 @@ export async function ensureTaxFeeProduct(db: D1Database): Promise<string> {
   return (await db.prepare('SELECT value FROM settings WHERE key = ?').bind(TAX_PRODUCT_KEY).first<{ value: string }>())?.value ?? product.id;
 }
 
+export async function ensureStripePlanCoupon(db: D1Database, rawCode: string, months: number): Promise<string> {
+  const code = rawCode.trim().toUpperCase();
+  const key = `stripe_coupon_${code}`;
+  const existing = await db.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>();
+  if (existing?.value) return existing.value;
+  const coupon = await stripe().coupons.create({
+    percent_off: 100,
+    duration: months === 1 ? 'once' : 'repeating',
+    ...(months > 1 ? { duration_in_months: months } : {}),
+    metadata: { code },
+  }, { idempotencyKey: `kaalera-plan-coupon:${code}` });
+  await db.prepare(
+    'INSERT INTO settings (key, value, updated_at, updated_by) VALUES (?, ?, ?, ?) ON CONFLICT(key) DO NOTHING',
+  ).bind(key, coupon.id, new Date().toISOString(), 'subscriptions').run();
+  return (await db.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first<{ value: string }>())?.value ?? coupon.id;
+}
+
 export async function createSubscriptionCheckout(
   db: D1Database,
   user: SubscriptionUser,
-  o: { plan: Plan; eligible: boolean; threadId?: string; taxFeePercent: number; trialDays: number; trialEnd: string; trialKeys: FreeKeys; currency: Currency },
+  o: { plan: Plan; eligible: boolean; threadId?: string; taxFeePercent: number; trialDays: number; trialEnd: string; trialKeys: FreeKeys; currency: Currency; coupon?: { code: string; months: number; stripeCouponId: string } },
   request: { ip: string | null; userAgent: string | null },
 ): Promise<string> {
   const consentId = crypto.randomUUID();
+  const trial = o.eligible && !o.coupon;
   const consent = subscriptionDisclaimer({
-    trial: o.eligible, trialEnd: o.trialEnd, monthlyCents: o.plan.cents, taxFeePercent: o.taxFeePercent, currency: o.currency,
+    trial, trialEnd: o.trialEnd, monthlyCents: o.plan.cents, taxFeePercent: o.taxFeePercent, currency: o.currency,
+    ...(o.coupon ? { coupon: { code: o.coupon.code, months: o.coupon.months, planName: o.plan.name } } : {}),
   });
   const now = new Date().toISOString();
   await db.prepare(
@@ -97,13 +116,15 @@ export async function createSubscriptionCheckout(
   const metadata = {
     kind: 'subscription', userId: user.id, plan: o.plan.id, threadId: o.threadId ?? '', consentId,
     trialDeviceKeys: o.trialKeys.devices.join(','), trialIpKey: o.trialKeys.ip ?? '',
+    ...(o.coupon ? { couponCode: o.coupon.code, couponMonths: String(o.coupon.months) } : {}),
   };
   const product = await ensurePlanProduct(db, o.plan);
   const session = await stripe().checkout.sessions.create({
     mode: 'subscription',
     customer: await ensureCustomer(db, user),
-    payment_method_collection: 'always',
-    ...(o.eligible ? {
+    payment_method_collection: o.coupon ? 'if_required' : 'always',
+    ...(o.coupon ? { discounts: [{ coupon: o.coupon.stripeCouponId }] } : {}),
+    ...(trial ? {
       subscription_data: {
         trial_period_days: o.trialDays,
         trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
@@ -150,7 +171,7 @@ export async function syncSubscription(db: D1Database, subscription: Stripe.Subs
   const pausedUntil = subscription.pause_collection?.resumes_at
     ? new Date(subscription.pause_collection.resumes_at * 1000).toISOString() : null;
   const pauseStartsAt = subscription.pause_collection ? currentPeriodEnd : null;
-  const trialing = subscription.status === 'trialing';
+  const trialing = subscription.status === 'trialing' && !meta.couponCode;
   await db.prepare(
     `INSERT INTO subscriptions
       (user_id, stripe_subscription_id, plan, status, trial_end, current_period_end, cancel_at_period_end, currency, paused_until, pause_starts_at, consults_left, last_invoice_id, had_trial, created_at, updated_at)

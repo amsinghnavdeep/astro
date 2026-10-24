@@ -114,6 +114,10 @@ dialog, .modal, .modal-card { background: var(--card); color: var(--text); borde
 .subscription-consent { align-items: flex-start; margin-bottom: 10px; line-height: 1.45; }
 .subscription-consent input { flex: none; margin-top: 3px; }
 #subscription-submit { margin-top: 10px; }
+.subscription-coupon-toggle { display: block; margin: 2px 0 4px; padding: 0; }
+.subscription-coupon { margin: 0 0 4px; }
+.subscription-coupon label { display: grid; gap: 6px; font-size: 13px; }
+.subscription-coupon input { width: 100%; text-transform: uppercase; }
 .manage-offers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .manage-offers .btn { min-height: 44px; height: auto; white-space: normal; }
 #subscription-cancel { margin-top: 8px; }

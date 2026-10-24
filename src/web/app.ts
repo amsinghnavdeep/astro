@@ -1,5 +1,5 @@
 import { confirmPurchase } from './consent.js';
-import { authorizedMonthlyPrice, authorizedPrice, taxFeeNote } from '../disclaimer.js';
+import { authorizedMonthlyPrice, authorizedPrice, planCouponConsent, taxFeeNote } from '../disclaimer.js';
 import { renderMarkdown } from '../markdown.js';
 import { isPdfRequest, markDates, openReport, parseAnswer } from './extras.js';
 import { saveBilling, type BillingInfo } from './billing.js';
@@ -63,6 +63,10 @@ let subscriptionInfo: SubscriptionData | null = null;
 let subscriptionThreadId: string | null = null;
 let overageThreadId: string | null = null;
 let selectedPlanId: Plan['id'] = 'basic';
+let couponPreviewCode = '';
+let couponPreviewMonths = 0;
+let couponPreviewSequence = 0;
+let couponPreviewTimer: number | undefined;
 let threads: Thread[] = [];
 let current: Thread | null = null;
 let kundlis: Kundli[] = [];
@@ -364,7 +368,26 @@ function updatePlanChoice(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-plan-id]').forEach((button) => {
     button.setAttribute('aria-pressed', String(button.dataset.planId === plan.id));
   });
-  $('subscription-submit').textContent = subscriptionInfo.trialEligible
+  const code = $<HTMLInputElement>('subscription-coupon-input').value.trim().toUpperCase();
+  const submit = $<HTMLButtonElement>('subscription-submit');
+  const agreed = $<HTMLInputElement>('subscription-agreed');
+  if (code) {
+    $('subscription-trial-badge').hidden = true;
+    submit.textContent = 'Start free with code';
+    submit.disabled = couponPreviewCode !== code || couponPreviewMonths < 1;
+    agreed.disabled = couponPreviewCode !== code || couponPreviewMonths < 1;
+    $('subscription-consent-copy').textContent = couponPreviewCode === code && couponPreviewMonths > 0
+      ? planCouponConsent({
+        code, months: couponPreviewMonths, planName: plan.name, monthlyCents: plan.cents,
+        taxFeePercent: subscriptionInfo.taxFeePercent, currency: subscriptionInfo.currency,
+      })
+      : 'I agree to the Terms. Check your code to see the free months and plan price.';
+    return;
+  }
+  $('subscription-trial-badge').hidden = !subscriptionInfo.trialEligible;
+  submit.disabled = false;
+  agreed.disabled = false;
+  submit.textContent = subscriptionInfo.trialEligible
     ? `Start ${subscriptionInfo.trialDays}-day free trial` : 'Subscribe';
   $('subscription-consent-copy').textContent = subscriptionInfo.trialEligible
     ? `I agree to the Terms and authorize ${authorizedMonthlyPrice(plan.cents, subscriptionInfo.taxFeePercent, subscriptionInfo.currency)} after my ${subscriptionInfo.trialDays}-day free trial. Cancel anytime from my account.`
@@ -379,6 +402,13 @@ async function openSubscriptionPlans(threadId: string | null = null): Promise<vo
   $('subscription-manage').hidden = true;
   $('subscription-error').textContent = '';
   $<HTMLInputElement>('subscription-agreed').checked = false;
+  $<HTMLInputElement>('subscription-coupon-input').value = '';
+  $('subscription-coupon-entry').hidden = true;
+  $('subscription-coupon-toggle').textContent = 'Have a code?';
+  couponPreviewSequence += 1;
+  couponPreviewCode = '';
+  couponPreviewMonths = 0;
+  if (couponPreviewTimer !== undefined) window.clearTimeout(couponPreviewTimer);
   $('subscription-pay-only').hidden = !threadId;
   const phoneInput = $<HTMLInputElement>('subscription-phone-input');
   phoneInput.value = data.phone ?? '';
@@ -406,12 +436,57 @@ async function openSubscriptionPlans(threadId: string | null = null): Promise<vo
       el('span', 'plan-card-consults', `${plan.consultations} consultations`),
       ...(data.taxFeePercent > 0 ? [el('span', 'plan-card-fee', '+ taxes & fees')] : []),
     );
-    card.addEventListener('click', () => { selectedPlanId = plan.id; updatePlanChoice(); });
+    card.addEventListener('click', () => {
+      if ($<HTMLInputElement>('subscription-coupon-input').value.trim()) $<HTMLInputElement>('subscription-agreed').checked = false;
+      selectedPlanId = plan.id;
+      updatePlanChoice();
+    });
     return card;
   }));
   updatePlanChoice();
   if (!subscriptionModal.open) subscriptionModal.showModal();
 }
+
+$('subscription-coupon-toggle').addEventListener('click', () => {
+  const entry = $('subscription-coupon-entry');
+  entry.hidden = !entry.hidden;
+  $('subscription-coupon-toggle').textContent = entry.hidden ? 'Have a code?' : 'Hide code';
+  if (entry.hidden) {
+    $<HTMLInputElement>('subscription-coupon-input').value = '';
+    $<HTMLInputElement>('subscription-agreed').checked = false;
+    couponPreviewSequence += 1;
+    couponPreviewCode = '';
+    couponPreviewMonths = 0;
+    $('subscription-error').textContent = '';
+    updatePlanChoice();
+  } else {
+    $<HTMLInputElement>('subscription-coupon-input').focus();
+  }
+});
+
+$<HTMLInputElement>('subscription-coupon-input').addEventListener('input', () => {
+  const input = $<HTMLInputElement>('subscription-coupon-input');
+  const code = input.value.trim().toUpperCase();
+  const sequence = ++couponPreviewSequence;
+  $<HTMLInputElement>('subscription-agreed').checked = false;
+  couponPreviewCode = '';
+  couponPreviewMonths = 0;
+  $('subscription-error').textContent = '';
+  if (couponPreviewTimer !== undefined) window.clearTimeout(couponPreviewTimer);
+  updatePlanChoice();
+  if (code.length < 3) return;
+  couponPreviewTimer = window.setTimeout(async () => {
+    const { ok, data } = await api<{ months?: number; error?: string }>(`/api/plan-coupon?code=${encodeURIComponent(code)}`);
+    if (sequence !== couponPreviewSequence || input.value.trim().toUpperCase() !== code) return;
+    if (ok && data.months) {
+      couponPreviewCode = code;
+      couponPreviewMonths = data.months;
+    } else {
+      $('subscription-error').textContent = data.error ?? 'This code is not valid.';
+    }
+    updatePlanChoice();
+  }, 250);
+});
 
 async function openSubscriptionManage(): Promise<void> {
   const data = await refreshSubscription();
@@ -553,13 +628,18 @@ $('subscription-submit').addEventListener('click', async () => {
       return;
     }
   }
+  const coupon = $<HTMLInputElement>('subscription-coupon-input').value.trim().toUpperCase();
+  if (coupon && (couponPreviewCode !== coupon || couponPreviewMonths < 1)) {
+    error.textContent = 'Check your plan code before continuing.';
+    return;
+  }
   const button = $<HTMLButtonElement>('subscription-submit');
   button.disabled = true;
   const { ok, data } = await api<{ checkoutUrl?: string; error?: string }>('/api/subscribe', {
     method: 'POST',
-    body: JSON.stringify({ plan: selectedPlanId, threadId: subscriptionThreadId ?? undefined, agreed: true, phone }),
+    body: JSON.stringify({ plan: selectedPlanId, threadId: subscriptionThreadId ?? undefined, agreed: true, phone, coupon: coupon || undefined }),
   });
-  button.disabled = false;
+  button.disabled = !!coupon && (couponPreviewCode !== coupon || couponPreviewMonths < 1);
   if (!ok || !data.checkoutUrl) { error.textContent = data.error ?? 'Could not open checkout.'; return; }
   location.href = data.checkoutUrl;
 });

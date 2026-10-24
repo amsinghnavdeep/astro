@@ -198,6 +198,10 @@
         <h2>Choose a monthly plan</h2>
         <p class="muted" id="subscription-trial-badge" hidden></p>
         <div class="plan-cards" id="subscription-cards"></div>
+        <button class="text-link subscription-coupon-toggle" type="button" id="subscription-coupon-toggle">Have a code?</button>
+        <div class="subscription-coupon" id="subscription-coupon-entry" hidden>
+          <label>Plan code<input id="subscription-coupon-input" type="text" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Enter your code" /></label>
+        </div>
         <div id="subscription-phone" class="phone-step" hidden>
           <h3 id="subscription-phone-title">Verify your phone</h3>
           <p class="muted" id="subscription-phone-hint">Phone verification is required to start a plan.</p>

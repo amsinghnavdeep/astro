@@ -353,7 +353,7 @@ export function couponsTab(list: Coupon[], site: string, notice = ''): string {
     const expired = !!c.expires_on && c.expires_on < new Date().toISOString().slice(0, 10);
     const link = `${site}/redeem?code=${encodeURIComponent(c.code)}`;
     return `<tr><td><b style="font-family:ui-monospace,monospace;letter-spacing:.5px">${h(c.code)}</b>${c.note ? `<small class="dim" style="display:block">${h(c.note)}</small>` : ''}</td>
-<td>${c.kind === 'percent' ? `${c.value}% off next purchase` : `${c.value} free ${c.value === 1 ? 'chat' : 'chats'}`}</td>
+<td>${c.kind === 'percent' ? `${c.value}% off next purchase` : c.kind === 'plan' ? `${c.value} free ${c.value === 1 ? 'month' : 'months'} of any plan` : `${c.value} free ${c.value === 1 ? 'chat' : 'chats'}`}</td>
 <td class="num">${c.uses} used · ${left}</td><td>${c.expires_on ? h(c.expires_on) : '<span class="dim">never</span>'}</td>
 <td><span class="status ${c.enabled && !expired ? 'st-published' : 'st-draft'}">${expired ? 'Expired' : c.enabled ? 'On' : 'Off'}</span></td>
 <td><code style="user-select:all;font-size:12px">${h(link)}</code></td>
@@ -362,8 +362,8 @@ export function couponsTab(list: Coupon[], site: string, notice = ''): string {
   return shell('coupons', `<section class="card"><h2>NEW COUPON</h2>
 <form method="post" action="/admin/coupons" class="form">
 <div class="two"><label>Code (letters, numbers, - or _)<input name="code" required pattern="[A-Za-z0-9][A-Za-z0-9_\\-]{2,23}" maxlength="24" placeholder="DIWALI20" style="text-transform:uppercase"></label>
-<label>Gives<select name="kind">${opt('percent', 'percent', '% off the next purchase')}${opt('chats', 'percent', 'Free chats')}</select></label></div>
-<div class="two"><label>Amount (% off: 1–90 · free chats: 1–20)<input name="value" type="number" min="1" max="90" required value="10"></label>
+<label>Gives<select name="kind">${opt('percent', 'percent', '% off the next purchase')}${opt('chats', 'percent', 'Free chats')}${opt('plan', 'percent', 'Free plan months (no card)')}</select></label></div>
+<div class="two"><label>Amount (% off: 1–90 · free chats: 1–20 · plan months: 1–3)<input name="value" type="number" min="1" max="90" required value="10"></label>
 <label>Max people (empty = no limit)<input name="max_uses" type="number" min="1" max="100000"></label></div>
 <div class="two"><label>Last day (empty = never ends)<input name="expires_on" type="date"></label><label>Note (only you see it)<input name="note" maxlength="200" placeholder="Influencer X, apology, Diwali..."></label></div>
 <div class="bar-row"><button class="btn">Create coupon</button></div>
