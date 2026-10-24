@@ -56,6 +56,7 @@ const statePanel = $('state-panel');
 const banner = $('banner');
 const langSelect = $<HTMLSelectElement>('lang-select');
 const PENDING_Q = 'kaalera:pendingQuestion';
+const PENDING_FOLLOWUP = 'kaalera:pendingFollowup';
 const STEPS = ['Casting your Kundli…', 'Reading the planets and houses…', 'Checking your dashas and transits…', "Writing Kaal's answer…"];
 
 let me: Me | null = null;
@@ -112,6 +113,22 @@ const pauseScheduleText = (startsAt: string | null, returnsAt: string | null) =>
 const RELOAD = 2;
 const packLabel = (p: Pricing) => `Add ${RELOAD} questions — ${money(p.extraQuestionCents * RELOAD, p.currency)}${taxFeeNote(p.taxFeePercent)}`;
 
+type PendingFollowup = { threadId: string; text: string };
+
+function readPendingFollowup(): PendingFollowup | null {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(PENDING_FOLLOWUP) ?? 'null') as Partial<PendingFollowup> | null;
+    return value && typeof value.threadId === 'string' && typeof value.text === 'string' ? value as PendingFollowup : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingFollowup(threadId: string, text: string): void {
+  const pendingFollowup = readPendingFollowup();
+  if (pendingFollowup?.threadId === threadId && pendingFollowup.text === text) sessionStorage.removeItem(PENDING_FOLLOWUP);
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -164,8 +181,18 @@ async function goToCheckout(threadId: string, btn?: HTMLButtonElement, cents = m
     btn.disabled = true;
     btn.textContent = 'Opening checkout…';
   }
-  const { ok, data } = await api<{ checkoutUrl: string; paid?: boolean }>(`/api/threads/${encodeURIComponent(threadId)}/checkout`, { method: 'POST', body: JSON.stringify({ agreed: true }) });
+  const { ok, data } = await api<{ checkoutUrl: string; paid?: boolean; thread?: Thread }>(`/api/threads/${encodeURIComponent(threadId)}/checkout`, { method: 'POST', body: JSON.stringify({ agreed: true }) });
   if (ok && data.paid) {
+    const pendingFollowup = readPendingFollowup();
+    if (pendingFollowup?.threadId === threadId && data.thread) {
+      sessionStorage.removeItem(PENDING_FOLLOWUP);
+      current = data.thread;
+      upsertThread(data.thread);
+      askInput.value = pendingFollowup.text;
+      autosize();
+      await ask(pendingFollowup.text);
+      return;
+    }
     location.href = `/?t=${encodeURIComponent(threadId)}`;
     return;
   }
@@ -254,12 +281,15 @@ async function refreshSubscription(): Promise<SubscriptionData | null> {
   if (!me || me.user.accountType === 'business') {
     subscriptionInfo = null;
     renderSubscriptionMenu();
+    renderThreads();
     return null;
   }
   const { ok, data } = await api<SubscriptionData>('/api/subscription');
   if (ok) {
     subscriptionInfo = data;
     renderSubscriptionMenu();
+    renderThreads();
+    if (current) renderState();
   }
   return ok ? data : null;
 }
@@ -852,7 +882,11 @@ function renderThreads(): void {
     ...threads.map((t) => {
       const b = el('button', 'thread' + (current?.id === t.id ? ' active' : '') + (t.expired ? ' closed' : ''));
       b.type = 'button';
-      const sub = t.expired || t.status !== 'active' ? timeLeft(t) : `${timeLeft(t)} · ${plural(t.questionsLeft, 'question')}`;
+      const plan = me?.user.accountType !== 'business' ? subscriptionInfo?.subscription : null;
+      const planCount = plan && ['active', 'trialing'].includes(plan.status)
+        ? `${plan.consultsLeft} of ${planAllowance(plan)} consultations left`
+        : null;
+      const sub = t.expired || t.status !== 'active' ? timeLeft(t) : `${timeLeft(t)} · ${planCount ?? plural(t.questionsLeft, 'question')}`;
       b.append(el('div', 't-name', t.fullName), el('div', 't-sub', sub));
       b.addEventListener('click', () => openThread(t));
       return b;
@@ -1517,12 +1551,13 @@ function renderState(): void {
   const p = me.pricing;
   const plan = me.user.accountType !== 'business' ? subscriptionInfo?.subscription : null;
   const hasPlan = !!plan && ['trialing', 'active'].includes(plan.status);
+  const planCount = plan && hasPlan ? `${plan.consultsLeft} of ${planAllowance(plan)} consultations left` : null;
   const planHint = plan && hasPlan
     ? `${plan.consultsLeft} of ${planAllowance(plan)} consultations left on ${plan.planName}${plan.status === 'trialing' ? ' trial' : ''}`
     : '';
   const isLive = t.status === 'active' && !t.expired;
   const paymentBusy = sending || pending > 0 || typing !== null || typingQueue.length > 0;
-  $('q-left').textContent = t.expired ? 'Closed' : t.status === 'active' ? `${plural(t.questionsLeft, 'question')} left` : timeLeft(t);
+  $('q-left').textContent = t.expired ? 'Closed' : t.status === 'active' ? planCount ?? `${plural(t.questionsLeft, 'question')} left` : timeLeft(t);
   langSelect.disabled = t.expired;
   statePanel.replaceChildren();
   statePanel.hidden = true;
@@ -1632,7 +1667,7 @@ async function ask(text: string, overage = false): Promise<void> {
   askInput.value = '';
   autosize();
   renderState();
-  const { ok, status, data } = await api<{ message: Msg; thread: Thread; code?: string; pauseStartsAt?: string; pausedUntil?: string }>(`/api/threads/${encodeURIComponent(t.id)}/messages`, {
+  const { ok, status, data } = await api<{ message: Msg; thread: Thread; code?: string; error?: string; pauseStartsAt?: string; pausedUntil?: string }>(`/api/threads/${encodeURIComponent(t.id)}/messages`, {
     method: 'POST',
     body: JSON.stringify({ text, language: langSelect.value || t.language, kundliId: aboutSelect.value || undefined, quick: quickMode || undefined, overage: overage || undefined }),
   });
@@ -1640,6 +1675,7 @@ async function ask(text: string, overage = false): Promise<void> {
   renderedKey = '';
   if (ok) {
     reloadFailed = false;
+    clearPendingFollowup(t.id, text);
     if ((data as { autoCharged?: boolean }).autoCharged && me?.user.accountType === 'business') me.walletCents = (me.walletCents ?? 0) - me.pricing.extraQuestionCents * RELOAD;
     if ((data as { autoCharged?: boolean }).autoCharged) showBanner(me!.user.accountType === 'business' ? `${RELOAD} more questions added from your Business wallet.` : `${RELOAD} more questions added: ${autoPrice()} charged to card •••• ${me!.billing?.card?.last4 ?? ''}. Receipt emailed.`, 7000);
     pending = Math.max(pending, 1);
@@ -1655,6 +1691,12 @@ async function ask(text: string, overage = false): Promise<void> {
       overageThreadId = t.id;
       overageFollowupText = text;
       $<HTMLDialogElement>('plan-used-up-modal').showModal();
+    } else if (data.error === 'no_questions') {
+      reloadFailed = true;
+      current = { ...t, questionsLeft: 0 };
+      upsertThread(current);
+      sessionStorage.setItem(PENDING_FOLLOWUP, JSON.stringify({ threadId: t.id, text }));
+      void goToCheckout(t.id, undefined, me!.pricing.extraQuestionCents * RELOAD);
     } else if (status === 402) {
       reloadFailed = true;
       current = { ...t, questionsLeft: 0 };
@@ -1685,7 +1727,7 @@ askInput.addEventListener('keydown', (e) => {
 
 /* ---------- boot ---------- */
 
-async function confirmCheckout(sessionId: string): Promise<void> {
+async function confirmCheckout(sessionId: string): Promise<boolean> {
   const { ok, data } = await api<{ paid: boolean; kind?: string; error?: string }>(`/api/checkout/confirm?session_id=${encodeURIComponent(sessionId)}`);
   const p = me!.pricing;
   if (!ok || !data.paid) showBanner(data.error ?? "We couldn't confirm the payment yet. If you were charged, it will appear shortly.");
@@ -1698,6 +1740,7 @@ async function confirmCheckout(sessionId: string): Promise<void> {
   await refreshSubscription();
   if (ok && data.paid) reloadFailed = false;
   renderBiz();
+  return ok && data.paid;
 }
 
 const chatPrices = () => ({ extraQuestionCents: me!.pricing.extraQuestionCents, taxFeePercent: me!.pricing.taxFeePercent, apiCreditCents: 0, currency: me!.pricing.currency as 'usd' | 'inr' });
@@ -1773,7 +1816,7 @@ async function boot(): Promise<void> {
     localStorage.removeItem(BIZ_SIGNUP);
     if (me.user.accountType !== 'business') $('biz-toggle').click();
   }
-  const deepLink = params.has('t') || params.has('checkout') || params.has('app') || !!sessionStorage.getItem(PENDING_Q);
+  const deepLink = params.has('t') || params.has('checkout') || params.has('app') || !!sessionStorage.getItem(PENDING_Q) || !!readPendingFollowup();
   if (!deepLink && !enteringApp) {
     landingView.hidden = false;
     appView.hidden = true;
@@ -1806,14 +1849,24 @@ async function boot(): Promise<void> {
 
   const checkout = params.get('checkout');
   const wantedId = params.get('t');
-  const confirming = checkout?.startsWith('cs_') ? confirmCheckout(checkout) : null;
-  if (confirming) await confirming;
+  const checkoutPaid = checkout?.startsWith('cs_') ? await confirmCheckout(checkout) : false;
   const { data } = await api<{ threads: Thread[] }>('/api/threads');
   threads = data.threads ?? [];
   const keepBanner = !banner.hidden ? banner.textContent : null;
   const pendingQ = sessionStorage.getItem(PENDING_Q);
-  const wanted = threads.find((t) => t.id === wantedId);
-  if (wanted) openThread(wanted);
+  const pendingFollowup = readPendingFollowup();
+  const wanted = threads.find((t) => t.id === wantedId) ?? threads.find((t) => t.id === pendingFollowup?.threadId);
+  if (wanted) {
+    openThread(wanted);
+    if (pendingFollowup?.threadId === wanted.id) {
+      askInput.value = pendingFollowup.text;
+      autosize();
+      if (checkoutPaid) {
+        sessionStorage.removeItem(PENDING_FOLLOWUP);
+        void ask(pendingFollowup.text);
+      }
+    }
+  }
   else if (pendingQ || !threads.length) showProfile(pendingQ ?? '');
   else openThread(threads[0]);
   if (params.get('account') === '1') void openSubscriptionManage();
