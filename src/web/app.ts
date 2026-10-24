@@ -62,6 +62,7 @@ let me: Me | null = null;
 let subscriptionInfo: SubscriptionData | null = null;
 let subscriptionThreadId: string | null = null;
 let overageThreadId: string | null = null;
+let overageFollowupText: string | null = null;
 let selectedPlanId: Plan['id'] = 'basic';
 let couponPreviewCode = '';
 let couponPreviewMonths = 0;
@@ -304,14 +305,32 @@ function showDeal(p: Pricing): void {
 const SHARE_SNOOZE_MS = 3 * 86_400_000;
 let shareShown = false;
 let shareThreadId = '';
+let shareTimer = 0;
+
+function shareBlocked(): boolean {
+  return sending || !working.hidden || appView.hidden || !!askInput.value.trim()
+    || document.activeElement === askInput || typing !== null || typingQueue.length > 0
+    || pending > 0 || !!document.querySelector('dialog[open]');
+}
+
+function scheduleShare(delay = 4000): void {
+  if (shareTimer) clearTimeout(shareTimer);
+  shareTimer = window.setTimeout(() => {
+    shareTimer = 0;
+    if (shareShown) return;
+    if (shareBlocked()) { scheduleShare(1000); return; }
+    void maybeShare('customer');
+  }, delay);
+}
 
 /** Corner card asking to share a referral or influencer link: once per visit, 3-day snooze after closing, never while busy. */
 async function maybeShare(kind: 'customer' | 'influencer'): Promise<void> {
   const key = `kaalera:share:${kind}`;
   if (shareShown || Date.now() - Number(localStorage.getItem(key) || 0) < SHARE_SNOOZE_MS) return;
-  if (sending || !working.hidden || appView.hidden || askInput.value.trim()) return;
+  if (shareBlocked()) return;
   const { ok, data } = await api<{ referral: { link: string }; influencer: { link: string; status: string; percent: number } | null }>('/api/partner');
   if (!ok || shareShown) return;
+  if (shareBlocked()) { scheduleShare(1000); return; }
   const inf = data.influencer?.status === 'active' ? data.influencer : null;
   if (kind === 'influencer' && !inf) return;
   shareShown = true;
@@ -658,11 +677,18 @@ $('subscription-pay-only').addEventListener('click', () => {
   void goToCheckout(threadId);
 });
 
-$('overage-cancel').addEventListener('click', () => $<HTMLDialogElement>('plan-used-up-modal').close());
+$('overage-cancel').addEventListener('click', () => {
+  overageFollowupText = null;
+  $<HTMLDialogElement>('plan-used-up-modal').close();
+});
 $('overage-continue').addEventListener('click', () => {
   const id = overageThreadId;
   $<HTMLDialogElement>('plan-used-up-modal').close();
-  if (id) void goToCheckout(id);
+  if (id && overageFollowupText && current?.id === id) {
+    const text = overageFollowupText;
+    overageFollowupText = null;
+    void ask(text, true);
+  } else if (id) void goToCheckout(id);
 });
 
 type SkyPlanet = { name: string; nakshatra: string; retrograde: boolean };
@@ -1372,6 +1398,7 @@ let typing: { id: string; done: number } | null = null;
  * Progress lives in `typing`, so a re-render resumes where it left off instead of jumping to the end.
  */
 function typeOut(div: HTMLElement, state: { id: string; done: number }): void {
+  if (shareTimer) { clearTimeout(shareTimer); shareTimer = 0; }
   const body = div.querySelector<HTMLElement>('.body');
   if (!body) return;
   type Step = { node: Text | null; words: string[]; block: HTMLElement };
@@ -1408,7 +1435,10 @@ function typeOut(div: HTMLElement, state: { id: string; done: number }): void {
     typed.add(state.id);
     typing = null;
     if (typingQueue.length) { renderedKey = ''; renderMessages(lastMsgs); }
-    else if (nearBottom()) scroller.scrollTop = scroller.scrollHeight;
+    else {
+      if (nearBottom()) scroller.scrollTop = scroller.scrollHeight;
+      if (pending === 0 && shareThreadId === current?.id) scheduleShare();
+    }
   };
   clearInterval(typingTimer);
   if (i >= steps.length) { finish(); return; }
@@ -1429,7 +1459,11 @@ function renderMessages(msgs: Msg[]): void {
   const stick = nearBottom() || !renderedKey || msgs.at(-1)?.role === 'user';
   renderedKey = key;
   const tid = current?.id ?? '';
-  if (seen?.threadId !== tid) { typingQueue = []; typing = null; }
+  if (seen?.threadId !== tid) {
+    typingQueue = [];
+    typing = null;
+    if (shareTimer) { clearTimeout(shareTimer); shareTimer = 0; }
+  }
   const fresh = seen?.threadId === tid
     ? msgs.filter((m) => m.role !== 'user' && !seen!.ids.has(m.id) && !typed.has(m.id))
     : [];
@@ -1481,7 +1515,13 @@ function renderState(): void {
   const t = current;
   if (!t || !me) return;
   const p = me.pricing;
+  const plan = me.user.accountType !== 'business' ? subscriptionInfo?.subscription : null;
+  const hasPlan = !!plan && ['trialing', 'active'].includes(plan.status);
+  const planHint = plan && hasPlan
+    ? `${plan.consultsLeft} of ${planAllowance(plan)} consultations left on ${plan.planName}${plan.status === 'trialing' ? ' trial' : ''}`
+    : '';
   const isLive = t.status === 'active' && !t.expired;
+  const paymentBusy = sending || pending > 0 || typing !== null || typingQueue.length > 0;
   $('q-left').textContent = t.expired ? 'Closed' : t.status === 'active' ? `${plural(t.questionsLeft, 'question')} left` : timeLeft(t);
   langSelect.disabled = t.expired;
   statePanel.replaceChildren();
@@ -1506,19 +1546,30 @@ function renderState(): void {
     panel('Complete payment to start', `${money(p.packCents, p.currency)}${taxFeeNote(p.taxFeePercent)} for an opening reading and the answer to your question.`, btn('Complete payment to start', (b) => goToCheckout(t.id, b)));
   } else if (t.status === 'failed') {
     panel("Kaal couldn't start this consultation", 'Your question is saved and you were not charged for a failed start.', btn('Retry', retry));
-  } else if (isLive && t.questionsLeft < 1 && !t.quickLeft && pending === 0 && !autoReload()) {
+  } else if (isLive && reloadFailed && t.questionsLeft < 1 && !t.quickLeft && !paymentBusy && !autoReload()) {
     const b = btn(packLabel(p), () => undefined);
     b.dataset.addq = '';
     panel("You've used all questions in this consultation", `Add ${RELOAD} more for ${money(p.extraQuestionCents * RELOAD, p.currency)}${taxFeeNote(p.taxFeePercent)}. After that, ${RELOAD} more are added automatically whenever you run out · ${timeLeft(t)} in this consultation.`, b);
   }
-  askForm.hidden = !isLive || (t.questionsLeft < 1 && !t.quickLeft && !autoReload());
+  askForm.hidden = !isLive;
   askSubmit.disabled = sending;
   askInput.placeholder = pending > 0 ? 'Kaal is answering… you can type your next question.' : 'Ask a follow-up about career, marriage, health, money…';
-  const left = t.questionsLeft < 1 ? `Next ${RELOAD} questions added when you ask (${autoPrice()})` : `${plural(t.questionsLeft, 'question')} left`;
+  const hint = $('composer-hint');
   const quickNote = t.quickLeft ? '1 quick answer already paid' : `Quick: up to ${p.quickWords ?? 60} words, half price (1 question = 2 quick answers)`;
-  $('composer-hint').textContent = quickMode ? `${quickNote} · ${left}` : `${left} · ${t.language}`;
+  hint.replaceChildren();
+  if (plan && hasPlan) {
+    if (quickMode) hint.append(el('span', '', `${quickNote} · `));
+    hint.append(el('span', '', planHint));
+  } else if (t.questionsLeft < 1) {
+    if (quickMode) hint.append(el('span', '', `${quickNote} · `));
+    hint.append(el('span', '', 'Ask a follow-up'));
+    hint.append(el('small', 'composer-hint-price', `${money(p.extraQuestionCents, p.currency)}${me.user.accountType === 'business' ? '' : taxFeeNote(p.taxFeePercent)} per question`));
+  } else {
+    const left = `${plural(t.questionsLeft, 'question')} left`;
+    hint.textContent = quickMode ? `${quickNote} · ${left}` : `${left} · ${t.language}`;
+  }
   const inline = $<HTMLButtonElement>('add-inline');
-  inline.hidden = !isLive || t.questionsLeft < 1;
+  inline.hidden = !isLive || t.questionsLeft < 1 || (!!plan && hasPlan && plan.consultsLeft > 0);
   inline.disabled = false;
   inline.textContent = packLabel(p);
   setWorking((t.status === 'starting' || pending > 0) && !t.expired);
@@ -1548,11 +1599,9 @@ async function poll(): Promise<void> {
   if (current?.id !== id) return;
   if (ok) {
     pending = data.pending;
+    if (pending > 0 && shareTimer) { clearTimeout(shareTimer); shareTimer = 0; }
     upsertThread(data.thread);
-    const prevLast = lastMsgs.at(-1)?.id;
     renderMessages(data.messages);
-    const last = data.messages.at(-1);
-    if (shareThreadId === id && last && last.role !== 'user' && last.id !== prevLast && data.pending === 0) window.setTimeout(() => void maybeShare('customer'), 4000);
     shareThreadId = id;
     renderState();
   }
@@ -1565,7 +1614,7 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden && current) poll();
 });
 
-async function ask(text: string): Promise<void> {
+async function ask(text: string, overage = false): Promise<void> {
   text = text.trim();
   if (!current || !text || sending) return;
   askError.textContent = '';
@@ -1583,9 +1632,9 @@ async function ask(text: string): Promise<void> {
   askInput.value = '';
   autosize();
   renderState();
-  const { ok, status, data } = await api<{ message: Msg; thread: Thread }>(`/api/threads/${encodeURIComponent(t.id)}/messages`, {
+  const { ok, status, data } = await api<{ message: Msg; thread: Thread; code?: string; pauseStartsAt?: string; pausedUntil?: string }>(`/api/threads/${encodeURIComponent(t.id)}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text, language: langSelect.value || t.language, kundliId: aboutSelect.value || undefined, quick: quickMode || undefined }),
+    body: JSON.stringify({ text, language: langSelect.value || t.language, kundliId: aboutSelect.value || undefined, quick: quickMode || undefined, overage: overage || undefined }),
   });
   sending = false;
   renderedKey = '';
@@ -1595,10 +1644,18 @@ async function ask(text: string): Promise<void> {
     if ((data as { autoCharged?: boolean }).autoCharged) showBanner(me!.user.accountType === 'business' ? `${RELOAD} more questions added from your Business wallet.` : `${RELOAD} more questions added: ${autoPrice()} charged to card •••• ${me!.billing?.card?.last4 ?? ''}. Receipt emailed.`, 7000);
     pending = Math.max(pending, 1);
     upsertThread(data.thread);
+    await refreshSubscription();
   } else {
     askInput.value = text;
     autosize();
-    if (status === 402) {
+    if ((data.code === 'plan_used_up' || data.code === 'plan_paused') && data.thread) {
+      reloadFailed = false;
+      current = data.thread;
+      upsertThread(data.thread);
+      overageThreadId = t.id;
+      overageFollowupText = text;
+      $<HTMLDialogElement>('plan-used-up-modal').showModal();
+    } else if (status === 402) {
       reloadFailed = true;
       current = { ...t, questionsLeft: 0 };
       upsertThread(current);

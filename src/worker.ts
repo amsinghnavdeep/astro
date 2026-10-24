@@ -48,7 +48,7 @@ import { creditBalance, creditLots, grantCredits, spendCredit } from './credits.
 import { currencyFor, lockCurrency, type Currency } from './currency.js';
 import { checkPhoneVerification, startPhoneVerification, validPhone } from './phone.js';
 import {
-  createSubscriptionCheckout, ensurePlanProduct, markTrialIdentity, planFor, plansForPrices, spendSubscriptionConsultation,
+  createSubscriptionCheckout, ensurePlanProduct, markTrialIdentity, planFor, plansForPrices, spendSubscriptionConsultation, spendSubscriptionQuestion,
   ensureStripePlanCoupon, ensureTaxFeeProduct, stripeId, subscriptionForUser, subscriptionIdFromInvoice, syncSubscription, trialEligible, type PlanId,
 } from './subscriptions.js';
 import type { AppEnv } from './types.js';
@@ -1111,7 +1111,7 @@ app.post('/api/threads', async (c) => {
       const sub = await subscriptionForUser(db, user.id);
       if (sub && ['trialing', 'active'].includes(sub.status)) {
         if (await spendSubscriptionConsultation(db, user.id, t.id)) {
-          t.questions_allowed = pr.chatPackQuestions;
+          t.questions_allowed = 1;
           covered = true;
         } else if (!body.data.overage) {
           const fresh = (await getThreadById(db, t.id))!;
@@ -1287,7 +1287,7 @@ const SEND_ERRORS: Record<SendError, [402 | 409 | 429 | 503, string]> = {
 app.post('/api/threads/:id/messages', async (c) => {
   const t = await ownThread(c);
   if (!t) return c.json({ error: 'Not found' }, 404);
-  const p = z.object({ text: questionText(), language: z.enum(LANGUAGES).optional(), kundliId: z.string().optional(), quick: z.boolean().optional() })
+  const p = z.object({ text: questionText(), language: z.enum(LANGUAGES).optional(), kundliId: z.string().optional(), quick: z.boolean().optional(), overage: z.boolean().optional() })
     .safeParse(await c.req.json().catch(() => null));
   if (!p.success) return c.json({ error: `Please write a question (up to ${env.chat.maxMessageChars} characters).` }, 400);
   let context: string | undefined;
@@ -1298,13 +1298,35 @@ app.post('/api/threads/:id/messages', async (c) => {
     if (!context) return c.json({ error: 'Could not calculate that Kundli. Check its birth details.' }, 400);
   }
   const quickWords = p.data.quick ? (await getPrices(c.env.DB)).quickWords : 0;
-  let r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context, quickWords);
+  const messageId = crypto.randomUUID();
+  let r = await sendCustomerMessage(c.env.DB, t, p.data.text, p.data.language, context, quickWords, messageId);
   let autoCharged = false;
   const me = c.get('user');
+  if (r.error === 'no_questions' && me && me.account_type !== 'business') {
+    const subscription = await subscriptionForUser(c.env.DB, me.id);
+    if (subscription && ['trialing', 'active'].includes(subscription.status)) {
+      const ref = `plan-question:${messageId}`;
+      if (await spendSubscriptionQuestion(c.env.DB, me.id, t.id, ref)) {
+        await c.env.DB.prepare(
+          'UPDATE threads SET questions_allowed = questions_allowed + 1 WHERE id = ? AND user_id = ?',
+        ).bind(t.id, me.id).run();
+        r = await sendCustomerMessage(c.env.DB, (await getThreadById(c.env.DB, t.id))!, p.data.text, p.data.language, context, quickWords, messageId);
+      } else if (!p.data.overage) {
+        const now = Date.now();
+        const paused = !!(subscription.pause_starts_at && subscription.paused_until
+          && Date.parse(subscription.pause_starts_at) <= now && Date.parse(subscription.paused_until) > now);
+        return c.json({
+          thread: await pubT(c, (await getThreadById(c.env.DB, t.id))!),
+          code: paused ? 'plan_paused' : 'plan_used_up',
+          ...(paused ? { pauseStartsAt: subscription.pause_starts_at, pausedUntil: subscription.paused_until } : {}),
+        }, 402);
+      }
+    }
+  }
   if (r.error === 'no_questions' && t.source === 'web'
     && ((me && (await walletPay(c.env.DB, me, t, 'topup'))) || (await autoChargeQuestion(c.env.DB, t, t.questions_used)))) {
     autoCharged = true;
-    r = await sendCustomerMessage(c.env.DB, (await getThreadById(c.env.DB, t.id))!, p.data.text, p.data.language, context, quickWords);
+    r = await sendCustomerMessage(c.env.DB, (await getThreadById(c.env.DB, t.id))!, p.data.text, p.data.language, context, quickWords, messageId);
   }
   if (r.error) {
     const [status, error] = SEND_ERRORS[r.error];
@@ -1371,14 +1393,13 @@ async function claimTrialForSubscription(
 async function startSubscriptionThread(db: D1Database, userId: string, threadId: string | null): Promise<void> {
   if (!threadId) return;
   const consumed = await spendSubscriptionConsultation(db, userId, threadId);
-  const prior = consumed || await db.prepare('SELECT 1 FROM subscription_usages WHERE thread_id = ? AND user_id = ?')
-    .bind(threadId, userId).first();
+  const prior = consumed || await db.prepare('SELECT 1 FROM subscription_usages WHERE id = ? AND user_id = ?')
+    .bind(`thread:${threadId}`, userId).first();
   if (!prior) return;
   const t = await getThreadById(db, threadId);
   if (!t || t.user_id !== userId || t.status !== 'awaiting_payment') return;
-  const p = await chatPrices(db, userId);
   await db.prepare('UPDATE threads SET questions_allowed = ? WHERE id = ? AND status = ?')
-    .bind(p.chatPackQuestions, threadId, 'awaiting_payment').run();
+    .bind(1, threadId, 'awaiting_payment').run();
   await startThreadSession(db, (await getThreadById(db, threadId))!);
 }
 

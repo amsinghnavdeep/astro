@@ -202,14 +202,29 @@ export async function spendSubscriptionConsultation(
   db: D1Database, userId: string, threadId: string, now = new Date().toISOString(),
 ): Promise<boolean> {
   const result = await db.prepare(
-    `INSERT INTO subscription_usages (thread_id, user_id, stripe_subscription_id, created_at)
-     SELECT t.id, s.user_id, s.stripe_subscription_id, ?
+    `INSERT INTO subscription_usages (id, thread_id, user_id, stripe_subscription_id, created_at)
+     SELECT 'thread:' || t.id, t.id, s.user_id, s.stripe_subscription_id, ?
      FROM threads t JOIN subscriptions s ON s.user_id = t.user_id
      WHERE t.id = ? AND t.user_id = ? AND t.status = 'awaiting_payment'
        AND s.consults_left > 0 AND s.status IN ('trialing', 'active')
        AND (s.paused_until IS NULL OR s.paused_until <= ? OR (s.pause_starts_at IS NOT NULL AND ? < s.pause_starts_at))
-     ON CONFLICT(thread_id) DO NOTHING`,
+     ON CONFLICT(id) DO NOTHING`,
   ).bind(now, threadId, userId, now, now).run();
+  return (result.meta?.changes ?? 0) > 0;
+}
+
+export async function spendSubscriptionQuestion(
+  db: D1Database, userId: string, threadId: string, ref: string, now = new Date().toISOString(),
+): Promise<boolean> {
+  const result = await db.prepare(
+    `INSERT INTO subscription_usages (id, thread_id, user_id, stripe_subscription_id, created_at)
+     SELECT ?, t.id, s.user_id, s.stripe_subscription_id, ?
+     FROM threads t JOIN subscriptions s ON s.user_id = t.user_id
+     WHERE t.id = ? AND t.user_id = ? AND t.status <> 'awaiting_payment'
+       AND s.consults_left > 0 AND s.status IN ('trialing', 'active')
+       AND (s.paused_until IS NULL OR s.paused_until <= ? OR (s.pause_starts_at IS NOT NULL AND ? < s.pause_starts_at))
+     ON CONFLICT(id) DO NOTHING`,
+  ).bind(ref, now, threadId, userId, now, now).run();
   return (result.meta?.changes ?? 0) > 0;
 }
 

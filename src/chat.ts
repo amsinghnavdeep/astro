@@ -117,12 +117,12 @@ export function pendingCount(messages: Message[]): number {
 export type SendError = 'no_questions' | 'expired' | 'too_many_pending' | 'thread_unavailable' | 'delivery_failed';
 
 export async function sendCustomerMessage(
-  db: D1Database, t: Thread, text: string, language?: string, context?: string, quickWords = 0,
+  db: D1Database, t: Thread, text: string, language?: string, context?: string, quickWords = 0, messageId = crypto.randomUUID(),
 ): Promise<{ message?: Message; error?: SendError }> {
   if (t.status !== 'active' || !t.devin_session_id) return { error: 'thread_unavailable' };
   if (isExpired(t)) return { error: 'expired' };
   if (pendingCount(await listMessages(db, t.id)) >= MAX_UNANSWERED) return { error: 'too_many_pending' };
-  const id = crypto.randomUUID();
+  const id = messageId;
   const ref = `question:${id}`;
   let fromCredits = false;
   const quick = quickWords > 0;
